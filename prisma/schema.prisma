@@ -146,6 +146,15 @@ model Listing {
   fromWho      String      @default("Sahibinden")
   exchangeAllowed Boolean  @default(false)
   damageRecord  String?
+  tramerAmount  Decimal?    @db.Decimal(12, 2)
+  severeDamage  Boolean     @default(false)
+  paintedParts  Json?
+  changedParts  Json?
+  mechanicalStatus String?
+  maintenanceHistory String?
+  appraisalReport String?
+  damageParts Json?
+  equipment   Json?
   price       Decimal?       @db.Decimal(12, 2)
   currency    String         @default("TRY")
   listingType ListingType

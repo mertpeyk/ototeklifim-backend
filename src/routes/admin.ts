@@ -100,6 +100,7 @@ const listingPayloadSchema = z.object({
       }),
     ),
   }),
+  equipment: z.array(z.string()).optional().default([]),
   photos: z.array(
     z.object({
       id: z.string(),
@@ -427,15 +428,16 @@ async function buildAdminRepository() {
         district: listing.district ?? '',
       },
       condition: {
-        tramerAmount: toNumber(listing.damageRecord),
-        severeDamage: false,
-        paintedParts: [],
-        changedParts: [],
-        mechanicalStatus: 'Bilgi girilmedi',
-        maintenanceHistory: 'Bilgi girilmedi',
-        appraisalReport: 'Bekleniyor',
-        damageParts: [],
+        tramerAmount: toNumber(listing.tramerAmount ?? listing.damageRecord),
+        severeDamage: listing.severeDamage,
+        paintedParts: parseArray<string>(listing.paintedParts),
+        changedParts: parseArray<string>(listing.changedParts),
+        mechanicalStatus: listing.mechanicalStatus ?? 'Bilgi girilmedi',
+        maintenanceHistory: listing.maintenanceHistory ?? 'Bilgi girilmedi',
+        appraisalReport: listing.appraisalReport ?? 'Bekleniyor',
+        damageParts: parseArray<{ key: string; label: string; status: string }>(listing.damageParts),
       },
+      equipment: parseArray<string>(listing.equipment),
     })),
     consignments: consignments.map((request) => {
       const vehicle = parseObject<Record<string, unknown>>(request.vehicleInfo, {});
@@ -732,6 +734,15 @@ export async function adminRoutes(app: FastifyInstance) {
         listingType: 'FIXED_PRICE',
         status: listingStatusMap[payload.status],
         damageRecord: String(payload.condition.tramerAmount),
+        tramerAmount: payload.condition.tramerAmount,
+        severeDamage: payload.condition.severeDamage,
+        paintedParts: payload.condition.paintedParts,
+        changedParts: payload.condition.changedParts,
+        mechanicalStatus: payload.condition.mechanicalStatus,
+        maintenanceHistory: payload.condition.maintenanceHistory,
+        appraisalReport: payload.condition.appraisalReport,
+        damageParts: payload.condition.damageParts,
+        equipment: payload.equipment,
         moderationNote: '',
         images: {
           create: payload.photos.map((photo, index) => ({
@@ -786,6 +797,15 @@ export async function adminRoutes(app: FastifyInstance) {
         price: payload.price,
         status: listingStatusMap[payload.status],
         damageRecord: String(payload.condition.tramerAmount),
+        tramerAmount: payload.condition.tramerAmount,
+        severeDamage: payload.condition.severeDamage,
+        paintedParts: payload.condition.paintedParts,
+        changedParts: payload.condition.changedParts,
+        mechanicalStatus: payload.condition.mechanicalStatus,
+        maintenanceHistory: payload.condition.maintenanceHistory,
+        appraisalReport: payload.condition.appraisalReport,
+        damageParts: payload.condition.damageParts,
+        equipment: payload.equipment,
         images: {
           create: payload.photos.map((photo, index) => ({
             imageUrl: photo.url,
