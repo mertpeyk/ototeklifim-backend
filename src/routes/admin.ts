@@ -249,7 +249,7 @@ function mapOfferStatus(status: OfferStatus) {
 }
 
 function mapUserRole() {
-  return 'SUPER_ADMIN';
+  return 'ADMIN';
 }
 
 function buildPermissions() {
