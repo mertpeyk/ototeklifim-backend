@@ -65,6 +65,28 @@ enum DealerAssignmentStatus {
   WITHDRAWN
 }
 
+enum FastSaleStatus {
+  NEW
+  UNDER_REVIEW
+  APPROVED
+  OFFER_SENT
+  COUNTER_OFFER_RECEIVED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum OfferStatus {
+  DRAFT
+  SENT
+  COUNTERED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+  EXPIRED
+}
+
 model User {
   id                  String                @id @default(cuid())
   accountType         AccountType           @default(INDIVIDUAL)
@@ -95,6 +117,8 @@ model User {
   sellerConversations Conversation[]        @relation("ConversationSeller")
   consignmentRequests ConsignmentRequest[]
   dealerAssignments   DealerAssignment[]    @relation("AssignedDealer")
+  fastSaleRequests    FastSaleRequest[]
+  adminNotes          AdminUserNote[]
 }
 
 model Listing {
@@ -298,4 +322,85 @@ model ConsignmentTimeline {
   consignment   ConsignmentRequest   @relation(fields: [requestId], references: [id], onDelete: Cascade)
 
   @@index([requestId, createdAt])
+}
+
+model FastSaleRequest {
+  id                   String           @id @default(cuid())
+  requestNo            String           @unique
+  userId               String
+  status               FastSaleStatus   @default(NEW)
+  vehicleInfo          Json
+  condition            Json
+  photos               Json
+  expectedPrice        Decimal          @db.Decimal(12, 2)
+  estimatedMarketValue Decimal          @db.Decimal(12, 2)
+  quickSaleValue       Decimal          @db.Decimal(12, 2)
+  dealerBuyValue       Decimal          @db.Decimal(12, 2)
+  valuationSummary     String           @db.Text
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offers               FastSaleOffer[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model FastSaleOffer {
+  id                String        @id @default(cuid())
+  requestId         String
+  amount            Decimal       @db.Decimal(12, 2)
+  status            OfferStatus   @default(SENT)
+  validUntil        DateTime
+  appraisalRequired Boolean       @default(false)
+  pickupOption      String
+  paymentMethod     String
+  adminNote         String        @default("")
+  message           String        @default("")
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  request           FastSaleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+}
+
+model AdminNotification {
+  id        String   @id @default(cuid())
+  title     String
+  body      String   @db.Text
+  target    String
+  delivery  String
+  channels  Json
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model AdminActivityLog {
+  id            String   @id @default(cuid())
+  adminId       String
+  adminName     String
+  role          String
+  action        String
+  module        String
+  recordId      String
+  previousValue String   @db.Text
+  newValue      String   @db.Text
+  ipAddress     String
+  description   String   @db.Text
+  createdAt     DateTime @default(now())
+
+  @@index([module, createdAt])
+  @@index([recordId, createdAt])
+}
+
+model AdminUserNote {
+  id        String   @id @default(cuid())
+  userId     String
+  body      String   @db.Text
+  createdBy String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

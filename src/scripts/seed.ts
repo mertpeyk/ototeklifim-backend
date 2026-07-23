@@ -1,15 +1,18 @@
 import 'dotenv/config';
-import { AuctionStatus, ListingStatus, ListingType } from '@prisma/client';
+import { AuctionStatus, ListingStatus, ListingType, OfferStatus } from '@prisma/client';
 
 import { prisma } from '../db.js';
 import { hashPassword } from '../lib/auth.js';
 
 async function upsertUser(input: {
+  id: string;
   email: string;
   fullName: string;
   accountType: 'INDIVIDUAL' | 'DEALER' | 'CORPORATE' | 'ADMIN';
   city: string;
+  district: string;
   phone: string;
+  password: string;
 }) {
   return prisma.user.upsert({
     where: { email: input.email },
@@ -17,38 +20,99 @@ async function upsertUser(input: {
       fullName: input.fullName,
       accountType: input.accountType,
       city: input.city,
+      district: input.district,
       phone: input.phone,
+      passwordHash: hashPassword(input.password),
     },
     create: {
-      ...input,
-      passwordHash: hashPassword('123456'),
+      id: input.id,
+      email: input.email,
+      fullName: input.fullName,
+      accountType: input.accountType,
+      city: input.city,
+      district: input.district,
+      phone: input.phone,
+      passwordHash: hashPassword(input.password),
     },
   });
 }
 
 async function main() {
   const admin = await upsertUser({
-    email: 'admin@ototeklifim.local',
-    fullName: 'OtoTeklifim Admin',
+    id: 'admin-1',
+    email: 'admin@ototeklifim.com',
+    fullName: 'Mert Yönetim',
     accountType: 'ADMIN',
     city: 'Istanbul',
-    phone: '05550000000',
+    district: 'Kadikoy',
+    phone: '05550000010',
+    password: 'Hakki576.',
   });
 
-  const seller = await upsertUser({
-    email: 'satici@ototeklifim.local',
+  const dealerOne = await upsertUser({
+    id: 'dealer-1',
+    email: 'ankara@ototeklifimgaleri.com',
     fullName: 'Ankara Premium Auto',
     accountType: 'DEALER',
     city: 'Ankara',
+    district: 'Cankaya',
     phone: '05550000001',
+    password: '123456',
   });
 
-  const buyer = await upsertUser({
-    email: 'alici@ototeklifim.local',
+  const dealerTwo = await upsertUser({
+    id: 'dealer-2',
+    email: 'izmir@ototeklifimgaleri.com',
+    fullName: 'Ege Oto Port',
+    accountType: 'DEALER',
+    city: 'Izmir',
+    district: 'Bornova',
+    phone: '05550000003',
+    password: '123456',
+  });
+
+  const dealerThree = await upsertUser({
+    id: 'dealer-3',
+    email: 'bursa@ototeklifimgaleri.com',
+    fullName: 'Bursa Vitrin Motorlu',
+    accountType: 'DEALER',
+    city: 'Bursa',
+    district: 'Nilufer',
+    phone: '05550000004',
+    password: '123456',
+  });
+
+  const userOne = await upsertUser({
+    id: 'user-1',
+    email: 'mert.demo@ototeklifim.com',
     fullName: 'Mert Demo',
     accountType: 'INDIVIDUAL',
     city: 'Istanbul',
+    district: 'Pendik',
     phone: '05550000002',
+    password: '123456',
+  });
+
+  const userTwo = await upsertUser({
+    id: 'user-2',
+    email: 'ayse.kaya@ototeklifim.com',
+    fullName: 'Ayse Kaya',
+    accountType: 'INDIVIDUAL',
+    city: 'Ankara',
+    district: 'Yenimahalle',
+    phone: '05550000005',
+    password: '123456',
+  });
+
+  const userThree = await upsertUser({
+    id: 'user-3',
+    email: 'emre.yildiz@ototeklifim.com',
+    fullName: 'Emre Yildiz',
+    accountType: 'INDIVIDUAL',
+    city: 'Izmir',
+    district: 'Karsiyaka',
+    phone: '05550000006',
+    password: '123456',
   });
 
   await prisma.bid.deleteMany();
@@ -59,32 +123,31 @@ async function main() {
   await prisma.consignmentTimeline.deleteMany();
   await prisma.dealerAssignment.deleteMany();
   await prisma.consignmentPhoto.deleteMany();
-  await prisma.consignmentRequest.deleteMany({
-    where: {
-      userId: {
-        in: [buyer.id],
-      },
-    },
-  });
+  await prisma.consignmentRequest.deleteMany();
+  await prisma.fastSaleOffer.deleteMany();
+  await prisma.fastSaleRequest.deleteMany();
+  await prisma.adminNotification.deleteMany();
+  await prisma.adminActivityLog.deleteMany();
+  await prisma.adminUserNote.deleteMany();
   await prisma.listingImage.deleteMany();
   await prisma.listing.deleteMany({
     where: {
       sellerId: {
-        in: [seller.id, buyer.id, admin.id],
+        in: [dealerOne.id, dealerTwo.id, dealerThree.id, admin.id],
       },
     },
   });
 
-  const seededListings = await Promise.all([
+  const listings = await Promise.all([
     prisma.listing.create({
       data: {
-        sellerId: seller.id,
+        id: 'listing-1',
+        sellerId: dealerOne.id,
         title: '2023 BMW 320i M Sport',
-        description:
-            'Boyasiz, ekspertizli, dusuk kilometreli ve bakimlari tam BMW 320i. Takasa acik.',
+        description: 'Boyasiz, ekspertizli, dusuk kilometreli ve bakimlari tam BMW 320i.',
         category: 'Otomobil',
         brand: 'BMW',
-        model: '320i M Sport',
+        model: '320i',
         packageName: 'M Sport',
         year: 2023,
         km: 18500,
@@ -107,14 +170,19 @@ async function main() {
         listingType: ListingType.FIXED_PRICE,
         status: ListingStatus.ACTIVE,
         publishedAt: new Date(),
+        images: {
+          create: [
+            { imageUrl: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=1200&q=80', sortOrder: 0 },
+          ],
+        },
       },
     }),
     prisma.listing.create({
       data: {
-        sellerId: seller.id,
+        id: 'listing-2',
+        sellerId: dealerTwo.id,
         title: '2022 Audi A3 Sportback',
-        description:
-            'Audi A3 Sportback, cam tavanli, adaptif hiz sabitleyicili, temiz aile araci.',
+        description: 'Cam tavanli, adaptif hiz sabitleyicili temiz aile araci.',
         category: 'Otomobil',
         brand: 'Audi',
         model: 'A3 Sportback',
@@ -140,17 +208,22 @@ async function main() {
         listingType: ListingType.FIXED_PRICE,
         status: ListingStatus.ACTIVE,
         publishedAt: new Date(),
+        images: {
+          create: [
+            { imageUrl: 'https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?auto=format&fit=crop&w=1200&q=80', sortOrder: 0 },
+          ],
+        },
       },
     }),
     prisma.listing.create({
       data: {
-        sellerId: seller.id,
+        id: 'listing-3',
+        sellerId: dealerThree.id,
         title: '2024 Peugeot 3008 GT',
-        description:
-            'Yeni kasa 3008 GT. Hatasiz, boyasiz, garantili. Teklif toplanan vitrin ilanidir.',
+        description: 'Yeni kasa, hatasiz, garantili vitrin SUV.',
         category: 'Arazi, SUV & Pickup',
         brand: 'Peugeot',
-        model: '3008 GT',
+        model: '3008',
         packageName: 'GT',
         year: 2024,
         km: 9400,
@@ -173,14 +246,18 @@ async function main() {
         listingType: ListingType.AUCTION,
         status: ListingStatus.ACTIVE,
         publishedAt: new Date(),
+        images: {
+          create: [
+            { imageUrl: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80', sortOrder: 0 },
+          ],
+        },
       },
     }),
   ]);
 
-  const auctionListing = seededListings[2];
   const auction = await prisma.auction.create({
     data: {
-      listingId: auctionListing.id,
+      listingId: 'listing-3',
       startPrice: 2050000,
       minIncrement: 25000,
       reservePrice: 2125000,
@@ -193,45 +270,49 @@ async function main() {
   await prisma.bid.create({
     data: {
       auctionId: auction.id,
-      bidderId: buyer.id,
+      bidderId: userOne.id,
       amount: 2075000,
     },
   });
 
   await prisma.favorite.create({
     data: {
-      userId: buyer.id,
-      listingId: seededListings[0].id,
+      userId: userOne.id,
+      listingId: 'listing-1',
     },
   });
 
   const conversation = await prisma.conversation.create({
     data: {
-      listingId: seededListings[0].id,
-      buyerId: buyer.id,
-      sellerId: seller.id,
+      id: 'conv-1',
+      listingId: 'listing-1',
+      buyerId: userOne.id,
+      sellerId: dealerOne.id,
     },
   });
 
   await prisma.message.createMany({
     data: [
       {
+        id: 'msg-1',
         conversationId: conversation.id,
-        senderId: buyer.id,
-        body: 'Merhaba, aracin ekspertiz raporu mevcut mu?',
+        senderId: userOne.id,
+        body: 'Merhaba, arac eksper raporu mevcut mu?',
       },
       {
+        id: 'msg-2',
         conversationId: conversation.id,
-        senderId: seller.id,
-        body: 'Merhaba, evet mevcut. Isterseniz mesajdan da iletebilirim.',
+        senderId: dealerOne.id,
+        body: 'Merhaba, evet mevcut. Dilerseniz PDF olarak iletebiliriz.',
       },
     ],
   });
 
   await prisma.consignmentRequest.create({
     data: {
+      id: 'cons-1',
       referenceNo: 'KS-2026-001',
-      userId: buyer.id,
+      userId: userOne.id,
       status: 'DEALER_ASSIGNED',
       vehicleInfo: {
         vehicleType: 'Otomobil',
@@ -245,11 +326,13 @@ async function main() {
         engine: '1.3 Multijet 95',
         bodyType: 'Sedan',
         color: 'Inci Beyazi',
+        city: 'Istanbul',
+        district: 'Pendik',
       },
       condition: {
         paintStatus: 'Sag on camurluk lokal boyali',
         changedPartsNote: 'Degisen parca yok',
-        tramerInfo: '12.450 TL',
+        tramerInfo: '12450',
         heavyDamage: 'Yok',
         mechanicalStatus: 'Iyi',
         engineStatus: 'Iyi',
@@ -259,8 +342,6 @@ async function main() {
         expertiseReport: 'Var',
         damageMap: [
           { part: 'Kaput', status: 'ORIGINAL' },
-          { part: 'Tavan', status: 'ORIGINAL' },
-          { part: 'Bagaj', status: 'ORIGINAL' },
           { part: 'On tampon', status: 'PAINTED' },
         ],
       },
@@ -274,8 +355,8 @@ async function main() {
         canLeaveAtDealer: true,
         requestOnsiteInspection: true,
         contactName: 'Mert Demo',
-        contactPhone: '5550000002',
-        contactEmail: 'alici@ototeklifim.local',
+        contactPhone: '05550000002',
+        contactEmail: 'mert.demo@ototeklifim.com',
         notes: 'Arac hafta ici aksam gorulebilir.',
       },
       approvals: {
@@ -286,59 +367,35 @@ async function main() {
       photos: {
         create: [
           {
+            id: 'cons-photo-1',
             category: 'FRONT',
             label: 'On gorunum',
             fileName: 'fiat-egea-front.jpg',
             mimeType: 'image/jpeg',
             fileSize: 245000,
-            imageUrl: '/uploads/demo-fiat-egea-front.jpg',
+            imageUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=1200&q=80',
             isCover: true,
             sortOrder: 0,
-          },
-          {
-            category: 'INTERIOR',
-            label: 'Ic mekan',
-            fileName: 'fiat-egea-interior.jpg',
-            mimeType: 'image/jpeg',
-            fileSize: 198000,
-            imageUrl: '/uploads/demo-fiat-egea-interior.jpg',
-            isCover: false,
-            sortOrder: 1,
           },
         ],
       },
       timeline: {
         create: [
-          {
-            title: 'Basvuru olusturuldu',
-            description: 'Konsinye basvurusu alindi.',
-            done: true,
-          },
-          {
-            title: 'Arac inceleniyor',
-            description: 'Uzman ekip ekspertiz ve evrak kontrolunu tamamladi.',
-            done: true,
-          },
-          {
-            title: 'Galeri eslestirme',
-            description: 'Ankara Premium Auto ile eslestirme yapildi.',
-            done: true,
-          },
-          {
-            title: 'Satis sureci basladi',
-            description: 'Arac konsinye satis vitrini icin hazirlikta.',
-            done: false,
-          },
+          { id: 'cons-tl-1', title: 'Basvuru olusturuldu', description: 'Konsinye basvurusu alindi.', done: true },
+          { id: 'cons-tl-2', title: 'Arac inceleniyor', description: 'Ekspertiz ve evrak kontrolu tamamlandi.', done: true },
+          { id: 'cons-tl-3', title: 'Galeri eslestirme', description: 'Ankara Premium Auto ile eslestirme yapildi.', done: true },
+          { id: 'cons-tl-4', title: 'Satis sureci basladi', description: 'Arac vitrinde yayina hazirlaniyor.', done: false },
         ],
       },
       assignedDealer: {
         create: {
-          dealerId: seller.id,
-          dealerName: seller.fullName,
-          city: seller.city ?? 'Ankara',
-          district: 'Cankaya',
+          id: 'assign-1',
+          dealerId: dealerOne.id,
+          dealerName: dealerOne.fullName,
+          city: dealerOne.city ?? 'Ankara',
+          district: dealerOne.district ?? 'Cankaya',
           contactName: 'Satis Danismani',
-          contactPhone: '5550000001',
+          contactPhone: dealerOne.phone ?? '05550000001',
           statusNote: 'Arac ilk ekspertizden gecti.',
           status: 'ACCEPTED',
         },
@@ -346,10 +403,239 @@ async function main() {
     },
   });
 
+  await prisma.consignmentRequest.create({
+    data: {
+      id: 'cons-2',
+      referenceNo: 'KS-2026-002',
+      userId: userTwo.id,
+      status: 'UNDER_REVIEW',
+      vehicleInfo: {
+        vehicleType: 'SUV',
+        brand: 'Nissan',
+        model: 'Qashqai',
+        packageName: 'Skypack',
+        year: '2021',
+        mileage: '64200',
+        fuel: 'Benzin',
+        transmission: 'Otomatik',
+        engine: '1.3 DIG-T',
+        bodyType: 'SUV',
+        color: 'Fume',
+        city: 'Ankara',
+        district: 'Yenimahalle',
+      },
+      condition: {
+        paintStatus: 'Kaputta lokal boya',
+        changedPartsNote: 'Sol arka kapi degisen',
+        tramerInfo: '38200',
+        heavyDamage: 'Yok',
+        mechanicalStatus: 'Iyi',
+        engineStatus: 'Iyi',
+        transmissionStatus: 'Iyi',
+        maintenanceHistory: 'Yetkili servis',
+        authorizedService: 'Evet',
+        expertiseReport: 'Yok',
+        damageMap: [{ part: 'Sol arka kapi', status: 'CHANGED' }],
+      },
+      expectations: {
+        expectedPrice: '1385000',
+        minimumPrice: '1320000',
+        salePriority: 'MAXIMUM',
+        city: 'Ankara',
+        district: 'Yenimahalle',
+        openToTrade: true,
+        canLeaveAtDealer: false,
+        requestOnsiteInspection: true,
+        contactName: 'Ayse Kaya',
+        contactPhone: '05550000005',
+        contactEmail: 'ayse.kaya@ototeklifim.com',
+      },
+      approvals: {
+        termsAccepted: true,
+        kvkkAccepted: true,
+        dealerShareAccepted: true,
+      },
+    },
+  });
+
+  await prisma.fastSaleRequest.create({
+    data: {
+      id: 'fast-1',
+      requestNo: 'HS-2026-001',
+      userId: userThree.id,
+      status: 'OFFER_SENT',
+      vehicleInfo: {
+        vehicleType: 'Otomobil',
+        brand: 'Toyota',
+        model: 'Corolla',
+        packageName: 'Flame X-Pack',
+        year: 2021,
+        mileage: 54000,
+        fuelType: 'Benzin',
+        transmission: 'Otomatik',
+        bodyType: 'Sedan',
+        engineVolume: '1598 cc',
+        enginePower: '132 hp',
+        color: 'Beyaz',
+        city: 'Izmir',
+        district: 'Karsiyaka',
+      },
+      condition: {
+        tramerAmount: 0,
+        severeDamage: false,
+        paintedParts: ['Sag arka camurluk'],
+        changedParts: [],
+        mechanicalStatus: 'Iyi',
+        maintenanceHistory: 'Periyodik bakim kayitli',
+        appraisalReport: 'Var',
+        damageParts: [{ key: 'sag-arka-camurluk', label: 'Sag arka camurluk', status: 'Lokal Boyalı' }],
+      },
+      photos: [
+        {
+          id: 'fast-photo-1',
+          title: 'On gorunum',
+          url: 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=1200&q=80',
+          cover: true,
+        },
+      ],
+      expectedPrice: 1245000,
+      estimatedMarketValue: 1210000,
+      quickSaleValue: 1165000,
+      dealerBuyValue: 1130000,
+      valuationSummary: 'Piyasa hareketleri ve benzer ilanlar dikkate alinarak hizli satis degeri hesaplandi.',
+      offers: {
+        create: [
+          {
+            id: 'offer-1',
+            amount: 1165000,
+            status: OfferStatus.SENT,
+            validUntil: new Date(Date.now() + 1000 * 60 * 60 * 24),
+            appraisalRequired: true,
+            pickupOption: 'Alicidan teslim alma',
+            paymentMethod: 'Havale / EFT',
+            adminNote: 'Ekspertiz sonrasi netlesecek.',
+            message: 'Araciniz icin ilk teklifimiz hazirdir.',
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.fastSaleRequest.create({
+    data: {
+      id: 'fast-2',
+      requestNo: 'HS-2026-002',
+      userId: userOne.id,
+      status: 'UNDER_REVIEW',
+      vehicleInfo: {
+        vehicleType: 'SUV',
+        brand: 'Hyundai',
+        model: 'Tucson',
+        packageName: 'Elite',
+        year: 2022,
+        mileage: 41000,
+        fuelType: 'Dizel',
+        transmission: 'Otomatik',
+        bodyType: 'SUV',
+        engineVolume: '1598 cc',
+        enginePower: '136 hp',
+        color: 'Siyah',
+        city: 'Istanbul',
+        district: 'Pendik',
+      },
+      condition: {
+        tramerAmount: 18200,
+        severeDamage: false,
+        paintedParts: ['On tampon'],
+        changedParts: [],
+        mechanicalStatus: 'Iyi',
+        maintenanceHistory: 'Yetkili servis',
+        appraisalReport: 'Bekleniyor',
+        damageParts: [{ key: 'on-tampon', label: 'On tampon', status: 'Boyalı' }],
+      },
+      photos: [],
+      expectedPrice: 1860000,
+      estimatedMarketValue: 1795000,
+      quickSaleValue: 1715000,
+      dealerBuyValue: 1680000,
+      valuationSummary: 'Ekspertiz ve detayli foto onayi bekleniyor.',
+    },
+  });
+
+  await prisma.adminNotification.createMany({
+    data: [
+      {
+        id: 'notif-1',
+        title: 'Yeni konsinye talebi',
+        body: 'Ayse Kaya icin yeni konsinye talebi olustu.',
+        target: 'Konsinye Yetkilileri',
+        delivery: 'Gönderildi',
+        channels: JSON.stringify(['IN_APP']),
+      },
+      {
+        id: 'notif-2',
+        title: 'Teklif suresi yaklasiyor',
+        body: 'HS-2026-001 teklifinin bitmesine 6 saat kaldi.',
+        target: 'Hızlı Sat Ekibi',
+        delivery: 'Beklemede',
+        channels: JSON.stringify(['IN_APP', 'EMAIL']),
+      },
+    ],
+  });
+
+  await prisma.adminActivityLog.createMany({
+    data: [
+      {
+        id: 'act-1',
+        adminId: admin.id,
+        adminName: admin.fullName,
+        role: 'SUPER_ADMIN',
+        action: 'CONSINGMENT_ASSIGN',
+        module: 'Konsinye',
+        recordId: 'cons-1',
+        previousValue: 'UNDER_REVIEW',
+        newValue: 'DEALER_ASSIGNED',
+        ipAddress: '10.24.18.42',
+        description: 'Talep Ankara Premium Auto galerisine atandi.',
+      },
+      {
+        id: 'act-2',
+        adminId: admin.id,
+        adminName: admin.fullName,
+        role: 'SUPER_ADMIN',
+        action: 'FAST_SALE_OFFER',
+        module: 'Hızlı Sat',
+        recordId: 'fast-1',
+        previousValue: 'UNDER_REVIEW',
+        newValue: 'OFFER_SENT',
+        ipAddress: '10.24.18.42',
+        description: 'Kullanicıya ilk fiyat teklifi gonderildi.',
+      },
+    ],
+  });
+
+  await prisma.adminUserNote.createMany({
+    data: [
+      {
+        id: 'note-1',
+        userId: userOne.id,
+        body: 'Aracini hafta ici 19:00 sonrasi gosterebiliyor.',
+        createdBy: admin.fullName,
+      },
+      {
+        id: 'note-2',
+        userId: userThree.id,
+        body: 'Hizli sat surecinde ekspertiz raporu talep edildi.',
+        createdBy: admin.fullName,
+      },
+    ],
+  });
+
   console.log('Seed tamamlandi.');
-  console.log('Demo admin: admin@ototeklifim.local / 123456');
-  console.log('Demo giris: alici@ototeklifim.local / 123456');
-  console.log('Demo satici: satici@ototeklifim.local / 123456');
+  console.log('Admin giris: admin@ototeklifim.com / Hakki576.');
+  console.log('Demo kullanici: mert.demo@ototeklifim.com / 123456');
+  console.log('Demo galeri: ankara@ototeklifimgaleri.com / 123456');
+  console.log(`Olusan kayitlar: ${listings.length} ilan, 2 konsinye, 2 hizli sat talebi.`);
 }
 
 main()
