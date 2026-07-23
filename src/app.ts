@@ -1,6 +1,7 @@
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
+import fs from 'node:fs';
 import path from 'node:path';
 import Fastify from 'fastify';
 
@@ -19,13 +20,16 @@ export function buildApp() {
   const app = Fastify({
     logger: true,
   });
+  const uploadRoot = path.resolve(process.cwd(), 'uploads');
+
+  fs.mkdirSync(uploadRoot, { recursive: true });
 
   app.register(cors, {
     origin: true,
   });
   app.register(multipart);
   app.register(fastifyStatic, {
-    root: path.resolve(process.cwd(), 'uploads'),
+    root: uploadRoot,
     prefix: '/uploads/',
   });
 
