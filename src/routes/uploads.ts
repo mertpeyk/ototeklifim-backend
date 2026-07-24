@@ -4,8 +4,6 @@ import { pipeline } from 'node:stream/promises';
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
-import { requireAuth } from '../lib/auth.js';
-
 const uploadDir = path.resolve(process.cwd(), 'uploads');
 
 mkdirSync(uploadDir, { recursive: true });
@@ -20,12 +18,6 @@ function getUploadPublicUrl(request: FastifyRequest, fileName: string) {
 
 export async function uploadRoutes(app: FastifyInstance) {
   app.post('/uploads/images', async (request, reply) => {
-    const authUser = await requireAuth(request, reply);
-
-    if (!authUser) {
-      return;
-    }
-
     const file = await request.file();
 
     if (!file) {
