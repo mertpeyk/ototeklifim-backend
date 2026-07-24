@@ -245,6 +245,66 @@ function mapConsignmentStatus(status: string) {
   }
 }
 
+function buildConsignmentTimelineEntry(status: z.infer<typeof consignmentStatusSchema>["status"], note?: string) {
+  switch (status) {
+    case 'UNDER_REVIEW':
+      return {
+        title: 'Basvuru inceleniyor',
+        description: note?.trim() || 'Operasyon ekibi konsinye detaylarini incelemeye aldi.',
+        done: true,
+      };
+    case 'INFO_REQUESTED':
+      return {
+        title: 'Ek bilgi talep edildi',
+        description: note?.trim() || 'Basvurunun ilerlemesi icin ek bilgi veya belge talep edildi.',
+        done: true,
+      };
+    case 'ACCEPTED':
+      return {
+        title: 'Basvuru onaylandi',
+        description: note?.trim() || 'Konsinye basvurusu operasyon ekibi tarafindan onaylandi.',
+        done: true,
+      };
+    case 'REJECTED':
+      return {
+        title: 'Basvuru reddedildi',
+        description: note?.trim() || 'Konsinye basvurusu mevcut kriterlere gore reddedildi.',
+        done: true,
+      };
+    case 'DEALER_ASSIGNED':
+      return {
+        title: 'Galeri atandi',
+        description: note?.trim() || 'Basvuru icin uygun galeri atamasi yapildi.',
+        done: true,
+      };
+    case 'IN_SALE':
+      return {
+        title: 'Satis sureci basladi',
+        description: note?.trim() || 'Arac aktif satis surecine alindi.',
+        done: true,
+      };
+    case 'COMPLETED':
+      return {
+        title: 'Surec tamamlandi',
+        description: note?.trim() || 'Konsinye sureci tamamlandi.',
+        done: true,
+      };
+    case 'CANCELLED':
+      return {
+        title: 'Surec iptal edildi',
+        description: note?.trim() || 'Konsinye sureci iptal edildi.',
+        done: true,
+      };
+    case 'NEW':
+    default:
+      return {
+        title: 'Basvuru olusturuldu',
+        description: note?.trim() || 'Konsinye basvurusu sisteme kaydedildi.',
+        done: true,
+      };
+  }
+}
+
 function mapFastSaleStatus(status: FastSaleStatus) {
   return status;
 }
@@ -361,6 +421,17 @@ async function buildAdminRepository() {
     notesByUser.set(note.userId, list);
   }
 
+  const consignmentLogsByRecord = new Map<string, typeof activityLogs>();
+  for (const log of activityLogs) {
+    if (log.module !== 'Konsinye') {
+      continue;
+    }
+
+    const list = consignmentLogsByRecord.get(log.recordId) ?? [];
+    list.push(log);
+    consignmentLogsByRecord.set(log.recordId, list);
+  }
+
   const mappedUsers = users.map((user) => ({
     id: user.id,
     fullName: user.fullName,
@@ -447,6 +518,29 @@ async function buildAdminRepository() {
       const vehicle = parseObject<Record<string, unknown>>(request.vehicleInfo, {});
       const condition = parseObject<Record<string, unknown>>(request.condition, {});
       const expectations = parseObject<Record<string, unknown>>(request.expectations, {});
+      const consignmentLogs = consignmentLogsByRecord.get(request.id) ?? [];
+      const feedback = consignmentLogs
+        .filter((item) => item.action === 'CONSIGNMENT_FEEDBACK')
+        .map((item) => ({
+          id: item.id,
+          subject: item.newValue,
+          message: item.description,
+          channels: ['IN_APP'] as Array<'IN_APP'>,
+          createdAt: item.createdAt.toISOString(),
+          createdBy: item.adminName,
+        }));
+      const adminNotes = [
+        request.reviewNote,
+        request.assignedDealer?.statusNote,
+        request.assignedDealer?.customerMessage,
+      ]
+        .filter((value): value is string => Boolean(value && value.trim()))
+        .concat(
+          consignmentLogs
+            .filter((item) => item.action === 'CONSIGNMENT_STATUS' || item.action === 'CONSIGNMENT_ASSIGN')
+            .map((item) => item.description)
+            .filter((value) => value.trim().length > 0),
+        );
       return {
         id: request.id,
         requestNo: request.referenceNo,
@@ -527,12 +621,12 @@ async function buildAdminRepository() {
         onsiteInspectionPreference: expectations.requestOnsiteInspection ? 'Yerinde inceleme istiyor' : 'Yerinde inceleme istemiyor',
         assignedDealerId: request.assignedDealer?.dealerId ?? undefined,
         assignedDealerName: request.assignedDealer?.dealerName ?? undefined,
-        commissionRate: undefined,
-        estimatedSalePrice: undefined,
-        estimatedSaleTime: undefined,
+        commissionRate: request.assignedDealer ? toNumber(request.assignedDealer.commissionRate) : undefined,
+        estimatedSalePrice: request.assignedDealer ? toNumber(request.assignedDealer.estimatedSalePrice) : undefined,
+        estimatedSaleTime: request.assignedDealer?.estimatedSaleTime ?? undefined,
         createdAt: request.createdAt.toISOString(),
-        feedback: [],
-        adminNotes: request.reviewNote ? [request.reviewNote] : [],
+        feedback,
+        adminNotes,
       };
     }),
     fastSales: fastSales.map((request) => {
@@ -963,6 +1057,9 @@ export async function adminRoutes(app: FastifyInstance) {
       data: {
         status: statusMap[payload.status],
         reviewNote: payload.note ?? '',
+        timeline: {
+          create: buildConsignmentTimelineEntry(payload.status, payload.note),
+        },
       },
     });
     await appendActivityLog({
@@ -973,7 +1070,7 @@ export async function adminRoutes(app: FastifyInstance) {
       recordId: updated.id,
       previousValue: '',
       newValue: payload.status,
-      description: `${updated.referenceNo} talep durumu güncellendi.`,
+      description: payload.note?.trim() || `${updated.referenceNo} talep durumu ${payload.status} olarak guncellendi.`,
     });
     return updated;
   });
@@ -985,6 +1082,14 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
     const payload = consignmentFeedbackSchema.parse(request.body);
+    await prisma.consignmentTimeline.create({
+      data: {
+        requestId: params.id,
+        title: payload.subject,
+        description: payload.message,
+        done: true,
+      },
+    });
     await appendActivityLog({
       adminId: admin.id,
       adminName: admin.fullName,
@@ -1015,6 +1120,10 @@ export async function adminRoutes(app: FastifyInstance) {
         district: dealer.district ?? '',
         contactName: dealer.fullName,
         contactPhone: dealer.phone ?? '',
+        estimatedSalePrice: payload.estimatedSalePrice,
+        commissionRate: payload.commissionRate,
+        estimatedSaleTime: payload.estimatedSaleTime,
+        customerMessage: payload.message ?? '',
         statusNote: payload.adminNote ?? '',
         status: 'ACCEPTED',
       },
@@ -1026,13 +1135,29 @@ export async function adminRoutes(app: FastifyInstance) {
         district: dealer.district ?? '',
         contactName: dealer.fullName,
         contactPhone: dealer.phone ?? '',
+        estimatedSalePrice: payload.estimatedSalePrice,
+        commissionRate: payload.commissionRate,
+        estimatedSaleTime: payload.estimatedSaleTime,
+        customerMessage: payload.message ?? '',
         statusNote: payload.adminNote ?? '',
         status: 'ACCEPTED',
       },
     });
     await prisma.consignmentRequest.update({
       where: { id: params.id },
-      data: { status: 'DEALER_ASSIGNED' },
+      data: {
+        status: 'DEALER_ASSIGNED',
+        reviewNote: payload.adminNote ?? '',
+        timeline: {
+          create: {
+            title: 'Galeri atandi',
+            description:
+              payload.message?.trim() ||
+              `${dealer.fullName} galerisi ile eslestirme yapildi. Tahmini satis suresi ${payload.estimatedSaleTime || 'paylasilacak'}.`,
+            done: true,
+          },
+        },
+      },
     });
     await appendActivityLog({
       adminId: admin.id,

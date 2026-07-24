@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   AccountType,
@@ -8,7 +9,7 @@ import {
 import { z } from 'zod';
 
 import { prisma } from '../db.js';
-import { requireAdmin, requireAuth } from '../lib/auth.js';
+import { hashPassword, requireAdmin, requireAuth, resolveAuthUser } from '../lib/auth.js';
 
 const phoneRegex = /^5\d{9}$/;
 
@@ -209,6 +210,24 @@ function buildReferenceNo() {
   return `KS-${year}-${randomBlock}`;
 }
 
+function normalizePhone(phone?: string | null) {
+  if (!phone) {
+    return undefined;
+  }
+
+  const digits = phone.replace(/\D/g, '');
+
+  if (digits.startsWith('90') && digits.length >= 12) {
+    return digits.slice(2);
+  }
+
+  if (digits.startsWith('0') && digits.length >= 11) {
+    return digits.slice(1);
+  }
+
+  return digits || undefined;
+}
+
 async function createUniqueReferenceNo() {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const referenceNo = buildReferenceNo();
@@ -332,20 +351,63 @@ export async function consignmentRoutes(app: FastifyInstance) {
   });
 
   app.post('/consignments', async (request, reply) => {
-    const authUser = await requireAuth(request, reply);
-
-    if (!authUser) {
-      return;
-    }
-
     const payload = createConsignmentSchema.parse(request.body);
+    const authUser = await resolveAuthUser(request);
     const referenceNo = await createUniqueReferenceNo();
     const coverUrl = payload.photos.find((photo) => photo.isCover)?.url;
+    const normalizedEmail = payload.expectations.contactEmail.trim().toLowerCase();
+    const normalizedPhone = normalizePhone(payload.expectations.contactPhone);
+    const fullName = payload.expectations.contactName.trim();
+
+    let userId = authUser?.id;
+
+    if (!userId) {
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: normalizedEmail },
+            normalizedPhone ? { phone: normalizedPhone } : undefined,
+          ].filter(Boolean) as Array<{ email?: string; phone?: string }>,
+        },
+        select: { id: true },
+      });
+
+      if (existingUser) {
+        userId = existingUser.id;
+      } else {
+        const createdUser = await prisma.user.create({
+          data: {
+            fullName,
+            email: normalizedEmail,
+            phone: normalizedPhone,
+            city: payload.expectations.city,
+            district: payload.expectations.district,
+            accountType: AccountType.INDIVIDUAL,
+            passwordHash: hashPassword(randomUUID()),
+          },
+          select: { id: true },
+        });
+
+        userId = createdUser.id;
+      }
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        fullName,
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        city: payload.expectations.city,
+        district: payload.expectations.district,
+        accountType: AccountType.INDIVIDUAL,
+      },
+    });
 
     const consignment = await prisma.consignmentRequest.create({
       data: {
         referenceNo,
-        userId: authUser.id,
+        userId,
         status: ConsignmentStatus.PENDING,
         vehicleInfo: payload.vehicleInfo,
         condition: payload.condition,
