@@ -57,6 +57,8 @@ const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+const LISTING_DESCRIPTION_MAX_LENGTH = 10_000;
+
 const listingPayloadSchema = z.object({
   id: z.string().min(1).optional(),
   listingNo: z.string().min(1),
@@ -67,7 +69,7 @@ const listingPayloadSchema = z.object({
   status: z.enum(['DRAFT', 'UNDER_REVIEW', 'PUBLISHED', 'UNPUBLISHED', 'SOLD', 'ARCHIVED']),
   year: z.number().int(),
   mileage: z.number().int().nonnegative(),
-  description: z.string().min(1),
+  description: z.string().trim().min(1).max(LISTING_DESCRIPTION_MAX_LENGTH),
   vehicle: z.object({
     vehicleType: z.string(),
     brand: z.string(),
@@ -709,12 +711,13 @@ export async function adminRoutes(app: FastifyInstance) {
       return;
     }
     const payload = listingPayloadSchema.parse(request.body);
+    const normalizedDescription = payload.description.trim();
     const listing = await prisma.listing.create({
       data: {
         id: payload.id,
         sellerId: payload.galleryId,
         title: payload.title,
-        description: payload.description,
+        description: normalizedDescription,
         category: payload.vehicle.vehicleType,
         brand: payload.vehicle.brand,
         model: payload.vehicle.model,
@@ -773,13 +776,14 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
     const payload = listingPayloadSchema.parse(request.body);
+    const normalizedDescription = payload.description.trim();
     await prisma.listingImage.deleteMany({ where: { listingId: params.id } });
     const listing = await prisma.listing.update({
       where: { id: params.id },
       data: {
         sellerId: payload.galleryId,
         title: payload.title,
-        description: payload.description,
+        description: normalizedDescription,
         category: payload.vehicle.vehicleType,
         brand: payload.vehicle.brand,
         model: payload.vehicle.model,
