@@ -1,9 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { FastSaleStatus } from '@prisma/client';
+import { AccountType, FastSaleStatus } from '@prisma/client';
 import { z } from 'zod';
 
 import { prisma } from '../db.js';
-import { requireAuth } from '../lib/auth.js';
+import { hashPassword, requireAuth, resolveAuthUser } from '../lib/auth.js';
 
 const statusValues = [
   FastSaleStatus.NEW,
@@ -85,6 +86,24 @@ function toDecimal(value: number) {
   return Number(value.toFixed(2));
 }
 
+function normalizePhone(phone?: string | null) {
+  if (!phone) {
+    return undefined;
+  }
+
+  const digits = phone.replace(/\D/g, '');
+
+  if (digits.startsWith('90') && digits.length >= 12) {
+    return digits.slice(2);
+  }
+
+  if (digits.startsWith('0') && digits.length >= 11) {
+    return digits.slice(1);
+  }
+
+  return digits || undefined;
+}
+
 function buildRequestNo() {
   const year = new Date().getFullYear();
   const randomBlock = Math.floor(100000 + Math.random() * 900000);
@@ -109,29 +128,60 @@ async function createUniqueRequestNo() {
 
 export async function fastSaleRoutes(app: FastifyInstance) {
   app.post('/fast-sales', async (request, reply) => {
-    const authUser = await requireAuth(request, reply);
-
-    if (!authUser) {
-      return;
-    }
-
     const payload = createFastSaleSchema.parse(request.body);
     const requestNo = await createUniqueRequestNo();
     const fullName = `${payload.contact.firstName} ${payload.contact.lastName}`.trim();
+    const normalizedEmail = payload.contact.email.trim().toLowerCase();
+    const normalizedPhone = normalizePhone(payload.contact.phone);
+    const authUser = await resolveAuthUser(request);
+
+    let userId = authUser?.id;
+
+    if (!userId) {
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: normalizedEmail },
+            normalizedPhone ? { phone: normalizedPhone } : undefined,
+          ].filter(Boolean) as Array<{ email?: string; phone?: string }>,
+        },
+        select: { id: true },
+      });
+
+      if (existingUser) {
+        userId = existingUser.id;
+      } else {
+        const createdUser = await prisma.user.create({
+          data: {
+            fullName,
+            email: normalizedEmail,
+            phone: normalizedPhone,
+            city: payload.vehicleInfo.city,
+            accountType: AccountType.INDIVIDUAL,
+            passwordHash: hashPassword(randomUUID()),
+          },
+          select: { id: true },
+        });
+
+        userId = createdUser.id;
+      }
+    }
 
     await prisma.user.update({
-      where: { id: authUser.id },
+      where: { id: userId },
       data: {
         fullName,
-        phone: payload.contact.phone,
+        email: normalizedEmail,
+        phone: normalizedPhone,
         city: payload.vehicleInfo.city,
+        accountType: AccountType.INDIVIDUAL,
       },
     });
 
     const fastSale = await prisma.fastSaleRequest.create({
       data: {
         requestNo,
-        userId: authUser.id,
+        userId,
         status: FastSaleStatus.NEW,
         vehicleInfo: payload.vehicleInfo,
         condition: payload.condition,
@@ -150,6 +200,47 @@ export async function fastSaleRoutes(app: FastifyInstance) {
     });
 
     reply.code(201);
+    return fastSale;
+  });
+
+  app.get('/fast-sales/reference/:requestNo', async (request, reply) => {
+    const params = z.object({ requestNo: z.string().min(1) }).parse(request.params);
+    const query = z.object({
+      email: z.email(),
+      phone: z.string().optional(),
+    }).parse(request.query);
+
+    const normalizedEmail = query.email.trim().toLowerCase();
+    const normalizedPhone = normalizePhone(query.phone);
+
+    const fastSale = await prisma.fastSaleRequest.findUnique({
+      where: { requestNo: params.requestNo },
+      include: {
+        user: {
+          select: {
+            email: true,
+            phone: true,
+          },
+        },
+        offers: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!fastSale) {
+      reply.code(404);
+      return { message: 'Hizli sat talebi bulunamadi.' };
+    }
+
+    const matchesEmail = fastSale.user.email.trim().toLowerCase() === normalizedEmail;
+    const matchesPhone = normalizedPhone && normalizePhone(fastSale.user.phone) === normalizedPhone;
+
+    if (!matchesEmail && !matchesPhone) {
+      reply.code(403);
+      return { message: 'Bu talebe erisim yetkiniz yok.' };
+    }
+
     return fastSale;
   });
 
