@@ -12,6 +12,9 @@ export type AuthUser = {
   email: string;
   fullName: string;
   accountType: AccountType;
+  phone?: string | null;
+  city?: string | null;
+  district?: string | null;
 };
 
 export function hashPassword(password: string) {
@@ -93,6 +96,9 @@ export async function resolveAuthUser(request: FastifyRequest) {
     email: session.user.email,
     fullName: session.user.fullName,
     accountType: session.user.accountType,
+    phone: session.user.phone,
+    city: session.user.city,
+    district: session.user.district,
   } satisfies AuthUser;
 }
 

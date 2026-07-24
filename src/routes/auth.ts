@@ -135,6 +135,9 @@ export async function authRoutes(app: FastifyInstance) {
         fullName: user.fullName,
         email: user.email,
         accountType: user.accountType,
+        phone: user.phone,
+        city: user.city,
+        district: user.district,
       },
     };
   });
@@ -171,6 +174,9 @@ export async function authRoutes(app: FastifyInstance) {
         fullName: user.fullName,
         email: user.email,
         accountType: user.accountType,
+        phone: user.phone,
+        city: user.city,
+        district: user.district,
       },
     };
   });
