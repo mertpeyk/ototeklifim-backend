@@ -10,6 +10,7 @@ import { authRoutes } from './routes/auth.js';
 import { auctionRoutes } from './routes/auctions.js';
 import { catalogRoutes } from './routes/catalog.js';
 import { consignmentRoutes } from './routes/consignments.js';
+import { fastSaleRoutes } from './routes/fast-sales.js';
 import { favoriteRoutes } from './routes/favorites.js';
 import { healthRoutes } from './routes/health.js';
 import { listingRoutes } from './routes/listings.js';
@@ -41,6 +42,7 @@ export function buildApp() {
   app.register(favoriteRoutes, { prefix: '/api' });
   app.register(messageRoutes, { prefix: '/api' });
   app.register(consignmentRoutes, { prefix: '/api' });
+  app.register(fastSaleRoutes, { prefix: '/api' });
   app.register(uploadRoutes, { prefix: '/api' });
   app.register(adminRoutes, { prefix: '/api' });
 
