@@ -126,6 +126,75 @@ async function createUniqueRequestNo() {
   throw new Error('Unique fast sale request number could not be generated');
 }
 
+function serializeFastSaleWithDetails(
+  fastSale: {
+    id: string;
+    requestNo: string;
+    status: FastSaleStatus;
+    vehicleInfo: unknown;
+    condition: unknown;
+    photos: unknown;
+    expectedPrice: unknown;
+    estimatedMarketValue: unknown;
+    quickSaleValue: unknown;
+    dealerBuyValue: unknown;
+    valuationSummary: string;
+    createdAt: Date;
+    offers: Array<{
+      id: string;
+      amount: unknown;
+      status: string;
+      validUntil: Date;
+      appraisalRequired: boolean;
+      pickupOption: string;
+      paymentMethod: string;
+      adminNote: string;
+      message: string;
+      createdAt: Date;
+    }>;
+  },
+  messageHistory: Array<{ id: string; sender: string; senderType: 'admin' | 'user' | 'dealer'; content: string; createdAt: string }>,
+) {
+  return {
+    ...fastSale,
+    expectedPrice: toDecimal(Number(fastSale.expectedPrice)),
+    estimatedMarketValue: toDecimal(Number(fastSale.estimatedMarketValue)),
+    quickSaleValue: toDecimal(Number(fastSale.quickSaleValue)),
+    dealerBuyValue: toDecimal(Number(fastSale.dealerBuyValue)),
+    currentOffer: fastSale.offers[0] ? toDecimal(Number(fastSale.offers[0].amount)) : 0,
+    previousOffers: fastSale.offers.map((offer) => ({
+      id: offer.id,
+      amount: toDecimal(Number(offer.amount)),
+      status: offer.status,
+      validUntil: offer.validUntil.toISOString(),
+      appraisalRequired: offer.appraisalRequired,
+      pickupOption: offer.pickupOption,
+      paymentMethod: offer.paymentMethod,
+      adminNote: offer.adminNote,
+      message: offer.message,
+      createdAt: offer.createdAt.toISOString(),
+    })),
+    messageHistory,
+  };
+}
+
+async function buildFastSaleMessageHistory(requestId: string) {
+  const activityLogs = await prisma.adminActivityLog.findMany({
+    where: { recordId: requestId, module: 'Hızlı Sat' },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return activityLogs
+    .filter((item) => item.description.trim().length > 0)
+    .map((item) => ({
+      id: item.id,
+      sender: item.adminName,
+      senderType: 'admin' as const,
+      content: item.description,
+      createdAt: item.createdAt.toISOString(),
+    }));
+}
+
 export async function fastSaleRoutes(app: FastifyInstance) {
   app.post('/fast-sales', async (request, reply) => {
     const payload = createFastSaleSchema.parse(request.body);
@@ -199,8 +268,9 @@ export async function fastSaleRoutes(app: FastifyInstance) {
       },
     });
 
+    const messageHistory = await buildFastSaleMessageHistory(fastSale.id);
     reply.code(201);
-    return fastSale;
+    return serializeFastSaleWithDetails(fastSale, messageHistory);
   });
 
   app.get('/fast-sales/reference/:requestNo', async (request, reply) => {
@@ -241,7 +311,8 @@ export async function fastSaleRoutes(app: FastifyInstance) {
       return { message: 'Bu talebe erisim yetkiniz yok.' };
     }
 
-    return fastSale;
+    const messageHistory = await buildFastSaleMessageHistory(fastSale.id);
+    return serializeFastSaleWithDetails(fastSale, messageHistory);
   });
 
   app.get('/me/fast-sales', async (request, reply) => {
@@ -253,7 +324,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
 
     const query = statusQuerySchema.parse(request.query);
 
-    return prisma.fastSaleRequest.findMany({
+    const fastSales = await prisma.fastSaleRequest.findMany({
       where: {
         userId: authUser.id,
         status: query.status,
@@ -267,5 +338,9 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         createdAt: 'desc',
       },
     });
+
+    return Promise.all(
+      fastSales.map(async (fastSale) => serializeFastSaleWithDetails(fastSale, await buildFastSaleMessageHistory(fastSale.id))),
+    );
   });
 }

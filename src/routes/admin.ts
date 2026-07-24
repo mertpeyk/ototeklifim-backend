@@ -139,6 +139,8 @@ const assignDealerSchema = z.object({
 
 const fastSaleStatusSchema = z.object({
   status: z.enum(['NEW', 'UNDER_REVIEW', 'APPROVED', 'OFFER_SENT', 'COUNTER_OFFER_RECEIVED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'CANCELLED']),
+  note: z.string().optional(),
+  message: z.string().optional(),
 });
 
 const fastSaleOfferSchema = z.object({
@@ -1064,7 +1066,7 @@ export async function adminRoutes(app: FastifyInstance) {
       recordId: params.id,
       previousValue: '',
       newValue: payload.status,
-      description: `${requestModel.requestNo} hızlı sat durumu güncellendi.`,
+      description: [payload.note, payload.message].filter(Boolean).join(' | ') || `${requestModel.requestNo} hızlı sat durumu güncellendi.`,
     });
     return requestModel;
   });
