@@ -2,13 +2,21 @@ import { createWriteStream, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import { requireAuth } from '../lib/auth.js';
 
 const uploadDir = path.resolve(process.cwd(), 'uploads');
 
 mkdirSync(uploadDir, { recursive: true });
+
+function getUploadPublicUrl(request: FastifyRequest, fileName: string) {
+  const forwardedProto = request.headers['x-forwarded-proto'];
+  const protocol = typeof forwardedProto === 'string' ? forwardedProto.split(',')[0]?.trim() : request.protocol;
+  const host = request.headers['x-forwarded-host'] ?? request.headers.host ?? request.hostname;
+  const origin = `${protocol || 'https'}://${host}`;
+  return `${origin}/uploads/${fileName}`;
+}
 
 export async function uploadRoutes(app: FastifyInstance) {
   app.post('/uploads/images', async (request, reply) => {
@@ -31,7 +39,7 @@ export async function uploadRoutes(app: FastifyInstance) {
     await pipeline(file.file, createWriteStream(targetPath));
 
     return {
-      url: `/uploads/${safeName}`,
+      url: getUploadPublicUrl(request, safeName),
       filename: safeName,
     };
   });
