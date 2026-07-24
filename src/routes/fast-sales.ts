@@ -69,7 +69,7 @@ const contactSchema = z.object({
 const createFastSaleSchema = z.object({
   vehicleInfo: vehicleInfoSchema,
   condition: conditionSchema,
-  photos: z.array(photoSchema).max(20).default([]),
+  photos: z.array(photoSchema).min(3).max(10),
   expectedPrice: z.number().nonnegative(),
   estimatedMarketValue: z.number().nonnegative(),
   quickSaleValue: z.number().nonnegative(),
