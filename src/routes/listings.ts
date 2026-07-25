@@ -52,6 +52,7 @@ export async function listingRoutes(app: FastifyInstance) {
       city: z.string().optional(),
       listingType: z.enum(ListingType).optional(),
       status: z.enum(ListingStatus).default(ListingStatus.ACTIVE),
+      take: z.coerce.number().int().min(1).max(500).optional(),
     });
 
     const query = querySchema.parse(request.query);
@@ -69,7 +70,7 @@ export async function listingRoutes(app: FastifyInstance) {
       orderBy: {
         createdAt: 'desc',
       },
-      take: 30,
+      take: query.take,
     });
   });
 
