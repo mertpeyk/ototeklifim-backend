@@ -181,7 +181,18 @@ async function ensureConsignmentAccess(
       timeline: {
         orderBy: { createdAt: 'asc' },
       },
-      assignedDealer: true,
+      assignedDealer: {
+        include: {
+          dealer: {
+            select: {
+              fullName: true,
+              city: true,
+              district: true,
+              phone: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -289,7 +300,18 @@ export async function consignmentRoutes(app: FastifyInstance) {
         timeline: {
           orderBy: { createdAt: 'asc' },
         },
-        assignedDealer: true,
+        assignedDealer: {
+          include: {
+            dealer: {
+              select: {
+                fullName: true,
+                city: true,
+                district: true,
+                phone: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -329,7 +351,18 @@ export async function consignmentRoutes(app: FastifyInstance) {
         timeline: {
           orderBy: { createdAt: 'asc' },
         },
-        assignedDealer: true,
+        assignedDealer: {
+          include: {
+            dealer: {
+              select: {
+                fullName: true,
+                city: true,
+                district: true,
+                phone: true,
+              },
+            },
+          },
+        },
       },
     });
 
