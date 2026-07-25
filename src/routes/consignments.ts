@@ -24,6 +24,17 @@ const consignmentStatusValues = [
   ConsignmentStatus.CANCELLED,
 ] as const;
 
+const timelineCompletionFloor: Record<(typeof consignmentStatusValues)[number], number> = {
+  PENDING: 0,
+  UNDER_REVIEW: 1,
+  MATCHING_DEALER: 2,
+  DEALER_ASSIGNED: 4,
+  VEHICLE_IN_SALE: 4,
+  NEGOTIATION: 4,
+  COMPLETED: 4,
+  CANCELLED: 4,
+};
+
 const vehiclePhotoCategoryValues = [
   VehiclePhotoCategory.FRONT,
   VehiclePhotoCategory.REAR,
@@ -280,6 +291,22 @@ function defaultTimeline() {
   ];
 }
 
+function normalizeTimelineDone<T extends { done: boolean; title: string }>(
+  timeline: T[],
+  status: (typeof consignmentStatusValues)[number],
+  hasDealerAssignment: boolean,
+) {
+  const lastExplicitDoneIndex = timeline.reduce((maxIndex, entry, index) => (entry.done ? index : maxIndex), -1);
+  const completionFloor = timelineCompletionFloor[status] ?? -1;
+  const assignmentFloor = hasDealerAssignment ? 4 : -1;
+  const lastCompletedIndex = Math.max(lastExplicitDoneIndex, completionFloor, assignmentFloor);
+
+  return timeline.map((entry, index) => ({
+    ...entry,
+    done: index <= lastCompletedIndex,
+  }));
+}
+
 export async function consignmentRoutes(app: FastifyInstance) {
   app.get('/me/consignments', async (request, reply) => {
     const authUser = await requireAuth(request, reply);
@@ -288,7 +315,7 @@ export async function consignmentRoutes(app: FastifyInstance) {
       return;
     }
 
-    return prisma.consignmentRequest.findMany({
+    const consignments = await prisma.consignmentRequest.findMany({
       where: {
         userId: authUser.id,
       },
@@ -317,11 +344,28 @@ export async function consignmentRoutes(app: FastifyInstance) {
         createdAt: 'desc',
       },
     });
+
+    return consignments.map((consignment) => ({
+      ...consignment,
+      timeline: normalizeTimelineDone(
+        consignment.timeline,
+        consignment.status,
+        Boolean(consignment.assignedDealer),
+      ),
+    }));
   });
 
   app.get('/consignments/:id', async (request, reply) => {
     const { id } = idParamsSchema.parse(request.params);
-    return ensureConsignmentAccess(request, reply, id);
+    const consignment = await ensureConsignmentAccess(request, reply, id);
+    if (!consignment) {
+      return;
+    }
+
+    return {
+      ...consignment,
+      timeline: normalizeTimelineDone(consignment.timeline, consignment.status, Boolean(consignment.assignedDealer)),
+    };
   });
 
   app.get('/consignments/reference/:referenceNo', async (request, reply) => {
@@ -380,7 +424,10 @@ export async function consignmentRoutes(app: FastifyInstance) {
       return { message: 'Bu basvuruya erisim yetkiniz yok' };
     }
 
-    return consignment;
+    return {
+      ...consignment,
+      timeline: normalizeTimelineDone(consignment.timeline, consignment.status, Boolean(consignment.assignedDealer)),
+    };
   });
 
   app.post('/consignments', async (request, reply) => {

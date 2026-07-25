@@ -305,6 +305,10 @@ function buildConsignmentTimelineEntry(status: z.infer<typeof consignmentStatusS
   }
 }
 
+function shouldCompleteHistoricalConsignmentSteps(status: z.infer<typeof consignmentStatusSchema>["status"]) {
+  return status === 'DEALER_ASSIGNED' || status === 'IN_SALE' || status === 'COMPLETED';
+}
+
 function mapFastSaleStatus(status: FastSaleStatus) {
   return status;
 }
@@ -1052,15 +1056,27 @@ export async function adminRoutes(app: FastifyInstance) {
       COMPLETED: 'COMPLETED',
       CANCELLED: 'CANCELLED',
     } as const;
-    const updated = await prisma.consignmentRequest.update({
-      where: { id: params.id },
-      data: {
-        status: statusMap[payload.status],
-        reviewNote: payload.note ?? '',
-        timeline: {
-          create: buildConsignmentTimelineEntry(payload.status, payload.note),
+    const nextStatus = statusMap[payload.status];
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.consignmentRequest.update({
+        where: { id: params.id },
+        data: {
+          status: nextStatus,
+          reviewNote: payload.note ?? '',
+          timeline: {
+            create: buildConsignmentTimelineEntry(payload.status, payload.note),
+          },
         },
-      },
+      });
+
+      if (shouldCompleteHistoricalConsignmentSteps(payload.status)) {
+        await tx.consignmentTimeline.updateMany({
+          where: { requestId: params.id },
+          data: { done: true },
+        });
+      }
+
+      return next;
     });
     await appendActivityLog({
       adminId: admin.id,
@@ -1143,21 +1159,27 @@ export async function adminRoutes(app: FastifyInstance) {
         status: 'ACCEPTED',
       },
     });
-    await prisma.consignmentRequest.update({
-      where: { id: params.id },
-      data: {
-        status: 'DEALER_ASSIGNED',
-        reviewNote: payload.adminNote ?? '',
-        timeline: {
-          create: {
-            title: 'Galeri atandi',
-            description:
-              payload.message?.trim() ||
-              `${dealer.fullName} galerisi ile eslestirme yapildi. Tahmini satis suresi ${payload.estimatedSaleTime || 'paylasilacak'}.`,
-            done: true,
+    await prisma.$transaction(async (tx) => {
+      await tx.consignmentRequest.update({
+        where: { id: params.id },
+        data: {
+          status: 'DEALER_ASSIGNED',
+          reviewNote: payload.adminNote ?? '',
+          timeline: {
+            create: {
+              title: 'Galeri atandi',
+              description:
+                payload.message?.trim() ||
+                `${dealer.fullName} galerisi ile eslestirme yapildi. Tahmini satis suresi ${payload.estimatedSaleTime || 'paylasilacak'}.`,
+              done: true,
+            },
           },
         },
-      },
+      });
+      await tx.consignmentTimeline.updateMany({
+        where: { requestId: params.id },
+        data: { done: true },
+      });
     });
     await appendActivityLog({
       adminId: admin.id,
