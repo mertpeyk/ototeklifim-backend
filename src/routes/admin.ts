@@ -937,7 +937,60 @@ export async function adminRoutes(app: FastifyInstance) {
       return;
     }
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
-    await prisma.listing.delete({ where: { id: params.id } });
+    const listing = await prisma.listing.findUnique({
+      where: { id: params.id },
+      select: {
+        id: true,
+        auction: {
+          select: { id: true },
+        },
+        conversations: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!listing) {
+      reply.code(404);
+      return { message: 'İlan bulunamadı.' };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const conversationIds = listing.conversations.map((conversation) => conversation.id);
+
+      if (conversationIds.length > 0) {
+        await tx.message.deleteMany({
+          where: {
+            conversationId: {
+              in: conversationIds,
+            },
+          },
+        });
+      }
+
+      await tx.conversation.deleteMany({
+        where: { listingId: params.id },
+      });
+
+      await tx.favorite.deleteMany({
+        where: { listingId: params.id },
+      });
+
+      await tx.listingImage.deleteMany({
+        where: { listingId: params.id },
+      });
+
+      if (listing.auction?.id) {
+        await tx.bid.deleteMany({
+          where: { auctionId: listing.auction.id },
+        });
+        await tx.auction.delete({
+          where: { id: listing.auction.id },
+        });
+      }
+
+      await tx.listing.delete({ where: { id: params.id } });
+    });
     await appendActivityLog({
       adminId: admin.id,
       adminName: admin.fullName,
