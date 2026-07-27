@@ -149,6 +149,7 @@ async function fetchViaCurl(url: string) {
 }
 
 async function fetchPublicHtml(url: string) {
+  let lastHtml = '';
   try {
     const response = await fetch(url, {
       headers: {
@@ -156,11 +157,21 @@ async function fetchPublicHtml(url: string) {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'accept-language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
         'cache-control': 'no-cache',
+        'pragma': 'no-cache',
+        'upgrade-insecure-requests': '1',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'none',
+        'sec-fetch-user': '?1',
+        'sec-ch-ua': '"Chromium";v="138", "Google Chrome";v="138", "Not=A?Brand";v="24"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"macOS"',
       },
       signal: AbortSignal.timeout(PUBLIC_HTML_TIMEOUT_MS),
     });
 
     const html = await response.text();
+    lastHtml = html;
     if (response.ok && html.includes('var adverts = [')) {
       return html;
     }
@@ -168,7 +179,11 @@ async function fetchPublicHtml(url: string) {
     // Curl fallback below.
   }
 
-  return fetchViaCurl(url);
+  try {
+    return await fetchViaCurl(url);
+  } catch {
+    return lastHtml;
+  }
 }
 
 function parseArabamAdverts(html: string) {
