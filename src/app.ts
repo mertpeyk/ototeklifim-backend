@@ -11,6 +11,7 @@ import { fastSaleRoutes } from './routes/fast-sales.js';
 import { favoriteRoutes } from './routes/favorites.js';
 import { healthRoutes } from './routes/health.js';
 import { listingRoutes } from './routes/listings.js';
+import { marketCompsRoutes } from './routes/market-comps.js';
 import { messageRoutes } from './routes/messages.js';
 import { publicUploadRoutes, uploadRoutes } from './routes/uploads.js';
 
@@ -33,6 +34,7 @@ export function buildApp() {
   app.register(catalogRoutes, { prefix: '/api' });
   app.register(healthRoutes, { prefix: '/api' });
   app.register(listingRoutes, { prefix: '/api' });
+  app.register(marketCompsRoutes, { prefix: '/api' });
   app.register(auctionRoutes, { prefix: '/api' });
   app.register(favoriteRoutes, { prefix: '/api' });
   app.register(messageRoutes, { prefix: '/api' });
