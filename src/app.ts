@@ -22,7 +22,12 @@ export function buildApp() {
   app.register(cors, {
     origin: true,
   });
-  app.register(multipart);
+  app.register(multipart, {
+    limits: {
+      fileSize: 20 * 1024 * 1024,
+      files: 10,
+    },
+  });
 
   app.register(authRoutes, { prefix: '/api' });
   app.register(catalogRoutes, { prefix: '/api' });
