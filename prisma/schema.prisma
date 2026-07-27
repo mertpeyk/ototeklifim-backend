@@ -182,6 +182,17 @@ model ListingImage {
   listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 }
 
+model UploadedImage {
+  id           String   @id @default(cuid())
+  filename     String   @unique
+  originalName String
+  contentType  String
+  content      Bytes
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model Auction {
   id           String        @id @default(cuid())
   listingId    String        @unique
