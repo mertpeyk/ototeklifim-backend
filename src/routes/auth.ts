@@ -9,7 +9,7 @@ const registerSchema = z
   .object({
     fullName: z.string().min(2),
     email: z.email(),
-    password: z.string().min(8),
+    password: z.string().min(6),
     phone: z.string().min(10).optional(),
     city: z.string().min(2).optional(),
     district: z.string().min(2).optional(),
