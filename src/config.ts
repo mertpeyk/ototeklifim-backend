@@ -9,6 +9,12 @@ const envSchema = z.object({
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_FROM_NUMBER: z.string().optional(),
+  ADMIN_EMAIL: z.string().optional(),
+  ADMIN_PASSWORD: z.string().optional(),
+  ADMIN_FULL_NAME: z.string().optional(),
+  ADMIN_PHONE: z.string().optional(),
+  ADMIN_CITY: z.string().optional(),
+  ADMIN_DISTRICT: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

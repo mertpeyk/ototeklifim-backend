@@ -22,6 +22,12 @@ mysql -uroot -e "CREATE DATABASE IF NOT EXISTS ototeklifim CHARACTER SET utf8mb4
 ```bash
 DATABASE_URL="mysql://root:password@127.0.0.1:3306/ototeklifim"
 PORT=3001
+ADMIN_EMAIL=admin@ototeklifim.com
+ADMIN_PASSWORD=Hakki576.
+ADMIN_FULL_NAME="Mert Yönetim"
+ADMIN_PHONE=05550000010
+ADMIN_CITY=Istanbul
+ADMIN_DISTRICT=Kadikoy
 ```
 
 4. Prisma + seed:
@@ -48,15 +54,26 @@ Gerekli environment variable'lar:
 ```bash
 DATABASE_URL=mysql://...
 PORT=3001
+ADMIN_EMAIL=admin@ototeklifim.com
+ADMIN_PASSWORD=Hakki576.
+ADMIN_FULL_NAME="Mert Yönetim"
+ADMIN_PHONE=05550000010
+ADMIN_CITY=Istanbul
+ADMIN_DISTRICT=Kadikoy
 ```
 
 Railway start komutu `npm start` ile acilir; bu komut uygulama kalkmadan once otomatik `prisma db push` calistirir.
+
+## Admin seed
+
+Admin hesabi `ADMIN_*` env degiskenlerinden okunur. Env verilmezse varsayilan olarak su bilgiler kullanilir:
+
+- Admin: `admin@ototeklifim.com` / `Hakki576.`
 
 ## Demo hesaplar
 
 - Alici: `alici@ototeklifim.local` / `123456`
 - Satici: `satici@ototeklifim.local` / `123456`
-- Admin: `admin@ototeklifim.local` / `123456`
 
 ## Mobil baglanti
 

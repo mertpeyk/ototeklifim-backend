@@ -1,8 +1,24 @@
 import 'dotenv/config';
 import { AuctionStatus, ListingStatus, ListingType, OfferStatus } from '@prisma/client';
 
+import { env } from '../config.js';
 import { prisma } from '../db.js';
 import { hashPassword } from '../lib/auth.js';
+
+const defaultAdminSeed = {
+  id: 'admin-1',
+  email: 'admin@ototeklifim.com',
+  fullName: 'Mert Yönetim',
+  city: 'Istanbul',
+  district: 'Kadikoy',
+  phone: '05550000010',
+  password: 'Hakki576.',
+} as const;
+
+function pickSeedValue(value: string | undefined, fallback: string) {
+  const normalized = value?.trim();
+  return normalized ? normalized : fallback;
+}
 
 async function upsertUser(input: {
   id: string;
@@ -38,15 +54,19 @@ async function upsertUser(input: {
 }
 
 async function main() {
+  const adminSeed = {
+    id: defaultAdminSeed.id,
+    email: pickSeedValue(env.ADMIN_EMAIL, defaultAdminSeed.email).toLowerCase(),
+    fullName: pickSeedValue(env.ADMIN_FULL_NAME, defaultAdminSeed.fullName),
+    accountType: 'ADMIN' as const,
+    city: pickSeedValue(env.ADMIN_CITY, defaultAdminSeed.city),
+    district: pickSeedValue(env.ADMIN_DISTRICT, defaultAdminSeed.district),
+    phone: pickSeedValue(env.ADMIN_PHONE, defaultAdminSeed.phone),
+    password: pickSeedValue(env.ADMIN_PASSWORD, defaultAdminSeed.password),
+  };
+
   const admin = await upsertUser({
-    id: 'admin-1',
-    email: 'admin@ototeklifim.com',
-    fullName: 'Mert Yönetim',
-    accountType: 'ADMIN',
-    city: 'Istanbul',
-    district: 'Kadikoy',
-    phone: '05550000010',
-    password: 'Hakki576.',
+    ...adminSeed,
   });
 
   const dealerOne = await upsertUser({
@@ -659,7 +679,8 @@ async function main() {
   });
 
   console.log('Seed tamamlandi.');
-  console.log('Admin giris: admin@ototeklifim.com / Hakki576.');
+  console.log(`Admin hesabi hazirlandi: ${adminSeed.email}`);
+  console.log('Admin sifresi seed icin env veya varsayilan degerden alindi.');
   console.log('Demo kullanici: mert.demo@ototeklifim.com / 123456');
   console.log('Demo galeri: ankara@ototeklifimgaleri.com / 123456');
   console.log(`Olusan kayitlar: ${listings.length} ilan, 2 konsinye, 2 hizli sat talebi.`);
