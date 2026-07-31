@@ -20,7 +20,7 @@ const OTP_MAX_ATTEMPTS = 5;
 const registerSchema = z
   .object({
     fullName: z.string().min(2),
-    email: z.email(),
+    email: z.string().optional(),
     password: z.string().min(6),
     phone: z.string().min(10),
     city: z.string().min(2).optional(),
@@ -39,6 +39,20 @@ const registerSchema = z
   .superRefine((payload, ctx) => {
     if (payload.accountType !== AccountType.CORPORATE) {
       return;
+    }
+
+    if (!payload.email?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['email'],
+        message: 'Bu alan zorunludur',
+      });
+    } else if (!z.email().safeParse(payload.email.trim().toLowerCase()).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['email'],
+        message: 'Gecerli bir e-posta adresi girin',
+      });
     }
 
     const requiredCorporateFields = [
@@ -120,6 +134,8 @@ type PendingRegistrationPayload = {
   taxOffice?: string;
 };
 
+const INTERNAL_OPTIONAL_EMAIL_DOMAIN = 'users.ototeklifim.local';
+
 function normalizePhone(phone?: string | null) {
   if (!phone) {
     return undefined;
@@ -136,6 +152,19 @@ function normalizePhone(phone?: string | null) {
   }
 
   return digits;
+}
+
+function normalizeEmail(email?: string | null) {
+  const value = email?.trim().toLowerCase();
+  return value ? value : undefined;
+}
+
+function buildOptionalEmailPlaceholder(phone: string) {
+  return `user-${phone}@${INTERNAL_OPTIONAL_EMAIL_DOMAIN}`;
+}
+
+function isOptionalEmailPlaceholder(email?: string | null) {
+  return Boolean(email && email.endsWith(`@${INTERNAL_OPTIONAL_EMAIL_DOMAIN}`));
 }
 
 function maskPhone(phone: string) {
@@ -174,7 +203,7 @@ function authPayloadFromUser(user: {
   return {
     id: user.id,
     fullName: user.fullName,
-    email: user.email,
+    email: isOptionalEmailPlaceholder(user.email) ? '' : user.email,
     accountType: user.accountType,
     phone: user.phone,
     city: user.city,
@@ -182,10 +211,15 @@ function authPayloadFromUser(user: {
   };
 }
 
-async function ensureUniqueIdentity(email: string, phone: string) {
+async function ensureUniqueIdentity(email: string | undefined, phone: string) {
+  const orConditions = [{ phone }] as Array<{ phone?: string; email?: string }>;
+  if (email) {
+    orConditions.push({ email });
+  }
+
   const exists = await prisma.user.findFirst({
     where: {
-      OR: [{ email }, { phone }],
+      OR: orConditions,
     },
   });
 
@@ -300,7 +334,6 @@ async function verifyOtpChallenge(input: {
 export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/register', async (request, reply) => {
     const payload = registerSchema.parse(request.body);
-    const normalizedEmail = payload.email.trim().toLowerCase();
     const normalizedPhone = normalizePhone(payload.phone);
 
     if (!normalizedPhone || normalizedPhone.length !== 10) {
@@ -308,9 +341,14 @@ export async function authRoutes(app: FastifyInstance) {
       return { message: 'Gecerli bir telefon numarasi girin' };
     }
 
+    const normalizedEmail = normalizeEmail(payload.email);
+    const resolvedEmail = normalizedEmail ?? buildOptionalEmailPlaceholder(normalizedPhone);
+
     const exists = await prisma.user.findFirst({
       where: {
-        OR: [{ email: normalizedEmail }, { phone: normalizedPhone }],
+        OR: normalizedEmail
+          ? [{ email: normalizedEmail }, { phone: normalizedPhone }]
+          : [{ phone: normalizedPhone }],
       },
     });
 
@@ -322,7 +360,7 @@ export async function authRoutes(app: FastifyInstance) {
     const user = await prisma.user.create({
       data: {
         fullName: payload.fullName.trim(),
-        email: normalizedEmail,
+        email: resolvedEmail,
         phone: normalizedPhone,
         city: payload.city?.trim(),
         district: payload.district?.trim(),
@@ -352,7 +390,6 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post('/auth/register/request-phone-verification', async (request, reply) => {
     const payload = registerSchema.parse(request.body);
-    const normalizedEmail = payload.email.trim().toLowerCase();
     const normalizedPhone = normalizePhone(payload.phone);
 
     if (!normalizedPhone || normalizedPhone.length !== 10) {
@@ -360,12 +397,15 @@ export async function authRoutes(app: FastifyInstance) {
       return { message: 'Gecerli bir telefon numarasi girin' };
     }
 
+    const normalizedEmail = normalizeEmail(payload.email);
+    const resolvedEmail = normalizedEmail ?? buildOptionalEmailPlaceholder(normalizedPhone);
+
     try {
       await ensureUniqueIdentity(normalizedEmail, normalizedPhone);
 
       const pendingRegistration: PendingRegistrationPayload = {
         fullName: payload.fullName.trim(),
-        email: normalizedEmail,
+        email: resolvedEmail,
         phone: normalizedPhone,
         city: payload.city?.trim(),
         district: payload.district?.trim(),
