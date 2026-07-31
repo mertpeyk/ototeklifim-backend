@@ -637,11 +637,29 @@ async function buildAdminRepository() {
       const vehicle = parseObject<Record<string, unknown>>(request.vehicleInfo, {});
       const condition = parseObject<Record<string, unknown>>(request.condition, {});
       const photos = parseArray<Record<string, unknown>>(request.photos);
+      const requestUser =
+        mappedUsers.find((user) => user.id === request.userId) ?? {
+          id: request.user.id,
+          fullName: request.user.fullName,
+          email: request.user.email,
+          phone: request.user.phone ?? '',
+          city: request.user.city ?? '',
+          district: request.user.district ?? '',
+          verificationStatus: request.user.documentConfirmed ? 'Doğrulanmış' : 'Eksik',
+          membershipDate: request.user.createdAt.toISOString(),
+          lastLoginAt: request.user.updatedAt.toISOString(),
+          consignmentCount: 0,
+          fastSaleCount: 0,
+          acceptedOffers: 0,
+          rejectedOffers: 0,
+          status: 'Aktif',
+          adminNotes: notesByUser.get(request.user.id) ?? [],
+        };
       return {
         id: request.id,
         requestNo: request.requestNo,
         status: mapFastSaleStatus(request.status),
-        user: mappedUsers.find((user) => user.id === request.userId)!,
+        user: requestUser,
         vehicle: {
           vehicleType: String(vehicle.vehicleType ?? ''),
           brand: String(vehicle.brand ?? ''),
