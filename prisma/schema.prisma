@@ -456,3 +456,10 @@ model AdminUserNote {
 
   @@index([userId, createdAt])
 }
+
+model AppSetting {
+  key       String   @id
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

@@ -176,6 +176,13 @@ const notificationSchema = z.object({
   channels: z.array(z.enum(['SMS', 'EMAIL', 'IN_APP'])).min(1),
 });
 
+const whatsappSettingsSchema = z.object({
+  whatsappNumber: z.string().min(10),
+});
+
+const WHATSAPP_SETTING_KEY = 'contact.whatsapp_number';
+const DEFAULT_WHATSAPP_NUMBER = '905443152285';
+
 function toNumber(value: unknown, fallback = 0) {
   const numeric = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -201,6 +208,32 @@ function parseArray<T>(value: unknown, fallback: T[] = []): T[] {
     }
   }
   return fallback;
+}
+
+function normalizeWhatsappNumber(value: string) {
+  const digits = value.replace(/\D/g, '');
+
+  if (!digits) {
+    return DEFAULT_WHATSAPP_NUMBER;
+  }
+
+  if (digits.startsWith('90')) {
+    return digits;
+  }
+
+  if (digits.startsWith('0')) {
+    return `90${digits.slice(1)}`;
+  }
+
+  return `90${digits}`;
+}
+
+async function getWhatsappSettingValue() {
+  const stored = await prisma.appSetting.findUnique({
+    where: { key: WHATSAPP_SETTING_KEY },
+  });
+
+  return normalizeWhatsappNumber(stored?.value ?? DEFAULT_WHATSAPP_NUMBER);
 }
 
 function mapListingStatus(status: ListingStatus) {
@@ -781,6 +814,15 @@ async function buildAdminRepository() {
 }
 
 export async function adminRoutes(app: FastifyInstance) {
+  app.get('/settings/whatsapp', async () => {
+    const whatsappNumber = await getWhatsappSettingValue();
+
+    return {
+      whatsappNumber,
+      whatsappUrl: `https://wa.me/${whatsappNumber}`,
+    };
+  });
+
   app.post('/admin/auth/login', async (request, reply) => {
     const payload = loginSchema.parse(request.body);
     const user = await prisma.user.findUnique({
@@ -821,6 +863,57 @@ export async function adminRoutes(app: FastifyInstance) {
       return;
     }
     return buildAdminRepository();
+  });
+
+  app.get('/admin/settings/whatsapp', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const whatsappNumber = await getWhatsappSettingValue();
+
+    return {
+      whatsappNumber,
+      whatsappUrl: `https://wa.me/${whatsappNumber}`,
+    };
+  });
+
+  app.put('/admin/settings/whatsapp', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const payload = whatsappSettingsSchema.parse(request.body);
+    const whatsappNumber = normalizeWhatsappNumber(payload.whatsappNumber);
+    const previousValue = await getWhatsappSettingValue();
+
+    await prisma.appSetting.upsert({
+      where: { key: WHATSAPP_SETTING_KEY },
+      update: { value: whatsappNumber },
+      create: {
+        key: WHATSAPP_SETTING_KEY,
+        value: whatsappNumber,
+      },
+    });
+
+    await appendActivityLog({
+      adminId: admin.id,
+      adminName: admin.fullName,
+      action: 'SETTINGS_UPDATE',
+      module: 'Ayarlar',
+      recordId: WHATSAPP_SETTING_KEY,
+      previousValue,
+      newValue: whatsappNumber,
+      description: 'WhatsApp iletisim numarasi guncellendi.',
+    });
+
+    return {
+      success: true,
+      whatsappNumber,
+      whatsappUrl: `https://wa.me/${whatsappNumber}`,
+    };
   });
 
   app.post('/admin/listings', async (request, reply) => {
