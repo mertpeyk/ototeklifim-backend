@@ -205,6 +205,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
     const authUser = await resolveAuthUser(request);
 
     let userId = authUser?.id;
+    let existingAccountType = authUser?.accountType;
 
     if (!userId) {
       const existingUser = await prisma.user.findFirst({
@@ -214,11 +215,12 @@ export async function fastSaleRoutes(app: FastifyInstance) {
             normalizedPhone ? { phone: normalizedPhone } : undefined,
           ].filter(Boolean) as Array<{ email?: string; phone?: string }>,
         },
-        select: { id: true },
+        select: { id: true, accountType: true },
       });
 
       if (existingUser) {
         userId = existingUser.id;
+        existingAccountType = existingUser.accountType;
       } else {
         const createdUser = await prisma.user.create({
           data: {
@@ -233,19 +235,22 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         });
 
         userId = createdUser.id;
+        existingAccountType = AccountType.INDIVIDUAL;
       }
     }
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        fullName,
-        email: normalizedEmail,
-        phone: normalizedPhone,
-        city: payload.vehicleInfo.city,
-        accountType: AccountType.INDIVIDUAL,
-      },
-    });
+    if (existingAccountType !== AccountType.ADMIN && existingAccountType !== AccountType.DEALER) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          fullName,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          city: payload.vehicleInfo.city,
+          accountType: AccountType.INDIVIDUAL,
+        },
+      });
+    }
 
     const fastSale = await prisma.fastSaleRequest.create({
       data: {
