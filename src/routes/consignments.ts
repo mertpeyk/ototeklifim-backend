@@ -433,6 +433,10 @@ export async function consignmentRoutes(app: FastifyInstance) {
   app.post('/consignments', async (request, reply) => {
     const payload = createConsignmentSchema.parse(request.body);
     const authUser = await resolveAuthUser(request);
+    if (authUser?.accountType === AccountType.ADMIN || authUser?.accountType === AccountType.DEALER) {
+      reply.code(403);
+      return { message: 'Admin veya galeri oturumu acikken bu formdan konsinye basvurusu gonderemezsiniz.' };
+    }
     const referenceNo = await createUniqueReferenceNo();
     const coverUrl = payload.photos.find((photo) => photo.isCover)?.url;
     const normalizedEmail = payload.expectations.contactEmail.trim().toLowerCase();
@@ -440,7 +444,7 @@ export async function consignmentRoutes(app: FastifyInstance) {
     const fullName = payload.expectations.contactName.trim();
 
     let userId = authUser?.id;
-    let existingAccountType = authUser?.accountType;
+    let existingAccountType: AccountType | undefined = authUser?.accountType;
 
     if (!userId) {
       const existingUser = await prisma.user.findFirst({
@@ -454,6 +458,10 @@ export async function consignmentRoutes(app: FastifyInstance) {
       });
 
       if (existingUser) {
+        if (existingUser.accountType === AccountType.ADMIN || existingUser.accountType === AccountType.DEALER) {
+          reply.code(403);
+          return { message: 'Admin veya galeri hesabiyla public konsinye basvurusu olusturulamaz.' };
+        }
         userId = existingUser.id;
         existingAccountType = existingUser.accountType;
       } else {
@@ -475,7 +483,11 @@ export async function consignmentRoutes(app: FastifyInstance) {
       }
     }
 
-    if (existingAccountType !== AccountType.ADMIN && existingAccountType !== AccountType.DEALER) {
+    if (
+      existingAccountType === undefined
+      || existingAccountType === AccountType.INDIVIDUAL
+      || existingAccountType === AccountType.CORPORATE
+    ) {
       await prisma.user.update({
         where: { id: userId },
         data: {

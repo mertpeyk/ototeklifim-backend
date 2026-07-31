@@ -203,9 +203,13 @@ export async function fastSaleRoutes(app: FastifyInstance) {
     const normalizedEmail = payload.contact.email.trim().toLowerCase();
     const normalizedPhone = normalizePhone(payload.contact.phone);
     const authUser = await resolveAuthUser(request);
+    if (authUser?.accountType === AccountType.ADMIN || authUser?.accountType === AccountType.DEALER) {
+      reply.code(403);
+      return { message: 'Admin veya galeri oturumu acikken bu formdan hizli sat talebi gonderemezsiniz.' };
+    }
 
     let userId = authUser?.id;
-    let existingAccountType = authUser?.accountType;
+    let existingAccountType: AccountType | undefined = authUser?.accountType;
 
     if (!userId) {
       const existingUser = await prisma.user.findFirst({
@@ -219,6 +223,10 @@ export async function fastSaleRoutes(app: FastifyInstance) {
       });
 
       if (existingUser) {
+        if (existingUser.accountType === AccountType.ADMIN || existingUser.accountType === AccountType.DEALER) {
+          reply.code(403);
+          return { message: 'Admin veya galeri hesabiyla public hizli sat talebi olusturulamaz.' };
+        }
         userId = existingUser.id;
         existingAccountType = existingUser.accountType;
       } else {
@@ -239,7 +247,11 @@ export async function fastSaleRoutes(app: FastifyInstance) {
       }
     }
 
-    if (existingAccountType !== AccountType.ADMIN && existingAccountType !== AccountType.DEALER) {
+    if (
+      existingAccountType === undefined
+      || existingAccountType === AccountType.INDIVIDUAL
+      || existingAccountType === AccountType.CORPORATE
+    ) {
       await prisma.user.update({
         where: { id: userId },
         data: {
