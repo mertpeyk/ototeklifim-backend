@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { prisma } from '../db.js';
 import { hashPassword, requireAuth, resolveAuthUser } from '../lib/auth.js';
+import { notifyNewApplicationViaTelegram, notifyNewApplicationViaWhatsapp } from '../lib/admin-alerts.js';
 
 const statusValues = [
   FastSaleStatus.NEW,
@@ -283,6 +284,33 @@ export async function fastSaleRoutes(app: FastifyInstance) {
           orderBy: { createdAt: 'desc' },
         },
       },
+    });
+
+    void notifyNewApplicationViaWhatsapp({
+      type: 'hizli-sat',
+      referenceNo: requestNo,
+      customerName: fullName,
+      customerPhone: normalizedPhone,
+      vehicleSummary: `${payload.vehicleInfo.year} ${payload.vehicleInfo.brand} ${payload.vehicleInfo.model}`.trim(),
+      city: payload.vehicleInfo.city,
+    }).catch((error) => {
+      request.log.error(
+        { error, requestNo, route: 'fast-sales.create' },
+        'WhatsApp hizli sat bildirimi gonderilemedi',
+      );
+    });
+    void notifyNewApplicationViaTelegram({
+      type: 'hizli-sat',
+      referenceNo: requestNo,
+      customerName: fullName,
+      customerPhone: normalizedPhone,
+      vehicleSummary: `${payload.vehicleInfo.year} ${payload.vehicleInfo.brand} ${payload.vehicleInfo.model}`.trim(),
+      city: payload.vehicleInfo.city,
+    }).catch((error) => {
+      request.log.error(
+        { error, requestNo, route: 'fast-sales.create' },
+        'Telegram hizli sat bildirimi gonderilemedi',
+      );
     });
 
     const messageHistory = await buildFastSaleMessageHistory(fastSale.id);

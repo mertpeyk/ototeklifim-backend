@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { prisma } from '../db.js';
 import { hashPassword, requireAdmin, requireAuth, resolveAuthUser } from '../lib/auth.js';
+import { notifyNewApplicationViaTelegram, notifyNewApplicationViaWhatsapp } from '../lib/admin-alerts.js';
 
 const phoneRegex = /^5\d{9}$/;
 
@@ -534,6 +535,33 @@ export async function consignmentRoutes(app: FastifyInstance) {
           orderBy: { createdAt: 'asc' },
         },
       },
+    });
+
+    void notifyNewApplicationViaWhatsapp({
+      type: 'konsinye',
+      referenceNo,
+      customerName: fullName,
+      customerPhone: normalizedPhone,
+      vehicleSummary: `${payload.vehicleInfo.year} ${payload.vehicleInfo.brand} ${payload.vehicleInfo.model}`.trim(),
+      city: payload.expectations.city,
+    }).catch((error) => {
+      request.log.error(
+        { error, referenceNo, route: 'consignments.create' },
+        'WhatsApp konsinye bildirimi gonderilemedi',
+      );
+    });
+    void notifyNewApplicationViaTelegram({
+      type: 'konsinye',
+      referenceNo,
+      customerName: fullName,
+      customerPhone: normalizedPhone,
+      vehicleSummary: `${payload.vehicleInfo.year} ${payload.vehicleInfo.brand} ${payload.vehicleInfo.model}`.trim(),
+      city: payload.expectations.city,
+    }).catch((error) => {
+      request.log.error(
+        { error, referenceNo, route: 'consignments.create' },
+        'Telegram konsinye bildirimi gonderilemedi',
+      );
     });
 
     reply.code(201);
