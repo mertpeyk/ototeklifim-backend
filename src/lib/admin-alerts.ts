@@ -10,8 +10,11 @@ type NewApplicationAlertInput = {
   referenceNo: string;
   customerName: string;
   customerPhone?: string | null;
+  customerEmail?: string | null;
   vehicleSummary: string;
   city?: string | null;
+  district?: string | null;
+  details?: string[];
 };
 
 async function resolveAlertPhone() {
@@ -45,11 +48,16 @@ function buildApplicationAlertMessage(input: NewApplicationAlertInput) {
     `No: ${input.referenceNo}`,
     `Musteri: ${input.customerName}`,
     `Telefon: ${input.customerPhone || '-'}`,
+    `E-posta: ${input.customerEmail || '-'}`,
     `Arac: ${input.vehicleSummary}`,
   ];
 
   if (input.city) {
-    lines.push(`Sehir: ${input.city}`);
+    lines.push(`Konum: ${input.city}${input.district ? ` / ${input.district}` : ''}`);
+  }
+
+  if (input.details?.length) {
+    lines.push(...input.details);
   }
 
   lines.push('Admin panelden kontrol edebilirsin.');
