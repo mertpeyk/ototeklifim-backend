@@ -67,10 +67,12 @@ const damageMapItemSchema = z.object({
   status: z.enum(['ORIGINAL', 'LOCAL_PAINT', 'PAINTED', 'REPAIRED', 'REPLACED']),
 });
 
+const normalizeNumericString = (value: string) => value.replace(/[^\d]/g, '');
+
 const conditionSchema = z.object({
   paintStatus: z.string().min(1),
   changedPartsNote: z.string().min(1),
-  tramerInfo: z.string().min(1),
+  tramerInfo: z.string().optional().default('').transform((value) => value.trim()),
   heavyDamage: z.string().min(1),
   mechanicalStatus: z.string().min(1),
   engineStatus: z.string().min(1),
@@ -82,8 +84,14 @@ const conditionSchema = z.object({
 });
 
 const expectationsSchema = z.object({
-  expectedPrice: z.string().min(1),
-  minimumPrice: z.string().min(1),
+  expectedPrice: z
+    .string()
+    .transform((value) => normalizeNumericString(value))
+    .refine((value) => value.length > 0, 'Beklenen satış fiyatını girin.'),
+  minimumPrice: z
+    .string()
+    .transform((value) => normalizeNumericString(value))
+    .refine((value) => value.length > 0, 'Minimum kabul fiyatını girin.'),
   salePriority: z.enum(['FAST', 'NORMAL', 'MAX_PRICE']),
   city: z.string().min(1),
   district: z.string().min(1),
@@ -94,6 +102,33 @@ const expectationsSchema = z.object({
   contactPhone: z.string().regex(phoneRegex),
   contactEmail: z.email(),
   notes: z.string().optional().default(''),
+}).superRefine((values, ctx) => {
+  const expectedPrice = Number(values.expectedPrice);
+  const minimumPrice = Number(values.minimumPrice);
+
+  if (!Number.isFinite(expectedPrice) || expectedPrice <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Beklenen satış fiyatını girin.',
+      path: ['expectedPrice'],
+    });
+  }
+
+  if (!Number.isFinite(minimumPrice) || minimumPrice <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Minimum kabul fiyatını girin.',
+      path: ['minimumPrice'],
+    });
+  }
+
+  if (Number.isFinite(expectedPrice) && Number.isFinite(minimumPrice) && minimumPrice > expectedPrice) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Minimum kabul fiyatı beklenen satış fiyatından yüksek olamaz.',
+      path: ['minimumPrice'],
+    });
+  }
 });
 
 const approvalsSchema = z.object({
