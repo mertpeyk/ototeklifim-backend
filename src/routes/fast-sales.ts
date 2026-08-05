@@ -6,6 +6,12 @@ import { z } from 'zod';
 import { prisma } from '../db.js';
 import { hashPassword, requireAuth, resolveAuthUser } from '../lib/auth.js';
 import { notifyNewApplicationViaTelegram, notifyNewApplicationViaWhatsapp } from '../lib/admin-alerts.js';
+import {
+  buildEstimatedFastSaleNumbers,
+  valuationConditionSchema,
+  valuationEstimateInputSchema,
+  valuationVehicleInfoSchema,
+} from '../lib/valuation.js';
 
 const statusValues = [
   FastSaleStatus.NEW,
@@ -105,11 +111,11 @@ const createFastSaleSchema = z.object({
   vehicleInfo: vehicleInfoSchema,
   condition: conditionSchema,
   photos: z.array(photoSchema).max(10).default([]),
-  expectedPrice: z.number().nonnegative(),
-  estimatedMarketValue: z.number().nonnegative(),
-  quickSaleValue: z.number().nonnegative(),
-  dealerBuyValue: z.number().nonnegative(),
-  valuationSummary: z.string().trim().min(10).max(5000),
+  expectedPrice: z.number().nonnegative().optional().default(0),
+  estimatedMarketValue: z.number().nonnegative().optional().default(0),
+  quickSaleValue: z.number().nonnegative().optional().default(0),
+  dealerBuyValue: z.number().nonnegative().optional().default(0),
+  valuationSummary: z.string().trim().min(10).max(5000).optional().default(''),
   contact: contactSchema,
 });
 
@@ -231,8 +237,28 @@ async function buildFastSaleMessageHistory(requestId: string) {
 }
 
 export async function fastSaleRoutes(app: FastifyInstance) {
+  app.post('/fast-sales/estimate', async (request) => {
+    const payload = z.object({
+      vehicleInfo: valuationVehicleInfoSchema,
+      condition: valuationConditionSchema,
+      extraKey: z.boolean().optional().default(false),
+      serviceHistory: z.boolean().optional().default(false),
+    }).parse(request.body);
+
+    return buildEstimatedFastSaleNumbers(valuationEstimateInputSchema.parse(payload));
+  });
+
   app.post('/fast-sales', async (request, reply) => {
     const payload = createFastSaleSchema.parse(request.body);
+    const estimatedValues = await buildEstimatedFastSaleNumbers({
+      vehicleInfo: payload.vehicleInfo,
+      condition: payload.condition,
+      extraKey: false,
+      serviceHistory:
+        payload.condition.mechanicalStatus.toLocaleLowerCase('tr-TR').includes('bakim')
+        || payload.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('bakim')
+        || payload.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('servis'),
+    });
     const requestNo = await createUniqueRequestNo();
     const fullName = `${payload.contact.firstName} ${payload.contact.lastName}`.trim();
     const normalizedEmail = payload.contact.email.trim().toLowerCase();
@@ -307,11 +333,11 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         vehicleInfo: payload.vehicleInfo,
         condition: payload.condition,
         photos: payload.photos,
-        expectedPrice: toDecimal(payload.expectedPrice),
-        estimatedMarketValue: toDecimal(payload.estimatedMarketValue),
-        quickSaleValue: toDecimal(payload.quickSaleValue),
-        dealerBuyValue: toDecimal(payload.dealerBuyValue),
-        valuationSummary: payload.valuationSummary,
+        expectedPrice: toDecimal(estimatedValues.expectedPrice),
+        estimatedMarketValue: toDecimal(estimatedValues.estimatedMarketValue),
+        quickSaleValue: toDecimal(estimatedValues.quickSaleValue),
+        dealerBuyValue: toDecimal(estimatedValues.dealerBuyValue),
+        valuationSummary: payload.valuationSummary || estimatedValues.valuationSummary,
       },
       include: {
         offers: {
@@ -338,10 +364,10 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `KM: ${payload.vehicleInfo.mileage}`,
         `Kasa: ${payload.vehicleInfo.bodyType}`,
         `Renk: ${payload.vehicleInfo.color}`,
-        `Beklenen fiyat: ${payload.expectedPrice} TL`,
-        `Piyasa degeri: ${payload.estimatedMarketValue} TL`,
-        `Hizli sat degeri: ${payload.quickSaleValue} TL`,
-        `Bayi alim degeri: ${payload.dealerBuyValue} TL`,
+        `Beklenen fiyat: ${estimatedValues.expectedPrice} TL`,
+        `Piyasa degeri: ${estimatedValues.estimatedMarketValue} TL`,
+        `Hizli sat degeri: ${estimatedValues.quickSaleValue} TL`,
+        `Bayi alim degeri: ${estimatedValues.dealerBuyValue} TL`,
         `Tramer: ${payload.condition.tramerAmount} TL`,
         `Agir hasar: ${payload.condition.severeDamage ? 'Var' : 'Yok'}`,
         `Mekanik: ${payload.condition.mechanicalStatus}`,
@@ -351,7 +377,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `Direk durumu: ${payload.condition.pillarCondition}`,
         `Ekspertiz notu: ${payload.condition.appraisalReport || '-'}`,
         `Foto sayisi: ${payload.photos.length}`,
-        `Degerleme notu: ${payload.valuationSummary}`,
+        `Degerleme notu: ${payload.valuationSummary || estimatedValues.valuationSummary}`,
       ],
     }).catch((error) => {
       request.log.error(
@@ -377,10 +403,10 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `KM: ${payload.vehicleInfo.mileage}`,
         `Kasa: ${payload.vehicleInfo.bodyType}`,
         `Renk: ${payload.vehicleInfo.color}`,
-        `Beklenen fiyat: ${payload.expectedPrice} TL`,
-        `Piyasa degeri: ${payload.estimatedMarketValue} TL`,
-        `Hizli sat degeri: ${payload.quickSaleValue} TL`,
-        `Bayi alim degeri: ${payload.dealerBuyValue} TL`,
+        `Beklenen fiyat: ${estimatedValues.expectedPrice} TL`,
+        `Piyasa degeri: ${estimatedValues.estimatedMarketValue} TL`,
+        `Hizli sat degeri: ${estimatedValues.quickSaleValue} TL`,
+        `Bayi alim degeri: ${estimatedValues.dealerBuyValue} TL`,
         `Tramer: ${payload.condition.tramerAmount} TL`,
         `Agir hasar: ${payload.condition.severeDamage ? 'Var' : 'Yok'}`,
         `Mekanik: ${payload.condition.mechanicalStatus}`,
@@ -390,7 +416,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `Direk durumu: ${payload.condition.pillarCondition}`,
         `Ekspertiz notu: ${payload.condition.appraisalReport || '-'}`,
         `Foto sayisi: ${payload.photos.length}`,
-        `Degerleme notu: ${payload.valuationSummary}`,
+        `Degerleme notu: ${payload.valuationSummary || estimatedValues.valuationSummary}`,
       ],
     }).catch((error) => {
       request.log.error(
