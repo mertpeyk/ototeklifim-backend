@@ -41,11 +41,18 @@ export async function getValuationModelMultipliers(forceRefresh = false) {
     return cachedSnapshot.data;
   }
 
-  const stored = await prisma.appSetting.findUnique({
-    where: { key: VALUATION_MODEL_MULTIPLIERS_SETTING_KEY },
-  });
+  let data: ValuationModelMultiplierMap = {};
 
-  const data = parseCalibrationMap(stored?.value);
+  try {
+    const stored = await prisma.appSetting.findUnique({
+      where: { key: VALUATION_MODEL_MULTIPLIERS_SETTING_KEY },
+    });
+
+    data = parseCalibrationMap(stored?.value);
+  } catch {
+    data = cachedSnapshot?.data || {};
+  }
+
   cachedSnapshot = {
     expiresAt: Date.now() + CALIBRATION_CACHE_TTL_MS,
     data,

@@ -164,6 +164,49 @@ function getOwnershipDemandBoost(input: ValuationEstimateInput) {
   return boost;
 }
 
+function getLiquidityBoost(input: ValuationEstimateInput) {
+  const brand = normalizeText(input.vehicleInfo.brand);
+  const model = normalizeText(input.vehicleInfo.model);
+  const transmission = normalizeText(input.vehicleInfo.transmission);
+  const fuel = normalizeText(input.vehicleInfo.fuelType);
+  const packageName = normalizeText(input.vehicleInfo.packageName);
+  const bodyType = normalizeText(input.vehicleInfo.bodyType);
+  const engine = normalizeText(input.vehicleInfo.engineVolume);
+  const year = input.vehicleInfo.year || 0;
+
+  let boost = 0;
+
+  const isAutomatic = transmission.includes('otomatik');
+  const isModernBenzinTurbo = fuel.includes('benzin') && (engine.includes('tsi') || engine.includes('turbo') || engine.includes('tce'));
+  const isCompactHatch = bodyType.includes('hatch');
+
+  if (brand === 'volkswagen' && model === 'polo') {
+    boost += 45000;
+    if (year >= 2020) boost += 25000;
+    if (isAutomatic) boost += 20000;
+    if (isModernBenzinTurbo) boost += 15000;
+    if (packageName.includes('comfortline') || packageName.includes('style') || packageName.includes('life')) boost += 10000;
+  }
+
+  if (brand === 'volkswagen' && model === 'golf' && isAutomatic) {
+    boost += 35000;
+  }
+
+  if (brand === 'renault' && model === 'clio' && isAutomatic && isCompactHatch) {
+    boost += 30000;
+  }
+
+  if (brand === 'toyota' && model === 'corolla') {
+    boost += 25000;
+  }
+
+  if (brand === 'hyundai' && model === 'i20' && isAutomatic) {
+    boost += 25000;
+  }
+
+  return boost;
+}
+
 function toRoundedCurrency(value: number) {
   return Math.max(0, Math.round(value));
 }
@@ -217,7 +260,7 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
   const bodyTypeAdjustments: Record<string, number> = {
     SUV: 180000,
     Sedan: 60000,
-    Hatchback: -45000,
+    Hatchback: -10000,
     MPV: 85000,
     'Pick up': 320000,
     StationWagon: 70000,
@@ -237,7 +280,7 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
     'Volkswagen|Caravelle': 460000,
     'Volkswagen|Caddy': 170000,
     'Volkswagen|Golf': 90000,
-    'Volkswagen|Polo': -240000,
+    'Volkswagen|Polo': -90000,
     'Volkswagen|Jetta': 50000,
     'Volkswagen|T-Roc': 180000,
     'Volkswagen|Taigo': 110000,
@@ -283,6 +326,7 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
   const packageBoost = getPackageTierBoost(input.vehicleInfo.packageName, input.vehicleInfo.brand, input.vehicleInfo.model);
   const regionalBoost = getRegionalAdjustment(input.vehicleInfo.city, input.vehicleInfo.district || '', brandBase, input.vehicleInfo.bodyType, input.vehicleInfo.brand);
   const ownershipDemandBoost = getOwnershipDemandBoost(input);
+  const liquidityBoost = getLiquidityBoost(input);
   const maintenanceBoost = input.serviceHistory ? 25000 : input.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('mevcut') ? 18000 : -20000;
   const extraKeyBoost = input.extraKey ? 10000 : -8000;
 
@@ -316,6 +360,7 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
       + packageBoost
       + regionalBoost
       + ownershipDemandBoost
+      + liquidityBoost
       + maintenanceBoost
       + extraKeyBoost
       - kmPenalty
@@ -392,6 +437,7 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
     input.vehicleInfo.transmission === 'Otomatik' ? 'Otomatik vites talebi destekliyor' : null,
     marketComps?.sampleSize ? `${marketComps.sampleSize} emsal ilan ile piyasa doğrulaması yapıldı` : null,
     regionalBoost > 0 ? `${input.vehicleInfo.city} bölgesinde talep primi uygulandı` : null,
+    liquidityBoost > 0 ? 'Likiditesi yüksek model avantajı uygulandı' : null,
     modelCalibrationPercent !== 0 ? `Model kalibrasyonu %${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(modelCalibrationPercent)} uygulandı` : null,
   ].filter(Boolean) as string[];
 

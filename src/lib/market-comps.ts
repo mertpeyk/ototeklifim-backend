@@ -215,6 +215,70 @@ function extractNumericEngineToken(value: string) {
   return match ? match[1]!.replace(/\s+/g, '') : '';
 }
 
+function extractPowerToken(value: string) {
+  const matches = normalizeText(value).match(/\b(\d{2,3})\b/g) || [];
+  const numeric = matches
+    .map((item) => Number(item))
+    .filter((item) => item >= 60 && item <= 400);
+  return numeric.length ? String(numeric[0]) : '';
+}
+
+function hasAnyToken(haystack: string, tokens: string[]) {
+  return tokens.some((token) => token && haystack.includes(token));
+}
+
+function isAdvertStrictMatch(
+  advert: { title: string; variant: string; categoryName: string },
+  query: MarketCompsQuery,
+) {
+  const haystack = normalizeText(`${advert.title} ${advert.variant} ${advert.categoryName}`);
+  const packageNormalized = normalizeText(query.packageName || '');
+  const engineNormalized = normalizeText(query.engine || '');
+  const engineNumericToken = extractNumericEngineToken(query.engine || '');
+  const powerToken = extractPowerToken(query.engine || '');
+  const fuelNormalized = normalizeText(query.fuelType || '');
+
+  if (packageNormalized && packageNormalized !== 'standart' && !haystack.includes(packageNormalized)) {
+    return false;
+  }
+
+  if (engineNumericToken) {
+    const advertNumericToken = extractNumericEngineToken(haystack);
+    if (!advertNumericToken || advertNumericToken !== engineNumericToken) {
+      return false;
+    }
+  }
+
+  if (engineNormalized.includes('tsi') && !haystack.includes('tsi')) {
+    return false;
+  }
+
+  if (engineNormalized.includes('tdi') && !haystack.includes('tdi')) {
+    return false;
+  }
+
+  if ((fuelNormalized.includes('benzin') || engineNormalized.includes('tsi')) && hasAnyToken(haystack, ['tdi', 'dizel', 'diesel'])) {
+    return false;
+  }
+
+  if (fuelNormalized.includes('dizel') && !hasAnyToken(haystack, ['tdi', 'dizel', 'diesel'])) {
+    return false;
+  }
+
+  if (fuelNormalized.includes('hibrit') && !hasAnyToken(haystack, ['hibrit', 'hybrid'])) {
+    return false;
+  }
+
+  if (powerToken && haystack.match(/\b\d{2,3}\b/)) {
+    const advertPowerMatch = haystack.match(/\b(\d{2,3})\b/);
+    if (advertPowerMatch && advertPowerMatch[1] !== powerToken) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function scoreAdvertRelevance(
   advert: { title: string; variant: string; categoryName: string },
   query: MarketCompsQuery,
@@ -315,10 +379,27 @@ async function resolveArabamComps(query: MarketCompsQuery): Promise<MarketCompsR
           ...item,
           relevanceScore: scoreAdvertRelevance(item, query),
         }));
+        const strictAdverts = scoredAdverts.filter((item) => isAdvertStrictMatch(item, query));
         const relevantAdverts = scoredAdverts
           .filter((item) => item.relevanceScore >= 2)
           .sort((left, right) => right.relevanceScore - left.relevanceScore || left.price - right.price);
-        const selectedAdverts = relevantAdverts.length >= 3 ? relevantAdverts : scoredAdverts;
+        const hasSpecificity = Boolean(
+          String(query.packageName || '').trim()
+          || String(query.engine || '').trim()
+          || String(query.fuelType || '').trim(),
+        );
+        const selectedAdverts = strictAdverts.length >= 2
+          ? strictAdverts.sort((left, right) => right.relevanceScore - left.relevanceScore || left.price - right.price)
+          : relevantAdverts.length >= 3 && !hasSpecificity
+            ? relevantAdverts
+            : !hasSpecificity
+              ? scoredAdverts
+              : [];
+
+        if (!selectedAdverts.length) {
+          continue;
+        }
+
         const prices = selectedAdverts.map((item) => item.price);
         return {
           ok: true,
