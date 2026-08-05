@@ -25,8 +25,12 @@ const CACHE_TTL_MS = 60 * 1000;
 let cachedCatalog: { expiresAt: number; catalog: ValuationCatalog; metadata: ValuationMetadata } | null = null;
 let catalogUnavailableUntil = 0;
 
-async function resolveLandingAssetsRoot() {
+async function resolveValuationAssetsRoot() {
   const candidates = [
+    path.resolve(__dirname, '../assets'),
+    path.resolve(__dirname, '../../src/assets'),
+    path.resolve(process.cwd(), 'src/assets'),
+    path.resolve(process.cwd(), 'dist/assets'),
     path.resolve(__dirname, '../../../ototeklifim-landing-web/assets'),
     path.resolve(__dirname, '../../ototeklifim-landing-web/assets'),
     path.resolve(process.cwd(), '../ototeklifim-landing-web/assets'),
@@ -111,9 +115,9 @@ async function loadCatalogSnapshot() {
   }
 
   try {
-    const landingAssetsRoot = await resolveLandingAssetsRoot();
-    const catalogPath = path.join(landingAssetsRoot, 'valuation-catalog.json');
-    const metadataPath = path.join(landingAssetsRoot, 'valuation-metadata.json');
+    const assetsRoot = await resolveValuationAssetsRoot();
+    const catalogPath = path.join(assetsRoot, 'valuation-catalog.json');
+    const metadataPath = path.join(assetsRoot, 'valuation-metadata.json');
 
     const [catalogRaw, metadataRaw] = await Promise.all([
       readFile(catalogPath, 'utf8'),

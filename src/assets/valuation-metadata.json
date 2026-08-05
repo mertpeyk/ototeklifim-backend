@@ -1,0 +1,1981 @@
+{
+  "defaultPackages": [
+    "Standart",
+    "Comfort",
+    "Prestige",
+    "Premium"
+  ],
+  "brandPackages": {
+    "Abarth": [
+      "Turismo",
+      "Competizione",
+      "Scorpionissima"
+    ],
+    "Acura": [
+      "Base",
+      "A-Spec",
+      "Advance",
+      "Type S"
+    ],
+    "Alfa Romeo": [
+      "Sprint",
+      "Ti",
+      "Veloce",
+      "Competizione",
+      "Quadrifoglio"
+    ],
+    "Aston Martin": [
+      "Base",
+      "S",
+      "F1 Edition",
+      "AMR"
+    ],
+    "Audi": [
+      "Advanced",
+      "Sport",
+      "S line",
+      "Black Edition",
+      "quattro"
+    ],
+    "BAIC": [
+      "Comfort",
+      "Elite",
+      "Premium",
+      "4x4"
+    ],
+    "BMW": [
+      "Sport Line",
+      "Luxury Line",
+      "xLine",
+      "M Sport",
+      "Edition"
+    ],
+    "BYD": [
+      "Comfort",
+      "Design",
+      "Excellence",
+      "AWD",
+      "Flagship"
+    ],
+    "Bentley": [
+      "Azure",
+      "S",
+      "Speed",
+      "Mulliner"
+    ],
+    "Cadillac": [
+      "Luxury",
+      "Premium Luxury",
+      "Sport",
+      "Platinum"
+    ],
+    "Chevrolet": [
+      "LT",
+      "LTZ",
+      "Premier",
+      "RS",
+      "High Country"
+    ],
+    "Chrysler": [
+      "Touring",
+      "Limited",
+      "Pinnacle",
+      "Hybrid"
+    ],
+    "Citroën": [
+      "Feel",
+      "Feel Bold",
+      "Shine",
+      "Shine Bold",
+      "Selection"
+    ],
+    "Cupra": [
+      "Style",
+      "Design",
+      "FR",
+      "VZ",
+      "VZ-Line"
+    ],
+    "DFSK": [
+      "Comfort",
+      "Luxury",
+      "Prestige"
+    ],
+    "DS Automobiles": [
+      "Bastille",
+      "Performance Line",
+      "Rivoli",
+      "Opera",
+      "Étoile"
+    ],
+    "Dacia": [
+      "Essential",
+      "Expression",
+      "Journey",
+      "Extreme",
+      "Prestige"
+    ],
+    "Dodge": [
+      "SXT",
+      "GT",
+      "R/T",
+      "SRT",
+      "Hellcat"
+    ],
+    "Ferrari": [
+      "Base",
+      "Fiorano",
+      "Assetto Fiorano",
+      "Speciale"
+    ],
+    "Fiat": [
+      "Easy",
+      "Street",
+      "Urban",
+      "Lounge",
+      "Cross"
+    ],
+    "Fisker": [
+      "Sport",
+      "Ultra",
+      "Extreme"
+    ],
+    "Ford": [
+      "Trend X",
+      "Titanium",
+      "Titanium X",
+      "ST-Line",
+      "Style"
+    ],
+    "Ford (USA)": [
+      "XLT",
+      "Lariat",
+      "Platinum",
+      "ST",
+      "Raptor"
+    ],
+    "GMC": [
+      "SLE",
+      "SLT",
+      "AT4",
+      "Denali"
+    ],
+    "GWM": [
+      "Pure",
+      "Pro",
+      "Premium",
+      "GT"
+    ],
+    "Genesis": [
+      "Premium",
+      "Prestige",
+      "Advanced",
+      "Luxury",
+      "Sport"
+    ],
+    "Great Wall": [
+      "Premium",
+      "Luxury",
+      "4x4"
+    ],
+    "Hongqi": [
+      "Executive",
+      "Prestige",
+      "Flagship"
+    ],
+    "Hyundai": [
+      "Jump",
+      "Style",
+      "Elite",
+      "Prime",
+      "N Line"
+    ],
+    "Ineos": [
+      "Utility",
+      "Trialmaster",
+      "Fieldmaster"
+    ],
+    "Infiniti": [
+      "Pure",
+      "Luxe",
+      "Sensory",
+      "Sport",
+      "Autograph"
+    ],
+    "Isuzu": [
+      "V",
+      "V-Cross",
+      "DLX",
+      "LSE",
+      "4x4"
+    ],
+    "Jaguar": [
+      "S",
+      "SE",
+      "R-Dynamic",
+      "HSE",
+      "Autobiography"
+    ],
+    "Jeep": [
+      "Longitude",
+      "Limited",
+      "S",
+      "Trailhawk",
+      "Summit"
+    ],
+    "Kia": [
+      "Cool",
+      "Concept",
+      "Elegance",
+      "Prestige",
+      "GT-Line"
+    ],
+    "Land Rover": [
+      "S",
+      "SE",
+      "HSE",
+      "R-Dynamic",
+      "Autobiography"
+    ],
+    "Lexus": [
+      "Business",
+      "Executive",
+      "F Sport",
+      "Luxury",
+      "Prestige"
+    ],
+    "MG": [
+      "Comfort",
+      "Luxury",
+      "Trophy",
+      "XPower"
+    ],
+    "MINI": [
+      "Essential",
+      "Classic",
+      "Favoured",
+      "JCW",
+      "John Cooper Works"
+    ],
+    "Maserati": [
+      "GT",
+      "Modena",
+      "Trofeo",
+      "Folgore"
+    ],
+    "Mazda": [
+      "Prime-Line",
+      "Center-Line",
+      "Exclusive-Line",
+      "Homura",
+      "Takumi"
+    ],
+    "Mercedes-Benz": [
+      "Style",
+      "Progressive",
+      "Avantgarde",
+      "AMG",
+      "Night Package"
+    ],
+    "Mitsubishi": [
+      "Invite",
+      "Intense",
+      "Instyle",
+      "4x4",
+      "Diamond"
+    ],
+    "Nissan": [
+      "Visia",
+      "Acenta",
+      "Skypack",
+      "Tekna",
+      "Platinum"
+    ],
+    "Opel": [
+      "Edition",
+      "Elegance",
+      "GS",
+      "Ultimate",
+      "Essentia"
+    ],
+    "Peugeot": [
+      "Active",
+      "Allure",
+      "GT Line",
+      "GT",
+      "Prime"
+    ],
+    "Porsche": [
+      "Base",
+      "Style",
+      "4S",
+      "GTS",
+      "Turbo"
+    ],
+    "Renault": [
+      "Joy",
+      "Touch",
+      "Icon",
+      "Techno",
+      "Esprit Alpine"
+    ],
+    "Seat": [
+      "Reference",
+      "Style",
+      "FR",
+      "Xcellence",
+      "Xperience"
+    ],
+    "Skoda": [
+      "Ambition",
+      "Style",
+      "Elite",
+      "Premium",
+      "Sportline"
+    ],
+    "Smart": [
+      "Pro",
+      "Premium",
+      "Pulse",
+      "BRABUS"
+    ],
+    "Ssangyong": [
+      "Deluxe",
+      "Platinum",
+      "Quartz",
+      "Titanium",
+      "Limited"
+    ],
+    "Subaru": [
+      "Premium",
+      "Sport",
+      "Adventure",
+      "Executive",
+      "Touring"
+    ],
+    "Suzuki": [
+      "GL",
+      "GLX",
+      "Joy",
+      "Life",
+      "Style"
+    ],
+    "Tesla": [
+      "Standard Range",
+      "Long Range",
+      "Performance",
+      "Plaid"
+    ],
+    "Toyota": [
+      "Vision",
+      "Dream",
+      "Flame",
+      "Passion",
+      "X-Pack"
+    ],
+    "Volkswagen": [
+      "Impression",
+      "Life",
+      "Style",
+      "Elegance",
+      "R-Line",
+      "Business",
+      "GTI",
+      "GTX",
+      "Aventura"
+    ],
+    "Volvo": [
+      "Core",
+      "Plus",
+      "Ultimate",
+      "Recharge Ultimate",
+      "Black Edition"
+    ]
+  },
+  "commonColors": [
+    "Açık Mavi",
+    "Alp Beyazı",
+    "Altın",
+    "Amarant",
+    "Antrasit",
+    "Ay Tozu Gri",
+    "Badem Yeşili",
+    "Bej",
+    "Beyaz",
+    "Bordo",
+    "Bronz",
+    "Buz Mavisi",
+    "Diğer",
+    "Füme",
+    "Gece Mavisi",
+    "Gri",
+    "Gümüş Gri",
+    "İnci Beyazı",
+    "Kahverengi",
+    "Kırmızı",
+    "Koyu Gri",
+    "Krem",
+    "Kum Beji",
+    "Kum Gri",
+    "Lacivert",
+    "Metalik Gri",
+    "Mavi",
+    "Mor",
+    "Obsedien Siyah",
+    "Pembe",
+    "Sarı",
+    "Siyah",
+    "Şampanya",
+    "Turuncu",
+    "Vişne",
+    "Yavru Ağzı",
+    "Yeşil"
+  ],
+  "modelPackages": {
+    "Abarth|595": [
+      "Turismo",
+      "Competizione"
+    ],
+    "Abarth|695": [
+      "Turismo",
+      "Competizione",
+      "Scorpionissima"
+    ],
+    "Acura|MDX": [
+      "Base",
+      "A-Spec",
+      "Advance",
+      "Type S"
+    ],
+    "Acura|RDX": [
+      "Base",
+      "A-Spec",
+      "Advance"
+    ],
+    "Acura|TLX": [
+      "Base",
+      "A-Spec",
+      "Advance",
+      "Type S"
+    ],
+    "Alfa Romeo|Giulia": [
+      "Sprint",
+      "Ti",
+      "Veloce",
+      "Quadrifoglio"
+    ],
+    "Alfa Romeo|Junior": [
+      "Ibrida",
+      "Speciale",
+      "Veloce"
+    ],
+    "Alfa Romeo|Stelvio": [
+      "Sprint",
+      "Ti",
+      "Veloce",
+      "Quadrifoglio"
+    ],
+    "Alfa Romeo|Tonale": [
+      "Sprint",
+      "Ti",
+      "Veloce",
+      "Plug-in Hybrid Q4"
+    ],
+    "Aston Martin|DB12": [
+      "Base"
+    ],
+    "Aston Martin|DBS": [
+      "Superleggera"
+    ],
+    "Aston Martin|DBX": [
+      "Base",
+      "707"
+    ],
+    "Aston Martin|Vantage": [
+      "Base",
+      "F1 Edition"
+    ],
+    "Audi|A3": [
+      "Advanced",
+      "Sport",
+      "S line",
+      "Black Edition"
+    ],
+    "Audi|A4": [
+      "Advanced",
+      "Sport",
+      "S line",
+      "quattro"
+    ],
+    "Audi|A5": [
+      "Advanced",
+      "Sport",
+      "S line",
+      "Black Edition"
+    ],
+    "Audi|A6": [
+      "Advanced",
+      "Sport",
+      "S line",
+      "quattro"
+    ],
+    "Audi|Q2": [
+      "Advanced",
+      "S line",
+      "Black Edition"
+    ],
+    "Audi|Q3": [
+      "Advanced",
+      "S line",
+      "Black Edition"
+    ],
+    "Audi|Q5": [
+      "Advanced",
+      "S line",
+      "Black Edition",
+      "quattro"
+    ],
+    "Audi|Q8": [
+      "S line",
+      "Black Edition",
+      "quattro",
+      "Edition One"
+    ],
+    "BAIC|BJ40": [
+      "4x4",
+      "Premium"
+    ],
+    "BAIC|Beijing X55": [
+      "Comfort",
+      "Elite",
+      "Premium"
+    ],
+    "BAIC|EU5": [
+      "Comfort",
+      "Premium"
+    ],
+    "BMW|1 Serisi": [
+      "Sport Line",
+      "Luxury Line",
+      "M Sport",
+      "Edition M Sport"
+    ],
+    "BMW|2 Serisi Gran Coupe": [
+      "Sport Line",
+      "Luxury Line",
+      "M Sport"
+    ],
+    "BMW|3 Serisi": [
+      "Sport Line",
+      "Luxury Line",
+      "M Sport",
+      "40. Yıl",
+      "Edition M Sport"
+    ],
+    "BMW|5 Serisi": [
+      "Business",
+      "Luxury Line",
+      "M Sport",
+      "Edition M Sport"
+    ],
+    "BMW|X1": [
+      "sDrive X-Line",
+      "sDrive M Sport",
+      "xDrive X-Line",
+      "xDrive M Sport"
+    ],
+    "BMW|X2": [
+      "sDrive xLine",
+      "sDrive M Sport",
+      "xDrive M Sport"
+    ],
+    "BMW|X3": [
+      "xLine",
+      "Luxury Line",
+      "M Sport"
+    ],
+    "BMW|X5": [
+      "xLine",
+      "Exclusive",
+      "M Sport"
+    ],
+    "BYD|Atto 3": [
+      "Comfort",
+      "Design"
+    ],
+    "BYD|Dolphin": [
+      "Comfort",
+      "Design"
+    ],
+    "BYD|Han": [
+      "Executive AWD"
+    ],
+    "BYD|Seal": [
+      "Design",
+      "Excellence AWD"
+    ],
+    "BYD|Seal U": [
+      "Design",
+      "Excellence AWD",
+      "DM-i Design"
+    ],
+    "Bentley|Bentayga": [
+      "Base",
+      "S",
+      "Azure",
+      "Mulliner"
+    ],
+    "Bentley|Continental GT": [
+      "Azure",
+      "S",
+      "Speed",
+      "Mulliner"
+    ],
+    "Bentley|Flying Spur": [
+      "Azure",
+      "S",
+      "Speed",
+      "Mulliner"
+    ],
+    "Cadillac|CT4": [
+      "Luxury",
+      "Sport",
+      "V-Series"
+    ],
+    "Cadillac|CT5": [
+      "Luxury",
+      "Sport",
+      "V-Series"
+    ],
+    "Cadillac|Escalade": [
+      "Luxury",
+      "Sport",
+      "Platinum"
+    ],
+    "Cadillac|Lyriq": [
+      "Luxury",
+      "Sport"
+    ],
+    "Cadillac|XT4": [
+      "Luxury",
+      "Premium Luxury",
+      "Sport"
+    ],
+    "Chevrolet|Bolt EV": [
+      "LT",
+      "Premier"
+    ],
+    "Chevrolet|Captiva": [
+      "LT",
+      "Premier"
+    ],
+    "Chevrolet|Spark EUV": [
+      "LT",
+      "Premier"
+    ],
+    "Chevrolet|Trailblazer": [
+      "LT",
+      "RS",
+      "Activ"
+    ],
+    "Chrysler|300C": [
+      "Touring",
+      "300C"
+    ],
+    "Chrysler|Pacifica": [
+      "Touring",
+      "Limited",
+      "Pinnacle",
+      "Hybrid"
+    ],
+    "Chrysler|Voyager": [
+      "LX",
+      "LXi"
+    ],
+    "Citroën|Berlingo": [
+      "Feel Bold",
+      "Shine",
+      "Shine Bold",
+      "Selection",
+      "Combi"
+    ],
+    "Citroën|C3": [
+      "Feel",
+      "Feel Bold",
+      "Shine",
+      "Shine Bold"
+    ],
+    "Citroën|C3 Aircross": [
+      "Feel",
+      "Shine",
+      "Shine Bold"
+    ],
+    "Citroën|C4": [
+      "Feel Bold",
+      "Shine",
+      "Shine Bold"
+    ],
+    "Citroën|C4 X": [
+      "Feel Bold",
+      "Shine",
+      "Shine Bold"
+    ],
+    "Citroën|C5 Aircross": [
+      "Feel Adventure",
+      "Shine",
+      "Shine Bold"
+    ],
+    "Citroën|e-C4 X": [
+      "Feel Bold",
+      "Shine",
+      "Shine Bold"
+    ],
+    "Cupra|Ateca": [
+      "Style",
+      "VZ",
+      "4Drive"
+    ],
+    "Cupra|Born": [
+      "e-Boost",
+      "One",
+      "VZ"
+    ],
+    "Cupra|Formentor": [
+      "Style",
+      "FR",
+      "VZ",
+      "VZ 4Drive"
+    ],
+    "Cupra|Leon": [
+      "Style",
+      "FR",
+      "VZ",
+      "e-Hybrid VZ"
+    ],
+    "DFSK|EC35": [
+      "Van",
+      "Cargo"
+    ],
+    "DFSK|F5": [
+      "Comfort",
+      "Luxury"
+    ],
+    "DFSK|Glory 580": [
+      "Comfort",
+      "Prestige"
+    ],
+    "DS Automobiles|DS 3": [
+      "Bastille",
+      "Performance Line",
+      "Rivoli",
+      "Opera"
+    ],
+    "DS Automobiles|DS 4": [
+      "Performance Line",
+      "Rivoli",
+      "Opera"
+    ],
+    "DS Automobiles|DS 7": [
+      "Performance Line",
+      "Rivoli",
+      "Opera",
+      "Étoile"
+    ],
+    "DS Automobiles|DS 9": [
+      "Rivoli",
+      "Opera",
+      "Performance Line+"
+    ],
+    "Dacia|Duster": [
+      "Comfort",
+      "Prestige",
+      "Prestige Plus",
+      "Essential",
+      "Expression",
+      "Journey",
+      "Extreme"
+    ],
+    "Dacia|Jogger": [
+      "Essential",
+      "Expression",
+      "Journey",
+      "Extreme"
+    ],
+    "Dacia|Logan": [
+      "Essential",
+      "Expression",
+      "Journey"
+    ],
+    "Dacia|Sandero": [
+      "Essential",
+      "Expression",
+      "Journey",
+      "Stepway",
+      "Stepway Journey"
+    ],
+    "Dacia|Sandero Stepway": [
+      "Essential",
+      "Expression",
+      "Journey",
+      "Extreme"
+    ],
+    "Dodge|Challenger": [
+      "SXT",
+      "R/T",
+      "Scat Pack",
+      "Hellcat"
+    ],
+    "Dodge|Charger": [
+      "SXT",
+      "GT",
+      "R/T",
+      "Hellcat"
+    ],
+    "Dodge|Durango": [
+      "SXT",
+      "GT",
+      "R/T"
+    ],
+    "Dodge|Hornet": [
+      "GT",
+      "R/T"
+    ],
+    "Ferrari|12Cilindri": [
+      "Base"
+    ],
+    "Ferrari|296 GTB": [
+      "Base",
+      "Assetto Fiorano"
+    ],
+    "Ferrari|Purosangue": [
+      "Base"
+    ],
+    "Ferrari|Roma": [
+      "Base"
+    ],
+    "Ferrari|SF90 Stradale": [
+      "Base",
+      "Assetto Fiorano"
+    ],
+    "Fiat|Doblo": [
+      "Easy",
+      "Safeline",
+      "Premio",
+      "Trekking",
+      "Combi",
+      "Cargo Maxi"
+    ],
+    "Fiat|Egea": [
+      "Easy",
+      "Street",
+      "Urban",
+      "Lounge",
+      "Mirror",
+      "S-Design",
+      "Limited",
+      "Cross"
+    ],
+    "Fiat|Fiorino": [
+      "Pop",
+      "Premio",
+      "Safeline",
+      "Combi"
+    ],
+    "Fisker|Ocean": [
+      "Sport",
+      "Ultra",
+      "Extreme"
+    ],
+    "Ford (USA)|Bronco": [
+      "Outer Banks",
+      "Badlands",
+      "Wildtrak",
+      "Raptor"
+    ],
+    "Ford (USA)|Explorer": [
+      "XLT",
+      "Limited",
+      "ST"
+    ],
+    "Ford (USA)|F-150": [
+      "XLT",
+      "Lariat",
+      "Platinum",
+      "Raptor"
+    ],
+    "Ford (USA)|Mustang": [
+      "EcoBoost",
+      "GT",
+      "Dark Horse"
+    ],
+    "Ford|Fiesta": [
+      "Trend",
+      "Style",
+      "Titanium",
+      "ST-Line"
+    ],
+    "Ford|Focus": [
+      "Trend X",
+      "Style",
+      "Titanium",
+      "Titanium Stil",
+      "Titanium X",
+      "ST-Line",
+      "ST-Line X",
+      "Active Style",
+      "Active X"
+    ],
+    "Ford|Kuga": [
+      "Trend X",
+      "Titanium",
+      "ST-Line",
+      "ST-Line X",
+      "Vignale"
+    ],
+    "Ford|Puma": [
+      "Style",
+      "Titanium",
+      "ST-Line",
+      "ST-Line X"
+    ],
+    "Ford|Tourneo Courier": [
+      "Trend",
+      "Deluxe",
+      "Titanium",
+      "Journey"
+    ],
+    "GMC|Acadia": [
+      "SLE",
+      "SLT",
+      "Denali"
+    ],
+    "GMC|Hummer EV": [
+      "EV2X",
+      "EV3X"
+    ],
+    "GMC|Sierra 1500": [
+      "Elevation",
+      "SLT",
+      "AT4",
+      "Denali"
+    ],
+    "GMC|Yukon": [
+      "SLE",
+      "SLT",
+      "AT4",
+      "Denali"
+    ],
+    "GWM|Haval H6": [
+      "Premium",
+      "Supreme"
+    ],
+    "GWM|Ora 03": [
+      "Pure",
+      "Pro",
+      "GT"
+    ],
+    "GWM|Tank 500": [
+      "Luxury",
+      "Premium"
+    ],
+    "Genesis|G70": [
+      "Premium",
+      "Sport",
+      "Luxury"
+    ],
+    "Genesis|G80": [
+      "Premium",
+      "Prestige",
+      "Electrified"
+    ],
+    "Genesis|GV70": [
+      "Premium",
+      "Sport",
+      "Electrified"
+    ],
+    "Genesis|GV80": [
+      "Prestige",
+      "Luxury",
+      "Sport"
+    ],
+    "Great Wall|Poer": [
+      "Premium",
+      "Luxury",
+      "4x4"
+    ],
+    "Great Wall|Tank 300": [
+      "Premium",
+      "Luxury"
+    ],
+    "Honda|City": [
+      "Elegance",
+      "Executive"
+    ],
+    "Honda|Civic": [
+      "Dream",
+      "Eco Elegance",
+      "Eco Executive+",
+      "Elegance+",
+      "Executive+"
+    ],
+    "Honda|HR-V": [
+      "Elegance",
+      "Advance"
+    ],
+    "Hongqi|E-HS9": [
+      "Executive",
+      "Flagship"
+    ],
+    "Hongqi|H5": [
+      "Executive",
+      "Prestige"
+    ],
+    "Hyundai|Bayon": [
+      "Jump",
+      "Style",
+      "Elite",
+      "Prime",
+      "N Line"
+    ],
+    "Hyundai|Elantra": [
+      "Style",
+      "Elite"
+    ],
+    "Hyundai|Kona": [
+      "Style",
+      "Smart",
+      "Elite",
+      "N Line"
+    ],
+    "Hyundai|Santa Fe": [
+      "Elite",
+      "Prestige",
+      "Prime Plus"
+    ],
+    "Hyundai|Tucson": [
+      "Comfort",
+      "Prime",
+      "Elite",
+      "Elite Plus",
+      "N Line",
+      "4x4"
+    ],
+    "Hyundai|i10": [
+      "Jump",
+      "Style",
+      "Style Plus",
+      "Elite"
+    ],
+    "Hyundai|i20": [
+      "Jump",
+      "Style",
+      "Style Plus",
+      "Elite",
+      "Elite Plus",
+      "Prime",
+      "N Line"
+    ],
+    "Ineos|Grenadier": [
+      "Utility",
+      "Trialmaster",
+      "Fieldmaster"
+    ],
+    "Ineos|Quartermaster": [
+      "Utility",
+      "Trialmaster",
+      "Fieldmaster"
+    ],
+    "Infiniti|Q30": [
+      "Pure",
+      "Premium",
+      "Sport"
+    ],
+    "Infiniti|Q50": [
+      "Pure",
+      "Sport",
+      "Red Sport"
+    ],
+    "Infiniti|QX30": [
+      "Premium",
+      "Elite",
+      "Sport"
+    ],
+    "Infiniti|QX50": [
+      "Pure",
+      "Luxe",
+      "Sensory"
+    ],
+    "Isuzu|D-Max": [
+      "DLX",
+      "V-Cross",
+      "LSE"
+    ],
+    "Jaguar|E-Pace": [
+      "S",
+      "SE",
+      "R-Dynamic"
+    ],
+    "Jaguar|F-Pace": [
+      "S",
+      "SE",
+      "R-Dynamic",
+      "HSE"
+    ],
+    "Jaguar|I-Pace": [
+      "S",
+      "SE",
+      "HSE"
+    ],
+    "Jaguar|XE": [
+      "S",
+      "SE",
+      "R-Dynamic"
+    ],
+    "Jaguar|XF": [
+      "S",
+      "SE",
+      "R-Dynamic"
+    ],
+    "Jeep|Avenger": [
+      "Longitude",
+      "Altitude",
+      "Summit"
+    ],
+    "Jeep|Compass": [
+      "Longitude",
+      "Limited",
+      "S",
+      "Trailhawk"
+    ],
+    "Jeep|Grand Cherokee": [
+      "Limited",
+      "Overland",
+      "Summit Reserve"
+    ],
+    "Jeep|Renegade": [
+      "Longitude",
+      "Limited",
+      "S",
+      "Trailhawk"
+    ],
+    "Jeep|Wrangler": [
+      "Sahara",
+      "Rubicon",
+      "Overland"
+    ],
+    "Kia|Ceed": [
+      "Cool",
+      "Elegance",
+      "Prestige",
+      "GT-Line"
+    ],
+    "Kia|Cerato": [
+      "Concept",
+      "Elegance",
+      "Prestige"
+    ],
+    "Kia|Niro": [
+      "Elegance",
+      "Prestige",
+      "Premium"
+    ],
+    "Kia|Picanto": [
+      "Live",
+      "Cool",
+      "Feel",
+      "Prestige"
+    ],
+    "Kia|Rio": [
+      "Cool",
+      "Concept",
+      "Elegance",
+      "Prestige"
+    ],
+    "Kia|Sportage": [
+      "Comfort",
+      "Concept",
+      "Elegance",
+      "Prestige",
+      "GT-Line"
+    ],
+    "Kia|Stonic": [
+      "Cool",
+      "Elegance",
+      "Prestige",
+      "Business"
+    ],
+    "Land Rover|Defender": [
+      "S",
+      "SE",
+      "HSE",
+      "X-Dynamic"
+    ],
+    "Land Rover|Discovery Sport": [
+      "S",
+      "SE",
+      "HSE",
+      "R-Dynamic"
+    ],
+    "Land Rover|Range Rover Evoque": [
+      "S",
+      "SE",
+      "R-Dynamic SE",
+      "Autobiography"
+    ],
+    "Land Rover|Range Rover Velar": [
+      "S",
+      "SE",
+      "HSE",
+      "Autobiography"
+    ],
+    "Lexus|ES": [
+      "Business",
+      "Executive",
+      "Prestige"
+    ],
+    "Lexus|LBX": [
+      "Elegant",
+      "Emotion",
+      "Cool"
+    ],
+    "Lexus|NX": [
+      "Business",
+      "Executive",
+      "F Sport",
+      "Luxury"
+    ],
+    "Lexus|RX": [
+      "Executive",
+      "F Sport",
+      "Luxury"
+    ],
+    "Lexus|UX": [
+      "Business",
+      "Executive",
+      "F Sport"
+    ],
+    "MG|HS": [
+      "Comfort",
+      "Luxury",
+      "Trophy"
+    ],
+    "MG|MG4": [
+      "Comfort",
+      "Luxury",
+      "XPower"
+    ],
+    "MG|ZS": [
+      "Comfort",
+      "Luxury"
+    ],
+    "MINI|Clubman": [
+      "Pepper",
+      "Chili",
+      "John Cooper Works"
+    ],
+    "MINI|Cooper 3 Kapı": [
+      "Essential",
+      "Classic",
+      "Favoured",
+      "JCW"
+    ],
+    "MINI|Cooper 5 Kapı": [
+      "Essential",
+      "Classic",
+      "Favoured",
+      "JCW"
+    ],
+    "MINI|Countryman": [
+      "Essential",
+      "Classic",
+      "Favoured",
+      "John Cooper Works"
+    ],
+    "Maserati|Ghibli": [
+      "GT",
+      "Modena",
+      "Trofeo"
+    ],
+    "Maserati|GranTurismo": [
+      "Modena",
+      "Trofeo",
+      "Folgore"
+    ],
+    "Maserati|Grecale": [
+      "GT",
+      "Modena",
+      "Trofeo",
+      "Folgore"
+    ],
+    "Maserati|Levante": [
+      "GT",
+      "Modena",
+      "Trofeo"
+    ],
+    "Mazda|2": [
+      "Prime-Line",
+      "Center-Line",
+      "Exclusive-Line"
+    ],
+    "Mazda|3": [
+      "Prime-Line",
+      "Exclusive-Line",
+      "Homura",
+      "Takumi"
+    ],
+    "Mazda|BT-50": [
+      "4x2",
+      "4x4",
+      "V-Cross"
+    ],
+    "Mazda|CX-3": [
+      "Prime-Line",
+      "Power",
+      "Sports Line"
+    ],
+    "Mazda|CX-30": [
+      "Prime-Line",
+      "Exclusive-Line",
+      "Homura",
+      "Takumi"
+    ],
+    "Mazda|CX-5": [
+      "Prime-Line",
+      "Exclusive-Line",
+      "Homura",
+      "Takumi"
+    ],
+    "Mazda|CX-60": [
+      "Exclusive-Line",
+      "Homura",
+      "Takumi"
+    ],
+    "Mercedes-Benz|A Serisi": [
+      "Style",
+      "Progressive",
+      "AMG",
+      "AMG Performance"
+    ],
+    "Mercedes-Benz|C Serisi": [
+      "Avantgarde",
+      "AMG",
+      "Edition 1"
+    ],
+    "Mercedes-Benz|CLA": [
+      "Style",
+      "Progressive",
+      "AMG",
+      "Night Package"
+    ],
+    "Mercedes-Benz|E Serisi": [
+      "Avantgarde",
+      "Exclusive",
+      "AMG",
+      "Edition 1"
+    ],
+    "Mercedes-Benz|GLA": [
+      "Progressive",
+      "AMG",
+      "Night Package"
+    ],
+    "Mercedes-Benz|GLB": [
+      "Progressive",
+      "AMG",
+      "Night Package"
+    ],
+    "Mercedes-Benz|GLC": [
+      "Progressive",
+      "4MATIC",
+      "AMG",
+      "Coupé AMG"
+    ],
+    "Mercedes-Benz|GLC Coupe": [
+      "Progressive",
+      "4MATIC",
+      "AMG",
+      "Coupe AMG"
+    ],
+    "Mitsubishi|ASX": [
+      "Invite",
+      "Intense",
+      "Instyle"
+    ],
+    "Mitsubishi|Eclipse Cross": [
+      "Invite",
+      "Intense",
+      "Diamond"
+    ],
+    "Mitsubishi|L200": [
+      "Invite",
+      "Storm",
+      "Instyle"
+    ],
+    "Mitsubishi|Outlander": [
+      "Intense",
+      "Instyle",
+      "PHEV Diamond"
+    ],
+    "Mitsubishi|Space Star": [
+      "Invite",
+      "Intense"
+    ],
+    "Nissan|Juke": [
+      "Visia",
+      "Tekna",
+      "Platinum",
+      "N-Design",
+      "N-Sport"
+    ],
+    "Nissan|Micra": [
+      "Street",
+      "Match",
+      "Platinum",
+      "Visia",
+      "Tekna"
+    ],
+    "Nissan|Navara": [
+      "Visia",
+      "Tekna",
+      "Platinum"
+    ],
+    "Nissan|Qashqai": [
+      "Visia",
+      "Acenta",
+      "Skypack",
+      "N-Connecta",
+      "Tekna",
+      "Platinum"
+    ],
+    "Nissan|X-Trail": [
+      "Visia",
+      "Skypack",
+      "Tekna",
+      "Platinum",
+      "Platinum Premium"
+    ],
+    "Opel|Astra": [
+      "Edition",
+      "Elegance",
+      "GS Line",
+      "Ultimate"
+    ],
+    "Opel|Combo": [
+      "Edition",
+      "Elegance"
+    ],
+    "Opel|Corsa": [
+      "Essentia",
+      "Enjoy",
+      "Edition",
+      "Elegance",
+      "GS",
+      "Ultimate"
+    ],
+    "Opel|Crossland": [
+      "Essentia",
+      "Edition",
+      "Elegance",
+      "Ultimate"
+    ],
+    "Opel|Grandland": [
+      "Edition",
+      "Elegance",
+      "Ultimate",
+      "GS"
+    ],
+    "Opel|Mokka": [
+      "Edition",
+      "GS",
+      "Ultimate"
+    ],
+    "Peugeot|2008": [
+      "Active",
+      "Active Prime",
+      "Allure",
+      "GT Line",
+      "GT"
+    ],
+    "Peugeot|208": [
+      "Active",
+      "Active Prime",
+      "Allure",
+      "GT Line",
+      "GT"
+    ],
+    "Peugeot|3008": [
+      "Active Prime",
+      "Allure",
+      "GT",
+      "GT Selection"
+    ],
+    "Peugeot|301": [
+      "Access",
+      "Active",
+      "Allure"
+    ],
+    "Peugeot|308": [
+      "Active Prime",
+      "Allure",
+      "GT",
+      "GT Selection"
+    ],
+    "Peugeot|5008": [
+      "Allure",
+      "GT",
+      "GT Selection"
+    ],
+    "Peugeot|Rifter": [
+      "Allure",
+      "GT Line"
+    ],
+    "Porsche|911": [
+      "Carrera",
+      "Carrera S",
+      "GTS",
+      "Turbo S"
+    ],
+    "Porsche|Cayenne": [
+      "Base",
+      "S",
+      "E-Hybrid",
+      "Turbo E-Hybrid"
+    ],
+    "Porsche|Macan": [
+      "Base",
+      "Style",
+      "S",
+      "GTS",
+      "Turbo"
+    ],
+    "Porsche|Panamera": [
+      "Base",
+      "4",
+      "4S",
+      "Turbo E-Hybrid"
+    ],
+    "Porsche|Taycan": [
+      "4",
+      "4S",
+      "Turbo",
+      "Turbo S"
+    ],
+    "Renault|Austral": [
+      "Techno",
+      "Esprit Alpine"
+    ],
+    "Renault|Captur": [
+      "Touch",
+      "Icon",
+      "Icon Plus",
+      "Evolution",
+      "Techno",
+      "Esprit Alpine"
+    ],
+    "Renault|Clio": [
+      "Joy",
+      "Touch",
+      "Icon",
+      "Equilibre",
+      "Evolution",
+      "Techno",
+      "Techno Esprit Alpine",
+      "Esprit Alpine"
+    ],
+    "Renault|Kadjar": [
+      "Touch",
+      "Icon",
+      "Black Edition"
+    ],
+    "Renault|Megane": [
+      "Joy",
+      "Touch",
+      "Icon",
+      "Icon Comfort",
+      "GT-Line",
+      "RS Line",
+      "Techno",
+      "Esprit Alpine"
+    ],
+    "Renault|Symbol": [
+      "Joy",
+      "Touch",
+      "Touch Plus",
+      "Authentique"
+    ],
+    "Renault|Taliant": [
+      "Joy",
+      "Touch",
+      "Joy Comfort",
+      "Touch Comfort"
+    ],
+    "Seat|Arona": [
+      "Style",
+      "FR",
+      "Xperience",
+      "Xcellence"
+    ],
+    "Seat|Ateca": [
+      "Style",
+      "FR",
+      "Xperience"
+    ],
+    "Seat|Ibiza": [
+      "Reference",
+      "Style",
+      "FR",
+      "Xcellence"
+    ],
+    "Seat|Leon": [
+      "Style",
+      "FR",
+      "Xcellence"
+    ],
+    "Skoda|Fabia": [
+      "Ambition",
+      "Style",
+      "Elite",
+      "Premium",
+      "Monte Carlo"
+    ],
+    "Skoda|Kamiq": [
+      "Elite",
+      "Premium",
+      "Monte Carlo"
+    ],
+    "Skoda|Karoq": [
+      "Elite",
+      "Premium",
+      "Prestige",
+      "Sportline"
+    ],
+    "Skoda|Kodiaq": [
+      "Prestige",
+      "Premium",
+      "Sportline"
+    ],
+    "Skoda|Octavia": [
+      "Ambition",
+      "Style",
+      "Elite",
+      "Premium",
+      "RS",
+      "Scout"
+    ],
+    "Skoda|Scala": [
+      "Ambition",
+      "Style",
+      "Elite",
+      "Premium",
+      "Monte Carlo"
+    ],
+    "Skoda|Superb": [
+      "Prestige",
+      "Premium",
+      "Sportline",
+      "L&K"
+    ],
+    "Smart|#1": [
+      "Pro",
+      "Premium",
+      "Pulse",
+      "BRABUS"
+    ],
+    "Smart|#3": [
+      "Pro",
+      "Premium",
+      "Pulse",
+      "BRABUS"
+    ],
+    "Smart|EQ fortwo": [
+      "Pure",
+      "Passion"
+    ],
+    "Ssangyong|Korando": [
+      "Deluxe",
+      "Platinum",
+      "Titanium"
+    ],
+    "Ssangyong|Musso Grand": [
+      "Quartz",
+      "Titanium",
+      "Limited"
+    ],
+    "Ssangyong|Rexton": [
+      "Deluxe",
+      "Platinum",
+      "Limited"
+    ],
+    "Ssangyong|Tivoli": [
+      "Deluxe",
+      "Quartz",
+      "Titanium"
+    ],
+    "Ssangyong|Torres": [
+      "Deluxe",
+      "Titanium",
+      "EVX"
+    ],
+    "Subaru|Crosstrek": [
+      "Premium",
+      "Sport",
+      "Executive"
+    ],
+    "Subaru|Forester": [
+      "Premium",
+      "Sport",
+      "Executive"
+    ],
+    "Subaru|Levorg": [
+      "GT",
+      "GT-S",
+      "STI Sport"
+    ],
+    "Subaru|Outback": [
+      "Premium",
+      "Adventure",
+      "Touring"
+    ],
+    "Subaru|XV": [
+      "Premium",
+      "Sport",
+      "Adventure"
+    ],
+    "Suzuki|Jimny": [
+      "Style",
+      "Adventure",
+      "AllGrip"
+    ],
+    "Suzuki|S-Cross": [
+      "GL Elegance",
+      "GLX Premium",
+      "AllGrip"
+    ],
+    "Suzuki|Swift": [
+      "GL Techno",
+      "GLX Premium",
+      "Sport"
+    ],
+    "Suzuki|Vitara": [
+      "GL+",
+      "GLX",
+      "Style",
+      "AllGrip"
+    ],
+    "Tesla|Model 3": [
+      "Standard Range",
+      "Long Range",
+      "Performance"
+    ],
+    "Tesla|Model S": [
+      "Long Range",
+      "Plaid"
+    ],
+    "Tesla|Model X": [
+      "Long Range",
+      "Plaid"
+    ],
+    "Tesla|Model Y": [
+      "Standard Range",
+      "Long Range",
+      "Performance"
+    ],
+    "Toyota|C-HR": [
+      "Flame",
+      "Passion",
+      "Passion X-Sport",
+      "Passion X-Style"
+    ],
+    "Toyota|Corolla": [
+      "Vision",
+      "Vision Plus",
+      "Dream",
+      "Dream X-Pack",
+      "Flame",
+      "Flame X-Pack",
+      "Passion",
+      "Passion X-Pack"
+    ],
+    "Toyota|Corolla Cross": [
+      "Flame",
+      "Flame X-Pack",
+      "Passion",
+      "Passion X-Pack"
+    ],
+    "Toyota|Hilux": [
+      "Adventure",
+      "Hi-Cruiser",
+      "Invincible"
+    ],
+    "Toyota|RAV4": [
+      "Flame",
+      "Passion",
+      "Adventure",
+      "Passion X-Pack"
+    ],
+    "Toyota|Yaris": [
+      "Dream",
+      "Flame",
+      "Passion",
+      "Passion X-Pack"
+    ],
+    "Toyota|Yaris Cross": [
+      "Dream",
+      "Flame",
+      "Flame X-Pack",
+      "Passion",
+      "Passion X-Pack"
+    ],
+    "Volkswagen|Amarok": [
+      "Life",
+      "Style",
+      "Aventura"
+    ],
+    "Volkswagen|Arteon": [
+      "Elegance",
+      "R-Line"
+    ],
+    "Volkswagen|Caddy": [
+      "Cargo",
+      "Life",
+      "Style"
+    ],
+    "Volkswagen|Caravelle": [
+      "Life",
+      "Style"
+    ],
+    "Volkswagen|Crafter": [
+      "PanelVan",
+      "Servis"
+    ],
+    "Volkswagen|Golf": [
+      "Impression",
+      "Life",
+      "Style",
+      "R-Line",
+      "GTI",
+      "GTE"
+    ],
+    "Volkswagen|ID.4": [
+      "Pure",
+      "Pro",
+      "GTX"
+    ],
+    "Volkswagen|ID.7": [
+      "Pro",
+      "GTX"
+    ],
+    "Volkswagen|ID.Buzz": [
+      "Pure",
+      "Pro",
+      "GTX",
+      "Cargo"
+    ],
+    "Volkswagen|Jetta": [
+      "Trendline",
+      "Comfortline",
+      "Highline"
+    ],
+    "Volkswagen|Multivan": [
+      "Life",
+      "Style"
+    ],
+    "Volkswagen|Passat": [
+      "Trendline",
+      "Comfortline",
+      "Highline",
+      "Impression",
+      "Business",
+      "Elegance",
+      "R-Line"
+    ],
+    "Volkswagen|Polo": [
+      "Trendline",
+      "Comfortline",
+      "Highline",
+      "Impression",
+      "Life",
+      "Style",
+      "R-Line"
+    ],
+    "Volkswagen|T-Cross": [
+      "Life",
+      "Style",
+      "R-Line"
+    ],
+    "Volkswagen|T-Roc": [
+      "Life",
+      "Style",
+      "R-Line",
+      "Black Edition"
+    ],
+    "Volkswagen|Taigo": [
+      "Life",
+      "Style",
+      "R-Line"
+    ],
+    "Volkswagen|Tayron": [
+      "Life",
+      "Elegance",
+      "R-Line"
+    ],
+    "Volkswagen|Tiguan": [
+      "Life",
+      "Elegance",
+      "R-Line"
+    ],
+    "Volkswagen|Touareg": [
+      "Elegance",
+      "R-Line"
+    ],
+    "Volkswagen|Touran": [
+      "Comfortline",
+      "Highline"
+    ],
+    "Volkswagen|Transporter": [
+      "Panelvan",
+      "Kombi",
+      "Camlı Van"
+    ],
+    "Volvo|EX30": [
+      "Core",
+      "Plus",
+      "Ultra",
+      "Twin Motor Performance"
+    ],
+    "Volvo|S60": [
+      "Core",
+      "Plus",
+      "Ultimate",
+      "Recharge Ultimate"
+    ],
+    "Volvo|S90": [
+      "Core",
+      "Plus",
+      "Ultimate",
+      "Recharge Ultimate"
+    ],
+    "Volvo|XC40": [
+      "Core",
+      "Plus",
+      "Ultimate",
+      "Black Edition"
+    ],
+    "Volvo|XC60": [
+      "Core",
+      "Plus",
+      "Ultimate",
+      "Recharge Ultimate"
+    ],
+    "Volvo|XC90": [
+      "Core",
+      "Plus",
+      "Ultimate",
+      "Recharge Ultimate"
+    ],
+    "Renault|Duster": [
+      "Evolution",
+      "Techno",
+      "Esprit Alpine"
+    ]
+  }
+}
