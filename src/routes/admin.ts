@@ -180,8 +180,14 @@ const whatsappSettingsSchema = z.object({
   whatsappNumber: z.string().min(10),
 });
 
+const supportPhoneSettingsSchema = z.object({
+  phoneNumber: z.string().min(10),
+});
+
 const WHATSAPP_SETTING_KEY = 'contact.whatsapp_number';
 const DEFAULT_WHATSAPP_NUMBER = '905443152285';
+const SUPPORT_PHONE_SETTING_KEY = 'contact.support_phone';
+const DEFAULT_SUPPORT_PHONE = '+908503050000';
 
 function toNumber(value: unknown, fallback = 0) {
   const numeric = typeof value === 'number' ? value : Number(value);
@@ -228,12 +234,57 @@ function normalizeWhatsappNumber(value: string) {
   return `90${digits}`;
 }
 
+function normalizeSupportPhoneNumber(value: string) {
+  const digits = value.replace(/\D/g, '');
+
+  if (!digits) {
+    return DEFAULT_SUPPORT_PHONE;
+  }
+
+  if (value.trim().startsWith('+') && digits.startsWith('90')) {
+    return `+${digits}`;
+  }
+
+  if (digits.startsWith('90')) {
+    return `+${digits}`;
+  }
+
+  if (digits.startsWith('0')) {
+    return `+90${digits.slice(1)}`;
+  }
+
+  return `+90${digits}`;
+}
+
+function formatSupportPhoneDisplay(value: string) {
+  const digits = value.replace(/\D/g, '');
+  const local = digits.startsWith('90') ? `0${digits.slice(2)}` : digits;
+
+  if (local.length === 11) {
+    return `${local.slice(0, 4)} ${local.slice(4, 7)} ${local.slice(7, 9)} ${local.slice(9, 11)}`;
+  }
+
+  if (local.length === 10) {
+    return `${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6, 8)} ${local.slice(8, 10)}`;
+  }
+
+  return local || '0850 305 00 00';
+}
+
 async function getWhatsappSettingValue() {
   const stored = await prisma.appSetting.findUnique({
     where: { key: WHATSAPP_SETTING_KEY },
   });
 
   return normalizeWhatsappNumber(stored?.value ?? DEFAULT_WHATSAPP_NUMBER);
+}
+
+async function getSupportPhoneSettingValue() {
+  const stored = await prisma.appSetting.findUnique({
+    where: { key: SUPPORT_PHONE_SETTING_KEY },
+  });
+
+  return normalizeSupportPhoneNumber(stored?.value ?? DEFAULT_SUPPORT_PHONE);
 }
 
 function mapListingStatus(status: ListingStatus) {
@@ -823,6 +874,16 @@ export async function adminRoutes(app: FastifyInstance) {
     };
   });
 
+  app.get('/settings/contact-phone', async () => {
+    const phoneTel = await getSupportPhoneSettingValue();
+
+    return {
+      phoneNumber: phoneTel,
+      phoneTel,
+      phoneDisplay: formatSupportPhoneDisplay(phoneTel),
+    };
+  });
+
   app.post('/admin/auth/login', async (request, reply) => {
     const payload = loginSchema.parse(request.body);
     const user = await prisma.user.findUnique({
@@ -879,6 +940,21 @@ export async function adminRoutes(app: FastifyInstance) {
     };
   });
 
+  app.get('/admin/settings/contact-phone', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const phoneTel = await getSupportPhoneSettingValue();
+
+    return {
+      phoneNumber: phoneTel,
+      phoneTel,
+      phoneDisplay: formatSupportPhoneDisplay(phoneTel),
+    };
+  });
+
   app.put('/admin/settings/whatsapp', async (request, reply) => {
     const admin = await requireAdmin(request, reply);
     if (!admin) {
@@ -913,6 +989,44 @@ export async function adminRoutes(app: FastifyInstance) {
       success: true,
       whatsappNumber,
       whatsappUrl: `https://wa.me/${whatsappNumber}`,
+    };
+  });
+
+  app.put('/admin/settings/contact-phone', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const payload = supportPhoneSettingsSchema.parse(request.body);
+    const phoneTel = normalizeSupportPhoneNumber(payload.phoneNumber);
+    const previousValue = await getSupportPhoneSettingValue();
+
+    await prisma.appSetting.upsert({
+      where: { key: SUPPORT_PHONE_SETTING_KEY },
+      update: { value: phoneTel },
+      create: {
+        key: SUPPORT_PHONE_SETTING_KEY,
+        value: phoneTel,
+      },
+    });
+
+    await appendActivityLog({
+      adminId: admin.id,
+      adminName: admin.fullName,
+      action: 'SETTINGS_UPDATE',
+      module: 'Ayarlar',
+      recordId: SUPPORT_PHONE_SETTING_KEY,
+      previousValue,
+      newValue: phoneTel,
+      description: 'Destek telefonu guncellendi.',
+    });
+
+    return {
+      success: true,
+      phoneNumber: phoneTel,
+      phoneTel,
+      phoneDisplay: formatSupportPhoneDisplay(phoneTel),
     };
   });
 
