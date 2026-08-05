@@ -42,7 +42,21 @@ const damagePartSchema = z.object({
   status: z.enum(['Orijinal', 'Lokal Boyali', 'Boyali', 'Onarimli', 'Degisen']),
 });
 
-const structuralConditionValueSchema = z.enum(['Belirtilmedi', 'Sorun yok', 'İşlem / sorun var']);
+const structuralConditionInputSchema = z.enum(['Belirtilmedi', 'clean', 'issue', 'Sorun yok', 'İşlem / sorun var']);
+
+function normalizeStructuralConditionValue(value: z.infer<typeof structuralConditionInputSchema>) {
+  if (value === 'Sorun yok') {
+    return 'clean' as const;
+  }
+
+  if (value === 'İşlem / sorun var') {
+    return 'issue' as const;
+  }
+
+  return value;
+}
+
+const structuralConditionValueSchema = structuralConditionInputSchema.transform(normalizeStructuralConditionValue);
 
 const criticalCheckSchema = z.object({
   key: z.string().min(1),
@@ -324,6 +338,9 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `Agir hasar: ${payload.condition.severeDamage ? 'Var' : 'Yok'}`,
         `Mekanik: ${payload.condition.mechanicalStatus}`,
         `Bakim gecmisi: ${payload.condition.maintenanceHistory}`,
+        `Airbag durumu: ${payload.condition.airbagCondition}`,
+        `Sase/Podye durumu: ${payload.condition.chassisPodyeCondition}`,
+        `Direk durumu: ${payload.condition.pillarCondition}`,
         `Ekspertiz notu: ${payload.condition.appraisalReport || '-'}`,
         `Foto sayisi: ${payload.photos.length}`,
         `Degerleme notu: ${payload.valuationSummary}`,
@@ -360,6 +377,9 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `Agir hasar: ${payload.condition.severeDamage ? 'Var' : 'Yok'}`,
         `Mekanik: ${payload.condition.mechanicalStatus}`,
         `Bakim gecmisi: ${payload.condition.maintenanceHistory}`,
+        `Airbag durumu: ${payload.condition.airbagCondition}`,
+        `Sase/Podye durumu: ${payload.condition.chassisPodyeCondition}`,
+        `Direk durumu: ${payload.condition.pillarCondition}`,
         `Ekspertiz notu: ${payload.condition.appraisalReport || '-'}`,
         `Foto sayisi: ${payload.photos.length}`,
         `Degerleme notu: ${payload.valuationSummary}`,

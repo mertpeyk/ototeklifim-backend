@@ -184,7 +184,21 @@ const supportPhoneSettingsSchema = z.object({
   phoneNumber: z.string().min(10),
 });
 
-const structuralConditionValueSchema = z.enum(['Belirtilmedi', 'Sorun yok', 'İşlem / sorun var']);
+const structuralConditionInputSchema = z.enum(['Belirtilmedi', 'clean', 'issue', 'Sorun yok', 'İşlem / sorun var']);
+
+function normalizeStructuralConditionValue(value: z.infer<typeof structuralConditionInputSchema>) {
+  if (value === 'Sorun yok') {
+    return 'clean' as const;
+  }
+
+  if (value === 'İşlem / sorun var') {
+    return 'issue' as const;
+  }
+
+  return value;
+}
+
+const structuralConditionValueSchema = structuralConditionInputSchema.transform(normalizeStructuralConditionValue);
 
 const WHATSAPP_SETTING_KEY = 'contact.whatsapp_number';
 const DEFAULT_WHATSAPP_NUMBER = '905443152285';
