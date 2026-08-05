@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { getMarketComps } from './market-comps.js';
 import { getValuationModelMultiplier } from './valuation-calibration.js';
+import { normalizeVehicleInfoWithCatalog } from './valuation-reference.js';
 
 export const valuationVehicleInfoSchema = z.object({
   vehicleType: z.string().min(1),
@@ -183,7 +184,12 @@ function buildValuationSummary(
 }
 
 export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
-  const input = valuationEstimateInputSchema.parse(rawInput);
+  const parsedInput = valuationEstimateInputSchema.parse(rawInput);
+  const normalizedVehicleInfo = await normalizeVehicleInfoWithCatalog(parsedInput.vehicleInfo);
+  const input: ValuationEstimateInput = {
+    ...parsedInput,
+    vehicleInfo: normalizedVehicleInfo,
+  };
 
   const baseByBrand: Record<string, number> = {
     BMW: 2140000,
@@ -400,6 +406,7 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
   ].filter(Boolean) as string[];
 
   return {
+    normalizedVehicleInfo: input.vehicleInfo,
     estimate: toRoundedCurrency(estimate),
     minimum: toRoundedCurrency(minimum),
     maximum: toRoundedCurrency(maximum),
@@ -433,6 +440,7 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
 export function buildEstimatedFastSaleNumbers(input: ValuationEstimateInput) {
   return estimateVehicleValue(input).then((result) => ({
     result,
+    normalizedVehicleInfo: result.normalizedVehicleInfo,
     estimatedMarketValue: result.estimate,
     quickSaleValue: result.quickValue,
     dealerBuyValue: result.galleryValue,
