@@ -47,6 +47,18 @@ export type MarketCompsResponse = {
   computedAt: string;
 };
 
+type ParsedArabamListing = {
+  id: number | null;
+  title: string;
+  price: number;
+  formattedPrice: string;
+  categoryName: string;
+  variant: string;
+  url?: string;
+  year?: number | null;
+  approxKm?: number | null;
+};
+
 const marketCompCache = new Map<string, { expiresAt: number; payload: MarketCompsResponse }>();
 
 function normalizeTurkish(input: string) {
@@ -115,8 +127,28 @@ function buildPathCandidates(query: MarketCompsQuery) {
   const packageSlug = slugifyArabam(query.packageName || '');
   const combos = new Set<string>();
 
-  if (engineSlug && packageSlug) combos.add(`${brandSlug}-${modelSlug}-${engineSlug}-${packageSlug}`);
-  if (engineSlug) combos.add(`${brandSlug}-${modelSlug}-${engineSlug}`);
+  const engineVariants = new Set<string>();
+  if (engineSlug) {
+    engineVariants.add(engineSlug);
+    const engineTokens = engineSlug.split('-').filter(Boolean);
+    const filteredTokens = engineTokens.filter((token) => !['dsg', 'cvt', 'edc', 'tam', 'otomatik', 'manuel'].includes(token));
+    if (filteredTokens.length) {
+      engineVariants.add(filteredTokens.join('-'));
+    }
+
+    const trimmedPowerTokens = filteredTokens.filter((token, index) => {
+      const isLast = index === filteredTokens.length - 1;
+      return !(isLast && /^\d{2,3}$/.test(token));
+    });
+    if (trimmedPowerTokens.length) {
+      engineVariants.add(trimmedPowerTokens.join('-'));
+    }
+  }
+
+  for (const engineVariant of engineVariants) {
+    if (engineVariant && packageSlug) combos.add(`${brandSlug}-${modelSlug}-${engineVariant}-${packageSlug}`);
+    if (engineVariant) combos.add(`${brandSlug}-${modelSlug}-${engineVariant}`);
+  }
   if (packageSlug) combos.add(`${brandSlug}-${modelSlug}-${packageSlug}`);
   combos.add(`${brandSlug}-${modelSlug}`);
 
@@ -197,6 +229,38 @@ function parseArabamAdverts(html: string) {
   }
 }
 
+function parseArabamInsiderListings(html: string): ParsedArabamListing[] {
+  const regex = /insiderArray\.push\(\{\s*"id":\s*"([^"]+)"[\s\S]*?"name":\s*"([^"]+)"[\s\S]*?"unit_price":\s*parseFloat\(\("([^"]+)"\)[\s\S]*?"url":\s*window\.location\.origin \+\s*"([^"]+)"/g;
+  const listings: ParsedArabamListing[] = [];
+
+  for (const match of html.matchAll(regex)) {
+    const [, idRaw, nameRaw, formattedPriceRaw, relativeUrlRaw] = match;
+    const formattedPrice = `${formattedPriceRaw}`.trim();
+    const price = parsePrice(formattedPrice);
+    const relativeUrl = String(relativeUrlRaw || '').trim();
+    const title = String(nameRaw || '').trim();
+
+    if (!price || !relativeUrl || !title) {
+      continue;
+    }
+
+    const decodedUrl = decodeURIComponent(relativeUrl);
+    listings.push({
+      id: Number.isFinite(Number(idRaw)) ? Number(idRaw) : null,
+      title,
+      price,
+      formattedPrice,
+      categoryName: '',
+      variant: title,
+      url: decodedUrl,
+      year: extractYearFromUrl(decodedUrl),
+      approxKm: extractKmFromUrl(decodedUrl),
+    });
+  }
+
+  return listings;
+}
+
 function parsePrice(value: unknown) {
   const digits = String(value || '').replace(/[^\d]/g, '');
   const numeric = Number(digits);
@@ -223,6 +287,40 @@ function extractPowerToken(value: string) {
   return numeric.length ? String(numeric[0]) : '';
 }
 
+function extractYearFromUrl(value: string) {
+  const match = String(value || '').match(/\b(20\d{2})\b/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  return Number.isFinite(year) ? year : null;
+}
+
+function extractKmFromUrl(value: string) {
+  const input = normalizeText(value);
+  const compactPatterns = [
+    /(\d{2,3})\s*bin\s*km/,
+    /(\d{2,3})binkm/,
+    /km\s*(\d{2,3})\s*(\d{3})/,
+    /(\d{2,3})\s*(\d{3})\s*km/,
+    /(\d{2,3})\s*ooo\s*km/,
+  ];
+
+  for (const pattern of compactPatterns) {
+    const match = input.match(pattern);
+    if (!match) continue;
+
+    if (match[2]) {
+      const km = Number(`${match[1]}${match[2]}`);
+      if (Number.isFinite(km)) return km;
+      continue;
+    }
+
+    const km = Number(match[1]) * 1000;
+    if (Number.isFinite(km)) return km;
+  }
+
+  return null;
+}
+
 function hasAnyToken(haystack: string, tokens: string[]) {
   return tokens.some((token) => token && haystack.includes(token));
 }
@@ -235,7 +333,6 @@ function isAdvertStrictMatch(
   const packageNormalized = normalizeText(query.packageName || '');
   const engineNormalized = normalizeText(query.engine || '');
   const engineNumericToken = extractNumericEngineToken(query.engine || '');
-  const powerToken = extractPowerToken(query.engine || '');
   const fuelNormalized = normalizeText(query.fuelType || '');
 
   if (packageNormalized && packageNormalized !== 'standart' && !haystack.includes(packageNormalized)) {
@@ -269,18 +366,11 @@ function isAdvertStrictMatch(
     return false;
   }
 
-  if (powerToken && haystack.match(/\b\d{2,3}\b/)) {
-    const advertPowerMatch = haystack.match(/\b(\d{2,3})\b/);
-    if (advertPowerMatch && advertPowerMatch[1] !== powerToken) {
-      return false;
-    }
-  }
-
   return true;
 }
 
 function scoreAdvertRelevance(
-  advert: { title: string; variant: string; categoryName: string },
+  advert: ParsedArabamListing,
   query: MarketCompsQuery,
 ) {
   const haystack = normalizeText(`${advert.title} ${advert.variant} ${advert.categoryName}`);
@@ -316,7 +406,42 @@ function scoreAdvertRelevance(
     score += 1;
   }
 
+  if (advert.year && query.year) {
+    const yearDiff = Math.abs(advert.year - query.year);
+    if (yearDiff === 0) score += 4;
+    else if (yearDiff === 1) score += 2;
+    else if (yearDiff >= 3) score -= 8;
+  }
+
+  if (advert.approxKm && query.km) {
+    const kmDiff = Math.abs(advert.approxKm - query.km);
+    if (kmDiff <= 15000) score += 3;
+    else if (kmDiff <= 35000) score += 1.5;
+    else if (kmDiff >= 90000) score -= 6;
+  }
+
   return score;
+}
+
+function isYearKmCompatible(advert: ParsedArabamListing, query: MarketCompsQuery) {
+  if (advert.year && query.year) {
+    if (Math.abs(advert.year - query.year) > 1) {
+      return false;
+    }
+  }
+
+  if (advert.approxKm && query.km) {
+    if (Math.abs(advert.approxKm - query.km) > 65000) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isSuspiciousCommercialListing(advert: ParsedArabamListing) {
+  const haystack = normalizeText(`${advert.title} ${advert.variant} ${advert.url || ''}`);
+  return ['senet', 'pesinat', 'kredi', 'aylik odeme', 'aylik taksit'].some((token) => haystack.includes(token));
 }
 
 function median(values: number[]) {
@@ -355,12 +480,19 @@ function buildStats(prices: number[]) {
 async function resolveArabamComps(query: MarketCompsQuery): Promise<MarketCompsResponse> {
   const categories = getCategoryCandidates(query);
   const paths = buildPathCandidates(query);
+  const requiresHighSpecificity = Boolean(
+    String(query.packageName || '').trim()
+    || String(query.engine || '').trim()
+    || String(query.fuelType || '').trim(),
+  );
 
   for (const category of categories) {
     for (const path of paths) {
       const url = `https://www.arabam.com/ikinci-el/${category}/${path}`;
-      const html = await fetchPublicHtml(url);
-      const adverts = parseArabamAdverts(html)
+      const html = requiresHighSpecificity ? await fetchViaCurl(url) : await fetchPublicHtml(url);
+      const insiderListings = parseArabamInsiderListings(html);
+
+      const adverts = (insiderListings.length ? insiderListings : parseArabamAdverts(html)
         .map((item) => {
           const price = parsePrice(item.FormattedPrice);
           return {
@@ -370,8 +502,8 @@ async function resolveArabamComps(query: MarketCompsQuery): Promise<MarketCompsR
             formattedPrice: String(item.FormattedPrice || '').trim(),
             categoryName: String(item.CategoryName || '').trim(),
             variant: String(item.Variant || '').trim(),
-          };
-        })
+          } as ParsedArabamListing;
+        }))
         .filter((item) => item.price > 0);
 
       if (adverts.length >= 3) {
@@ -379,20 +511,21 @@ async function resolveArabamComps(query: MarketCompsQuery): Promise<MarketCompsR
           ...item,
           relevanceScore: scoreAdvertRelevance(item, query),
         }));
-        const strictAdverts = scoredAdverts.filter((item) => isAdvertStrictMatch(item, query));
+        const strictAdverts = scoredAdverts.filter((item) => (
+          isAdvertStrictMatch(item, query)
+          && isYearKmCompatible(item, query)
+          && !isSuspiciousCommercialListing(item)
+        ));
+        const strictDatedAdverts = strictAdverts.filter((item) => item.year);
         const relevantAdverts = scoredAdverts
-          .filter((item) => item.relevanceScore >= 2)
+          .filter((item) => item.relevanceScore >= 2 && !isSuspiciousCommercialListing(item))
           .sort((left, right) => right.relevanceScore - left.relevanceScore || left.price - right.price);
-        const hasSpecificity = Boolean(
-          String(query.packageName || '').trim()
-          || String(query.engine || '').trim()
-          || String(query.fuelType || '').trim(),
-        );
         const selectedAdverts = strictAdverts.length >= 2
-          ? strictAdverts.sort((left, right) => right.relevanceScore - left.relevanceScore || left.price - right.price)
-          : relevantAdverts.length >= 3 && !hasSpecificity
+          ? (strictDatedAdverts.length >= 3 ? strictDatedAdverts : strictAdverts)
+            .sort((left, right) => right.relevanceScore - left.relevanceScore || left.price - right.price)
+          : relevantAdverts.length >= 3 && !requiresHighSpecificity
             ? relevantAdverts
-            : !hasSpecificity
+            : !requiresHighSpecificity
               ? scoredAdverts
               : [];
 

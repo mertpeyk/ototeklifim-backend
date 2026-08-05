@@ -37,6 +37,10 @@ export function buildValuationModelKey(brand: string, model: string) {
 }
 
 export async function getValuationModelMultipliers(forceRefresh = false) {
+  if (process.env.VALUATION_SKIP_CALIBRATION_DB === '1') {
+    return cachedSnapshot?.data || {};
+  }
+
   if (!forceRefresh && cachedSnapshot && cachedSnapshot.expiresAt > Date.now()) {
     return cachedSnapshot.data;
   }
