@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,12 +20,31 @@ type ValuationMetadata = {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const landingAssetsRoot = path.resolve(__dirname, '../../../ototeklifim-landing-web/assets');
-const catalogPath = path.join(landingAssetsRoot, 'valuation-catalog.json');
-const metadataPath = path.join(landingAssetsRoot, 'valuation-metadata.json');
 const CACHE_TTL_MS = 60 * 1000;
 
 let cachedCatalog: { expiresAt: number; catalog: ValuationCatalog; metadata: ValuationMetadata } | null = null;
+
+async function resolveLandingAssetsRoot() {
+  const candidates = [
+    path.resolve(__dirname, '../../../ototeklifim-landing-web/assets'),
+    path.resolve(__dirname, '../../ototeklifim-landing-web/assets'),
+    path.resolve(process.cwd(), '../ototeklifim-landing-web/assets'),
+    path.resolve(process.cwd(), 'ototeklifim-landing-web/assets'),
+    path.resolve('/Users/mertpeyk/Projects/OtoTeklifim/ototeklifim-landing-web/assets'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await access(path.join(candidate, 'valuation-catalog.json'));
+      await access(path.join(candidate, 'valuation-metadata.json'));
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error(`Valuation catalog assets not found. Tried: ${candidates.join(', ')}`);
+}
 
 function normalizeText(value: string | undefined) {
   return String(value || '')
@@ -85,6 +104,10 @@ async function loadCatalogSnapshot() {
   if (cachedCatalog && cachedCatalog.expiresAt > Date.now()) {
     return cachedCatalog;
   }
+
+  const landingAssetsRoot = await resolveLandingAssetsRoot();
+  const catalogPath = path.join(landingAssetsRoot, 'valuation-catalog.json');
+  const metadataPath = path.join(landingAssetsRoot, 'valuation-metadata.json');
 
   const [catalogRaw, metadataRaw] = await Promise.all([
     readFile(catalogPath, 'utf8'),
