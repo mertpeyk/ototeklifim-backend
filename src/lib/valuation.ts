@@ -196,6 +196,14 @@ function getLiquidityBoost(input: ValuationEstimateInput) {
     boost += 30000;
   }
 
+  if (brand === 'renault' && model === 'duster') {
+    boost += 35000;
+    if (bodyType.includes('suv')) boost += 20000;
+    if (isAutomatic) boost += 15000;
+    if (fuel.includes('hibrit') || fuel.includes('hybrid') || engine.includes('e tech')) boost += 30000;
+    if (packageName.includes('techno')) boost += 12000;
+  }
+
   if (brand === 'toyota' && model === 'corolla') {
     boost += 25000;
   }
@@ -289,6 +297,7 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
     'Renault|Clio': -80000,
     'Renault|Captur': 110000,
     'Renault|Austral': 280000,
+    'Renault|Duster': 210000,
     'Toyota|Corolla': 120000,
     'Toyota|Corolla Cross': 210000,
     'Toyota|C-HR': 190000,
@@ -380,7 +389,10 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
     + (pillarState === 'issue' ? 2 : 0);
 
   const highDemandBrands = ['Tesla', 'BMW', 'Mercedes-Benz', 'Toyota', 'Volkswagen', 'Land Rover'];
-  const demand = highDemandBrands.includes(input.vehicleInfo.brand) ? 'Yüksek' : 'Dengeli';
+  const isHighDemandModel =
+    (input.vehicleInfo.brand === 'Renault' && input.vehicleInfo.model === 'Duster')
+    || (input.vehicleInfo.brand === 'Renault' && input.vehicleInfo.model === 'Clio');
+  const demand = highDemandBrands.includes(input.vehicleInfo.brand) || isHighDemandModel ? 'Yüksek' : 'Dengeli';
 
   const marketComps = await getMarketComps({
     brand: input.vehicleInfo.brand,

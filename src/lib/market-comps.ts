@@ -155,6 +155,11 @@ function buildPathCandidates(query: MarketCompsQuery) {
   return Array.from(combos).filter(Boolean);
 }
 
+function isCloudflareChallenge(html: string) {
+  const normalized = String(html || '').toLowerCase();
+  return normalized.includes('just a moment') && normalized.includes('cf_chl_opt');
+}
+
 async function fetchViaCurl(url: string) {
   const { stdout } = await execFileAsync(
     'curl',
@@ -366,6 +371,14 @@ function isAdvertStrictMatch(
     return false;
   }
 
+  if (engineNormalized.includes('e tech') && !hasAnyToken(haystack, ['e tech', 'hibrit', 'hybrid'])) {
+    return false;
+  }
+
+  if (engineNormalized.includes('hybrid') && !hasAnyToken(haystack, ['hybrid', 'hibrit', 'e tech'])) {
+    return false;
+  }
+
   return true;
 }
 
@@ -394,6 +407,15 @@ function scoreAdvertRelevance(
   const fuelNormalized = normalizeText(query.fuelType || '');
   if (fuelNormalized && haystack.includes(fuelNormalized.split(' ')[0] || fuelNormalized)) {
     score += 2;
+  }
+
+  const engineNormalized = normalizeText(query.engine || '');
+  if (engineNormalized.includes('e tech') && hasAnyToken(haystack, ['e tech', 'hibrit', 'hybrid'])) {
+    score += 2.5;
+  }
+
+  if (engineNormalized.includes('hybrid') && hasAnyToken(haystack, ['hybrid', 'hibrit', 'e tech'])) {
+    score += 2.5;
   }
 
   const transmissionNormalized = normalizeText(query.transmission || '');
@@ -489,7 +511,10 @@ async function resolveArabamComps(query: MarketCompsQuery): Promise<MarketCompsR
   for (const category of categories) {
     for (const path of paths) {
       const url = `https://www.arabam.com/ikinci-el/${category}/${path}`;
-      const html = requiresHighSpecificity ? await fetchViaCurl(url) : await fetchPublicHtml(url);
+      const html = await fetchPublicHtml(url);
+      if (isCloudflareChallenge(html)) {
+        continue;
+      }
       const insiderListings = parseArabamInsiderListings(html);
 
       const adverts = (insiderListings.length ? insiderListings : parseArabamAdverts(html)
@@ -546,6 +571,16 @@ async function resolveArabamComps(query: MarketCompsQuery): Promise<MarketCompsR
         };
       }
     }
+  }
+
+  if (requiresHighSpecificity) {
+    return resolveArabamComps({
+      ...query,
+      fuelType: '',
+      transmission: '',
+      engine: '',
+      packageName: '',
+    });
   }
 
   return {

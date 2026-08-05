@@ -114,6 +114,43 @@ const scenarios: Array<{ name: string; input: ValuationEstimateInput }> = [
       serviceHistory: true,
     },
   },
+  {
+    name: '2024 Renault Duster 1.6 Hybrid Techno',
+    input: {
+      vehicleInfo: {
+        vehicleType: 'Otomobil',
+        brand: 'Renault',
+        model: 'Duster',
+        packageName: 'Techno',
+        year: 2024,
+        mileage: 64000,
+        fuelType: 'Hibrit',
+        transmission: 'Otomatik',
+        bodyType: 'SUV',
+        engineVolume: '1.6 Hybrid',
+        enginePower: '',
+        color: 'Gri',
+        city: 'Istanbul',
+        district: '',
+      },
+      condition: {
+        tramerAmount: 0,
+        severeDamage: false,
+        paintedParts: [],
+        changedParts: [],
+        mechanicalStatus: 'Periyodik bakim gecmisi mevcut',
+        maintenanceHistory: 'Tum bakimlar yetkili servis',
+        appraisalReport: '',
+        airbagCondition: 'clean',
+        chassisPodyeCondition: 'clean',
+        pillarCondition: 'clean',
+        criticalChecks: [],
+        damageParts: [],
+      },
+      extraKey: false,
+      serviceHistory: true,
+    },
+  },
 ];
 
 for (const scenario of scenarios) {
