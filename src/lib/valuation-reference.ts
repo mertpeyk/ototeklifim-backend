@@ -23,6 +23,7 @@ const __dirname = path.dirname(__filename);
 const CACHE_TTL_MS = 60 * 1000;
 
 let cachedCatalog: { expiresAt: number; catalog: ValuationCatalog; metadata: ValuationMetadata } | null = null;
+let catalogUnavailableUntil = 0;
 
 async function resolveLandingAssetsRoot() {
   const candidates = [
@@ -101,27 +102,36 @@ function pickBestOption(expected: string, options: string[], fallback = expected
 }
 
 async function loadCatalogSnapshot() {
+  if (catalogUnavailableUntil > Date.now()) {
+    return null;
+  }
+
   if (cachedCatalog && cachedCatalog.expiresAt > Date.now()) {
     return cachedCatalog;
   }
 
-  const landingAssetsRoot = await resolveLandingAssetsRoot();
-  const catalogPath = path.join(landingAssetsRoot, 'valuation-catalog.json');
-  const metadataPath = path.join(landingAssetsRoot, 'valuation-metadata.json');
+  try {
+    const landingAssetsRoot = await resolveLandingAssetsRoot();
+    const catalogPath = path.join(landingAssetsRoot, 'valuation-catalog.json');
+    const metadataPath = path.join(landingAssetsRoot, 'valuation-metadata.json');
 
-  const [catalogRaw, metadataRaw] = await Promise.all([
-    readFile(catalogPath, 'utf8'),
-    readFile(metadataPath, 'utf8'),
-  ]);
+    const [catalogRaw, metadataRaw] = await Promise.all([
+      readFile(catalogPath, 'utf8'),
+      readFile(metadataPath, 'utf8'),
+    ]);
 
-  const snapshot = {
-    expiresAt: Date.now() + CACHE_TTL_MS,
-    catalog: JSON.parse(catalogRaw) as ValuationCatalog,
-    metadata: JSON.parse(metadataRaw) as ValuationMetadata,
-  };
+    const snapshot = {
+      expiresAt: Date.now() + CACHE_TTL_MS,
+      catalog: JSON.parse(catalogRaw) as ValuationCatalog,
+      metadata: JSON.parse(metadataRaw) as ValuationMetadata,
+    };
 
-  cachedCatalog = snapshot;
-  return snapshot;
+    cachedCatalog = snapshot;
+    return snapshot;
+  } catch {
+    catalogUnavailableUntil = Date.now() + CACHE_TTL_MS;
+    return null;
+  }
 }
 
 function getAllBrands(catalog: ValuationCatalog) {
@@ -144,7 +154,16 @@ export async function normalizeVehicleInfoWithCatalog(input: {
   city: string;
   district?: string;
 }) {
-  const { catalog, metadata } = await loadCatalogSnapshot();
+  const snapshot = await loadCatalogSnapshot();
+  if (!snapshot) {
+    return {
+      ...input,
+      enginePower: input.enginePower || '',
+      district: input.district || '',
+    };
+  }
+
+  const { catalog, metadata } = snapshot;
   const yearKey = String(input.year);
   const yearBrands = catalog.makesByYear?.[yearKey] || getAllBrands(catalog);
   const brand = pickBestOption(input.brand, yearBrands, input.brand);
