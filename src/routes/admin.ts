@@ -13,6 +13,12 @@ import { z } from 'zod';
 
 import { prisma } from '../db.js';
 import { createSession, createSession as createAuthSession, requireAdmin, requireAuth, verifyPassword } from '../lib/auth.js';
+import {
+  buildValuationModelKey,
+  getValuationModelMultipliers,
+  removeValuationModelMultiplier,
+  upsertValuationModelMultiplier,
+} from '../lib/valuation-calibration.js';
 
 const adminPermissions = [
   'listings.view',
@@ -182,6 +188,17 @@ const whatsappSettingsSchema = z.object({
 
 const supportPhoneSettingsSchema = z.object({
   phoneNumber: z.string().min(10),
+});
+
+const valuationCalibrationSchema = z.object({
+  brand: z.string().trim().min(1),
+  model: z.string().trim().min(1),
+  adjustmentPercent: z.number().min(-15).max(15),
+});
+
+const valuationCalibrationResetSchema = z.object({
+  brand: z.string().trim().min(1),
+  model: z.string().trim().min(1),
 });
 
 const structuralConditionInputSchema = z.enum(['Belirtilmedi', 'clean', 'issue', 'Temiz', 'İşlemli', 'Sorun yok', 'İşlem / sorun var']);
@@ -1079,6 +1096,92 @@ export async function adminRoutes(app: FastifyInstance) {
       phoneNumber: phoneTel,
       phoneTel,
       phoneDisplay: formatSupportPhoneDisplay(phoneTel),
+    };
+  });
+
+  app.get('/admin/settings/valuation-calibration', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const multipliers = await getValuationModelMultipliers(true);
+    const items = Object.entries(multipliers)
+      .map(([key, adjustmentPercent]) => {
+        const [brand, model] = key.split('|');
+        return {
+          key,
+          brand: brand ?? '',
+          model: model ?? '',
+          adjustmentPercent,
+        };
+      })
+      .sort((left, right) => Math.abs(right.adjustmentPercent) - Math.abs(left.adjustmentPercent));
+
+    return {
+      items,
+    };
+  });
+
+  app.put('/admin/settings/valuation-calibration/model', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const payload = valuationCalibrationSchema.parse(request.body);
+    const { key, previousValue, nextValue } = await upsertValuationModelMultiplier(payload.brand, payload.model, payload.adjustmentPercent);
+
+    await appendActivityLog({
+      adminId: admin.id,
+      adminName: admin.fullName,
+      action: 'SETTINGS_UPDATE',
+      module: 'Ayarlar',
+      recordId: `valuation.model_multiplier.${key}`,
+      previousValue: String(previousValue),
+      newValue: String(nextValue),
+      description: `${payload.brand} ${payload.model} icin model kalibrasyonu ${nextValue > 0 ? '+' : ''}%${nextValue} olarak guncellendi.`,
+    });
+
+    return {
+      success: true,
+      item: {
+        key,
+        brand: payload.brand,
+        model: payload.model,
+        adjustmentPercent: nextValue,
+      },
+    };
+  });
+
+  app.delete('/admin/settings/valuation-calibration/model', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const payload = valuationCalibrationResetSchema.parse(request.body);
+    const { key, previousValue } = await removeValuationModelMultiplier(payload.brand, payload.model);
+
+    await appendActivityLog({
+      adminId: admin.id,
+      adminName: admin.fullName,
+      action: 'SETTINGS_UPDATE',
+      module: 'Ayarlar',
+      recordId: `valuation.model_multiplier.${key}`,
+      previousValue: String(previousValue),
+      newValue: '0',
+      description: `${payload.brand} ${payload.model} icin model kalibrasyonu sifirlandi.`,
+    });
+
+    return {
+      success: true,
+      item: {
+        key: buildValuationModelKey(payload.brand, payload.model),
+        brand: payload.brand,
+        model: payload.model,
+        adjustmentPercent: 0,
+      },
     };
   });
 

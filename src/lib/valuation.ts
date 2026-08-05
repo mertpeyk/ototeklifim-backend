@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { getMarketComps } from './market-comps.js';
+import { getValuationModelMultiplier } from './valuation-calibration.js';
 
 export const valuationVehicleInfoSchema = z.object({
   vehicleType: z.string().min(1),
@@ -295,15 +296,27 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
 
   if (marketComps?.stats) {
     const sampleSize = Number(marketComps.sampleSize || 0);
-    const confidence = Math.min(0.78, 0.22 + ((sampleSize / 12) * 0.56));
-    const marketAnchor = Math.round(
-      (Number(marketComps.stats.trimmedAverage || 0) * 0.7)
-      + (Number(marketComps.stats.median || 0) * 0.3),
-    );
+    const trimmedAverage = Number(marketComps.stats.trimmedAverage || 0);
+    const medianValue = Number(marketComps.stats.median || 0);
+    const lowerBand = Number(marketComps.stats.lowerBand || medianValue || trimmedAverage || estimate);
+    const upperBand = Number(marketComps.stats.upperBand || medianValue || trimmedAverage || estimate);
+    const spreadRatio = trimmedAverage > 0 ? Math.min(0.24, Math.max(0, (upperBand - lowerBand) / trimmedAverage)) : 0.12;
+    const stabilityFactor = Math.max(0.38, 1 - (spreadRatio * 2.4));
+    const confidence = Math.min(0.84, 0.24 + ((sampleSize / 12) * 0.52) + ((stabilityFactor - 0.38) * 0.28));
+    const marketAnchorBase = spreadRatio > 0.08
+      ? (trimmedAverage * 0.45) + (medianValue * 0.55)
+      : (trimmedAverage * 0.72) + (medianValue * 0.28);
+    const marketAnchor = Math.round(marketAnchorBase);
     estimate = Math.round((marketAnchor * confidence) + (heuristicEstimate * (1 - confidence)));
-    minimum = Math.round((Number(marketComps.stats.lowerBand || estimate * 0.97) * 0.85) + (estimate * 0.15));
-    maximum = Math.round((Number(marketComps.stats.upperBand || estimate * 1.03) * 0.85) + (estimate * 0.15));
+    minimum = Math.round((lowerBand * 0.88) + (estimate * 0.12));
+    maximum = Math.round((upperBand * 0.88) + (estimate * 0.12));
   }
+
+  const modelCalibrationPercent = await getValuationModelMultiplier(input.vehicleInfo.brand, input.vehicleInfo.model);
+  const calibrationMultiplier = 1 + (modelCalibrationPercent / 100);
+  estimate = Math.round(estimate * calibrationMultiplier);
+  minimum = Math.round(minimum * calibrationMultiplier);
+  maximum = Math.round(maximum * calibrationMultiplier);
 
   const galleryMultiplier = severityScore >= 4 ? 0.905 : demand === 'Yüksek' ? 0.945 : 0.932;
   const quickMultiplier = severityScore >= 4 ? 0.875 : demand === 'Yüksek' ? 0.918 : 0.902;
@@ -318,6 +331,7 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
     input.serviceHistory ? 'Yetkili/Belgeli bakım geçmişi' : null,
     input.vehicleInfo.transmission === 'Otomatik' ? 'Otomatik vites talebi destekliyor' : null,
     marketComps?.sampleSize ? `${marketComps.sampleSize} emsal ilan ile piyasa doğrulaması yapıldı` : null,
+    modelCalibrationPercent !== 0 ? `Model kalibrasyonu %${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(modelCalibrationPercent)} uygulandı` : null,
   ].filter(Boolean) as string[];
 
   const negatives = [
