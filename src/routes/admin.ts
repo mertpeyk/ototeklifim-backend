@@ -184,10 +184,14 @@ const supportPhoneSettingsSchema = z.object({
   phoneNumber: z.string().min(10),
 });
 
-const structuralConditionInputSchema = z.enum(['Belirtilmedi', 'clean', 'issue', 'Sorun yok', 'İşlem / sorun var']);
+const structuralConditionInputSchema = z.enum(['Belirtilmedi', 'clean', 'issue', 'Temiz', 'İşlemli', 'Sorun yok', 'İşlem / sorun var']);
 
 function normalizeStructuralConditionValue(value: z.infer<typeof structuralConditionInputSchema>) {
   if (value === 'Sorun yok') {
+    return 'clean' as const;
+  }
+
+  if (value === 'Temiz') {
     return 'clean' as const;
   }
 
@@ -195,7 +199,30 @@ function normalizeStructuralConditionValue(value: z.infer<typeof structuralCondi
     return 'issue' as const;
   }
 
+  if (value === 'İşlemli') {
+    return 'issue' as const;
+  }
+
   return value;
+}
+
+function resolveStructuralConditionFromChecks(
+  rawValue: unknown,
+  checks: Array<Record<string, unknown>>,
+  matchers: string[],
+) {
+  const parsedRaw = structuralConditionValueSchema.safeParse(rawValue);
+  if (parsedRaw.success && parsedRaw.data !== 'Belirtilmedi') {
+    return parsedRaw.data;
+  }
+
+  const fallback = checks.find((item) => {
+    const key = String(item.key ?? '').toLocaleLowerCase('tr-TR');
+    const label = String(item.label ?? '').toLocaleLowerCase('tr-TR');
+    return matchers.some((matcher) => key.includes(matcher) || label.includes(matcher));
+  });
+
+  return structuralConditionValueSchema.catch('Belirtilmedi').parse(fallback?.status);
 }
 
 const structuralConditionValueSchema = structuralConditionInputSchema.transform(normalizeStructuralConditionValue);
@@ -736,6 +763,7 @@ async function buildAdminRepository() {
     fastSales: fastSales.map((request) => {
       const vehicle = parseObject<Record<string, unknown>>(request.vehicleInfo, {});
       const condition = parseObject<Record<string, unknown>>(request.condition, {});
+      const criticalChecks = parseArray<Record<string, unknown>>(condition.criticalChecks);
       const photos = parseArray<Record<string, unknown>>(request.photos);
       const requestUser =
         mappedUsers.find((user) => user.id === request.userId) ?? {
@@ -784,10 +812,10 @@ async function buildAdminRepository() {
           mechanicalStatus: String(condition.mechanicalStatus ?? ''),
           maintenanceHistory: String(condition.maintenanceHistory ?? ''),
           appraisalReport: String(condition.appraisalReport ?? ''),
-          airbagCondition: structuralConditionValueSchema.catch('Belirtilmedi').parse(condition.airbagCondition),
-          chassisPodyeCondition: structuralConditionValueSchema.catch('Belirtilmedi').parse(condition.chassisPodyeCondition),
-          pillarCondition: structuralConditionValueSchema.catch('Belirtilmedi').parse(condition.pillarCondition),
-          criticalChecks: parseArray<Record<string, unknown>>(condition.criticalChecks).map((item, index) => ({
+          airbagCondition: resolveStructuralConditionFromChecks(condition.airbagCondition, criticalChecks, ['airbag']),
+          chassisPodyeCondition: resolveStructuralConditionFromChecks(condition.chassisPodyeCondition, criticalChecks, ['chassis', 'podye', 'şase', 'sase']),
+          pillarCondition: resolveStructuralConditionFromChecks(condition.pillarCondition, criticalChecks, ['pillar', 'direk']),
+          criticalChecks: criticalChecks.map((item, index) => ({
             key: String(item.key ?? `${request.id}-critical-${index}`),
             label: String(item.label ?? ''),
             status: structuralConditionValueSchema.catch('Belirtilmedi').parse(item.status),

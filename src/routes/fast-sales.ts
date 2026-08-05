@@ -42,14 +42,22 @@ const damagePartSchema = z.object({
   status: z.enum(['Orijinal', 'Lokal Boyali', 'Boyali', 'Onarimli', 'Degisen']),
 });
 
-const structuralConditionInputSchema = z.enum(['Belirtilmedi', 'clean', 'issue', 'Sorun yok', 'İşlem / sorun var']);
+const structuralConditionInputSchema = z.enum(['Belirtilmedi', 'clean', 'issue', 'Temiz', 'İşlemli', 'Sorun yok', 'İşlem / sorun var']);
 
 function normalizeStructuralConditionValue(value: z.infer<typeof structuralConditionInputSchema>) {
   if (value === 'Sorun yok') {
     return 'clean' as const;
   }
 
+  if (value === 'Temiz') {
+    return 'clean' as const;
+  }
+
   if (value === 'İşlem / sorun var') {
+    return 'issue' as const;
+  }
+
+  if (value === 'İşlemli') {
     return 'issue' as const;
   }
 
