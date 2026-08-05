@@ -203,6 +203,58 @@ function parsePrice(value: unknown) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function normalizeText(value: string) {
+  return normalizeTurkish(String(value || ''))
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function extractNumericEngineToken(value: string) {
+  const match = normalizeText(value).match(/(\d+(?:\s*\d+)?)/);
+  return match ? match[1]!.replace(/\s+/g, '') : '';
+}
+
+function scoreAdvertRelevance(
+  advert: { title: string; variant: string; categoryName: string },
+  query: MarketCompsQuery,
+) {
+  const haystack = normalizeText(`${advert.title} ${advert.variant} ${advert.categoryName}`);
+  let score = 0;
+
+  const packageNormalized = normalizeText(query.packageName || '');
+  if (packageNormalized && packageNormalized !== 'standart') {
+    if (haystack.includes(packageNormalized)) {
+      score += 6;
+    } else {
+      const packageTokens = packageNormalized.split(' ').filter((token) => token.length >= 3);
+      score += packageTokens.filter((token) => haystack.includes(token)).length * 1.5;
+    }
+  }
+
+  const engineNumericToken = extractNumericEngineToken(query.engine || '');
+  if (engineNumericToken && haystack.includes(engineNumericToken)) {
+    score += 3;
+  }
+
+  const fuelNormalized = normalizeText(query.fuelType || '');
+  if (fuelNormalized && haystack.includes(fuelNormalized.split(' ')[0] || fuelNormalized)) {
+    score += 2;
+  }
+
+  const transmissionNormalized = normalizeText(query.transmission || '');
+  if (transmissionNormalized && haystack.includes(transmissionNormalized)) {
+    score += 1.5;
+  }
+
+  const bodyTypeNormalized = normalizeText(query.bodyType || query.vehicleType || '');
+  if (bodyTypeNormalized && haystack.includes(bodyTypeNormalized.split(' ')[0] || bodyTypeNormalized)) {
+    score += 1;
+  }
+
+  return score;
+}
+
 function median(values: number[]) {
   if (!values.length) return 0;
   const middle = Math.floor(values.length / 2);
@@ -259,15 +311,23 @@ async function resolveArabamComps(query: MarketCompsQuery): Promise<MarketCompsR
         .filter((item) => item.price > 0);
 
       if (adverts.length >= 3) {
-        const prices = adverts.map((item) => item.price);
+        const scoredAdverts = adverts.map((item) => ({
+          ...item,
+          relevanceScore: scoreAdvertRelevance(item, query),
+        }));
+        const relevantAdverts = scoredAdverts
+          .filter((item) => item.relevanceScore >= 2)
+          .sort((left, right) => right.relevanceScore - left.relevanceScore || left.price - right.price);
+        const selectedAdverts = relevantAdverts.length >= 3 ? relevantAdverts : scoredAdverts;
+        const prices = selectedAdverts.map((item) => item.price);
         return {
           ok: true,
           source: 'arabam',
           sourceUrl: url,
-          sampleSize: adverts.length,
-          fallbackUsed: false,
+          sampleSize: selectedAdverts.length,
+          fallbackUsed: relevantAdverts.length < 3,
           stats: buildStats(prices),
-          listings: adverts.slice(0, 12),
+          listings: selectedAdverts.slice(0, 12).map(({ relevanceScore: _score, ...item }) => item),
           computedAt: new Date().toISOString(),
         };
       }

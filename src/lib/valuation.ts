@@ -56,6 +56,16 @@ export type ValuationEstimateInput = z.infer<typeof valuationEstimateInputSchema
 
 type StructuralState = 'clean' | 'issue' | 'Belirtilmedi';
 
+function normalizeText(value: string | undefined) {
+  return String(value || '')
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ı/g, 'i')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 function normalizeStructuralState(value: string | undefined): StructuralState {
   if (value === 'clean' || value === 'Temiz' || value === 'Sorun yok') return 'clean';
   if (value === 'issue' || value === 'İşlemli' || value === 'İşlem / sorun var') return 'issue';
@@ -63,21 +73,21 @@ function normalizeStructuralState(value: string | undefined): StructuralState {
 }
 
 function parseEngineScore(engineValue: string, enginePower: string) {
-  const normalized = `${engineValue || ''} ${enginePower || ''}`
-    .replace(',', '.')
-    .toLocaleLowerCase('tr-TR');
+  const normalized = `${engineValue || ''} ${enginePower || ''}`.replace(',', '.').toLocaleLowerCase('tr-TR');
   if (!normalized.trim()) return 0;
 
   const literMatch = normalized.match(/(\d+(?:\.\d+)?)/);
   const powerMatch = normalized.match(/(\d{2,3})\s*(hp|bg|ps|kw)/);
   const literBoost = literMatch ? Math.max(-45000, (Number(literMatch[1]) - 1.2) * 90000) : 0;
   const powerBoost = powerMatch ? Math.max(-25000, (Number(powerMatch[1]) - 100) * 900) : 0;
+  const turboBoost = normalized.includes('turbo') || normalized.includes('tsi') || normalized.includes('ecoboost') || normalized.includes('tce') ? 18000 : 0;
+  const premiumEngineBoost = normalized.includes('tdi') || normalized.includes('tsi') || normalized.includes('hybrid') || normalized.includes('hibrit') ? 12000 : 0;
 
   if (normalized.includes('electric') || normalized.includes('elektrik') || normalized.includes('ev')) {
     return literBoost + powerBoost + 120000;
   }
 
-  return literBoost + powerBoost;
+  return literBoost + powerBoost + turboBoost + premiumEngineBoost;
 }
 
 function getYearAdjustment(year: number) {
@@ -99,18 +109,58 @@ function getKmPenalty(km: number) {
   return 175000 + ((Math.min(km, 260000) - 180000) * 1.55);
 }
 
-function getPackageTierBoost(packageName: string) {
-  const normalized = String(packageName || '').toLocaleLowerCase('tr-TR');
+function getPackageTierBoost(packageName: string, brand: string, model: string) {
+  const normalized = normalizeText(packageName);
   if (!normalized) return 0;
 
-  const premiumKeywords = ['premium', 'prestige', 'executive', 'exclusive', 'elite', 'design', 'excellence', 'flagship', 'autobiography', 'platinum', 'quattro'];
-  const sportKeywords = ['m sport', 'amg', 's line', 'gt line', 'fr', 'r-line', 'black edition', 'veloce', 'f sport'];
-  const entryKeywords = ['base', 'easy', 'essential', 'vision', 'jump', 'prime', 'standart'];
+  const premiumKeywords = ['premium', 'prestige', 'executive', 'exclusive', 'elite', 'design', 'excellence', 'flagship', 'autobiography', 'platinum', 'quattro', 'x pack', 'highline', 'advance', 'luxury', 'summit'];
+  const sportKeywords = ['m sport', 'amg', 's line', 'gt line', 'fr', 'r line', 'black edition', 'veloce', 'f sport', 'gts', 'rs', 'sportback', 'track'];
+  const entryKeywords = ['base', 'easy', 'essential', 'vision', 'jump', 'prime', 'standart', 'authentic', 'touch', 'joy'];
+  const offroadKeywords = ['4x4', 'awd', '4wd', 'quattro', 'xdrive', '4motion'];
+  const normalizedBrand = normalizeText(brand);
+  const normalizedModel = normalizeText(model);
 
+  if (offroadKeywords.some((keyword) => normalized.includes(keyword))) return 135000;
   if (sportKeywords.some((keyword) => normalized.includes(keyword))) return 120000;
   if (premiumKeywords.some((keyword) => normalized.includes(keyword))) return 80000;
   if (entryKeywords.some((keyword) => normalized.includes(keyword))) return -25000;
+  if (normalizedBrand === 'land rover' || normalizedBrand === 'porsche' || normalizedBrand === 'tesla') return 40000;
+  if (normalizedModel.includes('range rover') || normalizedModel.includes('defender')) return 55000;
   return 15000;
+}
+
+function getRegionalAdjustment(city: string, district: string, brandBase: number, bodyType: string, brand: string) {
+  const normalizedCity = normalizeText(city);
+  const normalizedDistrict = normalizeText(district);
+  const normalizedBodyType = normalizeText(bodyType);
+  const normalizedBrand = normalizeText(brand);
+  let multiplier = 0;
+
+  if (normalizedCity === 'istanbul') multiplier += 0.018;
+  else if (normalizedCity === 'ankara' || normalizedCity === 'izmir') multiplier += 0.012;
+  else if (['bursa', 'antalya', 'kocaeli', 'mugla'].includes(normalizedCity)) multiplier += 0.007;
+  else if (['konya', 'kayseri', 'samsun', 'gaziantep', 'eskişehir', 'adana'].includes(normalizedCity)) multiplier += 0.003;
+  else multiplier -= 0.002;
+
+  if (['besiktas', 'sariyer', 'bakirkoy', 'kadikoy', 'cekmekoy', 'uskudar'].includes(normalizedDistrict)) multiplier += 0.004;
+  if (normalizedBodyType.includes('suv') || normalizedBodyType.includes('pick')) multiplier += 0.003;
+  if (['bmw', 'mercedes benz', 'audi', 'land rover', 'porsche', 'tesla'].includes(normalizedBrand)) multiplier += 0.003;
+
+  return Math.round(brandBase * Math.max(-0.01, Math.min(0.035, multiplier)));
+}
+
+function getOwnershipDemandBoost(input: ValuationEstimateInput) {
+  const normalizedFuel = normalizeText(input.vehicleInfo.fuelType);
+  const normalizedTransmission = normalizeText(input.vehicleInfo.transmission);
+  const normalizedPackage = normalizeText(input.vehicleInfo.packageName);
+  let boost = 0;
+
+  if (normalizedTransmission.includes('otomatik')) boost += 15000;
+  if (normalizedFuel.includes('hibrit') || normalizedFuel.includes('elektrik')) boost += 20000;
+  if (normalizedPackage.includes('cam tavan') || normalizedPackage.includes('panoramik')) boost += 10000;
+  if (normalizedPackage.includes('4x4') || normalizedPackage.includes('awd') || normalizedPackage.includes('4motion')) boost += 18000;
+
+  return boost;
 }
 
 function toRoundedCurrency(value: number) {
@@ -224,7 +274,9 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
       : input.vehicleInfo.transmission === 'Manuel' ? -15000
         : 0;
 
-  const packageBoost = getPackageTierBoost(input.vehicleInfo.packageName);
+  const packageBoost = getPackageTierBoost(input.vehicleInfo.packageName, input.vehicleInfo.brand, input.vehicleInfo.model);
+  const regionalBoost = getRegionalAdjustment(input.vehicleInfo.city, input.vehicleInfo.district || '', brandBase, input.vehicleInfo.bodyType, input.vehicleInfo.brand);
+  const ownershipDemandBoost = getOwnershipDemandBoost(input);
   const maintenanceBoost = input.serviceHistory ? 25000 : input.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('mevcut') ? 18000 : -20000;
   const extraKeyBoost = input.extraKey ? 10000 : -8000;
 
@@ -256,6 +308,8 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
       + fuelBoost
       + transmissionBoost
       + packageBoost
+      + regionalBoost
+      + ownershipDemandBoost
       + maintenanceBoost
       + extraKeyBoost
       - kmPenalty
@@ -331,6 +385,7 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
     input.serviceHistory ? 'Yetkili/Belgeli bakım geçmişi' : null,
     input.vehicleInfo.transmission === 'Otomatik' ? 'Otomatik vites talebi destekliyor' : null,
     marketComps?.sampleSize ? `${marketComps.sampleSize} emsal ilan ile piyasa doğrulaması yapıldı` : null,
+    regionalBoost > 0 ? `${input.vehicleInfo.city} bölgesinde talep primi uygulandı` : null,
     modelCalibrationPercent !== 0 ? `Model kalibrasyonu %${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(modelCalibrationPercent)} uygulandı` : null,
   ].filter(Boolean) as string[];
 
