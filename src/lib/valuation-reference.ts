@@ -105,6 +105,26 @@ function pickBestOption(expected: string, options: string[], fallback = expected
   return fallback || options[0]!;
 }
 
+function getCatalogBrandCandidates(brand: string, model: string) {
+  if (brand === 'Renault' && model === 'Duster') {
+    return ['Renault', 'Dacia'];
+  }
+
+  return [brand].filter(Boolean);
+}
+
+function getCatalogBodyTypeCandidates(bodyType: string, vehicleType: string) {
+  return Array.from(new Set([bodyType, vehicleType].filter(Boolean)));
+}
+
+function normalizeInputEngineLabel(engineVolume: string, brand: string, model: string) {
+  if (brand === 'Renault' && model === 'Duster') {
+    return engineVolume.replace(/e-tech/gi, 'Hybrid');
+  }
+
+  return engineVolume;
+}
+
 async function loadCatalogSnapshot() {
   if (catalogUnavailableUntil > Date.now()) {
     return null;
@@ -172,20 +192,52 @@ export async function normalizeVehicleInfoWithCatalog(input: {
   const yearBrands = catalog.makesByYear?.[yearKey] || getAllBrands(catalog);
   const brand = pickBestOption(input.brand, yearBrands, input.brand);
 
-  const modelOptions = catalog.modelsByYearMake?.[`${yearKey}|${brand}`] || [];
+  const modelOptions = Array.from(new Set(
+    getCatalogBrandCandidates(brand, input.model).flatMap(
+      (candidateBrand) => catalog.modelsByYearMake?.[`${yearKey}|${candidateBrand}`] || [],
+    ),
+  ));
   const model = pickBestOption(input.model, modelOptions, input.model);
 
-  const bodyTypeOptions = catalog.bodyTypesByYearMakeModel?.[`${yearKey}|${brand}|${model}`] || [];
+  const bodyTypeOptions = Array.from(new Set(
+    getCatalogBrandCandidates(brand, model).flatMap(
+      (candidateBrand) => catalog.bodyTypesByYearMakeModel?.[`${yearKey}|${candidateBrand}|${model}`] || [],
+    ),
+  ));
   const bodyType = pickBestOption(input.bodyType, bodyTypeOptions, input.bodyType);
 
-  const fuelTypeOptions = catalog.fuelTypesByKey?.[`${yearKey}|${brand}|${model}|${bodyType}`] || [];
+  const fuelTypeOptions = Array.from(new Set(
+    getCatalogBrandCandidates(brand, model).flatMap((candidateBrand) =>
+      getCatalogBodyTypeCandidates(bodyType, input.vehicleType).flatMap(
+        (candidateBodyType) => catalog.fuelTypesByKey?.[`${yearKey}|${candidateBrand}|${model}|${candidateBodyType}`] || [],
+      ),
+    ),
+  ));
   const fuelType = pickBestOption(input.fuelType, fuelTypeOptions, input.fuelType);
 
-  const transmissionOptions = catalog.transmissionsByKey?.[`${yearKey}|${brand}|${model}|${bodyType}|${fuelType}`] || [];
+  const transmissionOptions = Array.from(new Set(
+    getCatalogBrandCandidates(brand, model).flatMap((candidateBrand) =>
+      getCatalogBodyTypeCandidates(bodyType, input.vehicleType).flatMap(
+        (candidateBodyType) =>
+          catalog.transmissionsByKey?.[`${yearKey}|${candidateBrand}|${model}|${candidateBodyType}|${fuelType}`] || [],
+      ),
+    ),
+  ));
   const transmission = pickBestOption(input.transmission, transmissionOptions, input.transmission);
 
-  const engineOptions = catalog.enginesByKey?.[`${yearKey}|${brand}|${model}|${bodyType}|${fuelType}|${transmission}`] || [];
-  const engineVolume = pickBestOption(input.engineVolume, engineOptions, input.engineVolume);
+  const engineOptions = Array.from(new Set(
+    getCatalogBrandCandidates(brand, model).flatMap((candidateBrand) =>
+      getCatalogBodyTypeCandidates(bodyType, input.vehicleType).flatMap(
+        (candidateBodyType) =>
+          catalog.enginesByKey?.[`${yearKey}|${candidateBrand}|${model}|${candidateBodyType}|${fuelType}|${transmission}`] || [],
+      ),
+    ),
+  ));
+  const engineVolume = pickBestOption(
+    normalizeInputEngineLabel(input.engineVolume, brand, model),
+    engineOptions,
+    input.engineVolume,
+  );
 
   const modelPackageOptions = metadata.modelPackages?.[`${brand}|${model}`] || [];
   const brandPackageOptions = metadata.brandPackages?.[brand] || [];
