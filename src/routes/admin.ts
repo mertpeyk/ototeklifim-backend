@@ -184,6 +184,8 @@ const supportPhoneSettingsSchema = z.object({
   phoneNumber: z.string().min(10),
 });
 
+const structuralConditionValueSchema = z.enum(['Belirtilmedi', 'Sorun yok', 'İşlem / sorun var']);
+
 const WHATSAPP_SETTING_KEY = 'contact.whatsapp_number';
 const DEFAULT_WHATSAPP_NUMBER = '905443152285';
 const SUPPORT_PHONE_SETTING_KEY = 'contact.support_phone';
@@ -768,6 +770,14 @@ async function buildAdminRepository() {
           mechanicalStatus: String(condition.mechanicalStatus ?? ''),
           maintenanceHistory: String(condition.maintenanceHistory ?? ''),
           appraisalReport: String(condition.appraisalReport ?? ''),
+          airbagCondition: structuralConditionValueSchema.catch('Belirtilmedi').parse(condition.airbagCondition),
+          chassisPodyeCondition: structuralConditionValueSchema.catch('Belirtilmedi').parse(condition.chassisPodyeCondition),
+          pillarCondition: structuralConditionValueSchema.catch('Belirtilmedi').parse(condition.pillarCondition),
+          criticalChecks: parseArray<Record<string, unknown>>(condition.criticalChecks).map((item, index) => ({
+            key: String(item.key ?? `${request.id}-critical-${index}`),
+            label: String(item.label ?? ''),
+            status: structuralConditionValueSchema.catch('Belirtilmedi').parse(item.status),
+          })),
           damageParts: parseArray<Record<string, unknown>>(condition.damageParts).map((item) => ({
             key: String(item.key ?? crypto.randomUUID()),
             label: String(item.label ?? ''),

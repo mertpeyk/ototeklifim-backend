@@ -42,6 +42,14 @@ const damagePartSchema = z.object({
   status: z.enum(['Orijinal', 'Lokal Boyali', 'Boyali', 'Onarimli', 'Degisen']),
 });
 
+const structuralConditionValueSchema = z.enum(['Belirtilmedi', 'Sorun yok', 'İşlem / sorun var']);
+
+const criticalCheckSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  status: structuralConditionValueSchema,
+});
+
 const conditionSchema = z.object({
   tramerAmount: z.number().min(0),
   severeDamage: z.boolean(),
@@ -50,6 +58,10 @@ const conditionSchema = z.object({
   mechanicalStatus: z.string().min(1),
   maintenanceHistory: z.string().min(1),
   appraisalReport: z.string().optional().default(''),
+  airbagCondition: structuralConditionValueSchema.optional().default('Belirtilmedi'),
+  chassisPodyeCondition: structuralConditionValueSchema.optional().default('Belirtilmedi'),
+  pillarCondition: structuralConditionValueSchema.optional().default('Belirtilmedi'),
+  criticalChecks: z.array(criticalCheckSchema).default([]),
   damageParts: z.array(damagePartSchema).default([]),
 });
 
