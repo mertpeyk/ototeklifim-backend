@@ -276,7 +276,7 @@ function buildPrompt(args: ValuationIntelligenceArgs, listings: IntelligenceList
 
 async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: IntelligenceListing[]): Promise<OpenAiRefinement | null> {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey || !listings.length) return null;
+  if (!apiKey) return null;
 
   const model = process.env.OPENAI_VALUATION_MODEL || 'gpt-4.1-mini';
   const payload = buildPrompt(args, listings.slice(0, 6));
@@ -295,12 +295,12 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
         messages: [
           {
             role: 'system',
-            content: 'You are a used-car valuation copilot. Score comparable listings for similarity, decide whether manual review is needed, and give a concise Turkish explanation. Return strict JSON.',
+            content: 'You are a used-car valuation copilot. Score comparable listings for similarity when available, evaluate vehicle-condition signals, suggest a cautious pricing adjustment, and give a concise Turkish explanation. Return strict JSON.',
           },
           {
             role: 'user',
             content: JSON.stringify({
-              task: 'Score listing similarity from 0 to 100, recommend approve or manual_review, provide a short reason and a concise Turkish explanation, and a safe adjustmentPercent between -5 and 5.',
+              task: 'If comparable listings exist, score listing similarity from 0 to 100. If listings are missing or weak, still evaluate the vehicle and condition payload conservatively. Recommend approve or manual_review, provide a short Turkish reason, a concise Turkish explanation, and a safe adjustmentPercent between -6 and 6. Use small adjustments unless the condition/package/risk signals clearly justify otherwise.',
               payload,
               schema: {
                 perListing: [{ index: 0, similarityScore: 76, note: 'trim and engine close match' }],
@@ -339,7 +339,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
       reviewRecommendation: parsed.reviewRecommendation === 'manual_review' ? 'manual_review' : 'approve',
       reviewReason: String(parsed.reviewReason || '').trim(),
       explanation: String(parsed.explanation || '').trim(),
-      adjustmentPercent: Math.max(-5, Math.min(5, Number(parsed.adjustmentPercent || 0))),
+      adjustmentPercent: Math.max(-6, Math.min(6, Number(parsed.adjustmentPercent || 0))),
     };
   } catch {
     return null;
@@ -359,7 +359,7 @@ export async function runValuationIntelligence(args: ValuationIntelligenceArgs):
   let explanation = '';
 
   if (openAiRefinement) {
-    provider = 'hybrid';
+    provider = baseListings.length ? 'hybrid' : 'openai';
     const aiMap = new Map(openAiRefinement.perListing.map((item) => [item.index, item]));
     listings = baseListings.map((item, index) => {
       const ai = aiMap.get(index);
@@ -387,12 +387,17 @@ export async function runValuationIntelligence(args: ValuationIntelligenceArgs):
   const filteredStats = buildStats(filteredListings);
 
   if (!reviewReason) {
-    if (filteredListings.length < 3) {
+    if (filteredListings.length < 3 && !openAiRefinement) {
       reviewRecommendation = 'manual_review';
       reviewReason = 'AI katmanı yeterince benzer emsal bulamadı';
     } else if (averageSimilarity < 68) {
       reviewRecommendation = 'manual_review';
       reviewReason = 'Emsaller var ama benzerlik gücü düşük';
+    } else if (!filteredListings.length && openAiRefinement) {
+      reviewRecommendation = args.severityScore >= 5 || parsedSignals.riskFlags.length ? 'manual_review' : 'approve';
+      reviewReason = reviewRecommendation === 'manual_review'
+        ? 'AI düzeltmesi uygulandı ama kondisyon riski uzman kontrolü gerektiriyor'
+        : 'AI düzeltmesi sınırlı veriyle kontrollü şekilde uygulandı';
     } else if (args.severityScore >= 5 || parsedSignals.riskFlags.length) {
       reviewRecommendation = 'manual_review';
       reviewReason = 'Kondisyon ve risk sinyalleri uzman kontrolü gerektiriyor';
@@ -406,7 +411,9 @@ export async function runValuationIntelligence(args: ValuationIntelligenceArgs):
     explanation = [
       filteredListings.length >= 3
         ? `${filteredListings.length} güçlü emsal AI benzerlik skoru ile seçildi`
-        : 'Emsal havuzu zayıf kaldı',
+        : openAiRefinement
+          ? 'Emsal zayıf olsa da AI kondisyon ve araç sinyallerinden kontrollü fiyat düzeltmesi üretti'
+          : 'Emsal havuzu zayıf kaldı',
       averageSimilarity ? `ortalama benzerlik ${averageSimilarity}/100` : '',
       parsedSignals.positives[0] || '',
       parsedSignals.negatives[0] || '',

@@ -490,6 +490,7 @@ export async function estimateVehicleValue(
     regionalBoost > 0 ? `${input.vehicleInfo.city} bölgesinde talep primi uygulandı` : null,
     liquidityBoost > 0 ? 'Likiditesi yüksek model avantajı uygulandı' : null,
     modelCalibrationPercent !== 0 ? `Model kalibrasyonu %${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(modelCalibrationPercent)} uygulandı` : null,
+    intelligence.adjustmentPercent > 0 ? `AI fiyat düzeltmesi +%${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(intelligence.adjustmentPercent)} uygulandı` : null,
     intelligence.averageSimilarity ? `AI benzerlik skoru ortalama ${intelligence.averageSimilarity}/100` : null,
     intelligence.parsedSignals.positives[0] || null,
   ].filter(Boolean) as string[];
@@ -502,6 +503,7 @@ export async function estimateVehicleValue(
     airbagState === 'issue' ? 'Airbag kaydı teklif seviyesini aşağı çeker' : null,
     chassisState === 'issue' ? 'Şase/Podye kaydı ciddi değer baskısı oluşturur' : null,
     pillarState === 'issue' ? 'Direk işlemi alıcı güvenini düşürür' : null,
+    intelligence.adjustmentPercent < 0 ? `AI fiyat düzeltmesi %${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(intelligence.adjustmentPercent)} uygulandı` : null,
     intelligence.parsedSignals.negatives[0] || null,
     intelligence.parsedSignals.riskFlags[0] || null,
   ].filter(Boolean) as string[];
