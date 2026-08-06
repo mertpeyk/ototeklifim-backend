@@ -325,13 +325,15 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
     };
     const content = json.choices?.[0]?.message?.content;
     if (!content) return null;
-    const parsed = JSON.parse(content) as Partial<OpenAiRefinement>;
-    if (!Array.isArray(parsed.perListing) || !parsed.reviewRecommendation || !parsed.reviewReason || !parsed.explanation) {
+    const parsed = JSON.parse(content) as Partial<OpenAiRefinement> & {
+      perListing?: OpenAiRefinement['perListing'];
+    };
+    if (!parsed.reviewRecommendation || !parsed.reviewReason || !parsed.explanation) {
       return null;
     }
 
     return {
-      perListing: parsed.perListing.map((item) => ({
+      perListing: (Array.isArray(parsed.perListing) ? parsed.perListing : []).map((item) => ({
         index: Number(item.index || 0),
         similarityScore: Math.max(0, Math.min(100, Number(item.similarityScore || 0))),
         note: String(item.note || '').trim(),
