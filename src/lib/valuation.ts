@@ -244,6 +244,7 @@ function buildValuationSummary(
       `${new Intl.NumberFormat('tr-TR').format(input.vehicleInfo.mileage)} KM`,
       'Yeterli emsal bulunamadi',
       'Manuel inceleme gerekli',
+      result.estimate > 0 ? `On referans: ${new Intl.NumberFormat('tr-TR').format(result.estimate)} TL` : '',
     ].join(' | ');
   }
 
@@ -523,14 +524,20 @@ export async function estimateVehicleValue(
 
   if (!pricingReady) {
     const insufficientComps = marketCompSampleSize < MIN_REQUIRED_MARKET_COMPS;
+    const provisionalEstimate = toRoundedCurrency(estimate);
+    const provisionalMinimum = toRoundedCurrency(minimum);
+    const provisionalMaximum = toRoundedCurrency(maximum);
+    const provisionalGalleryValue = toRoundedCurrency(galleryValue);
+    const provisionalQuickValue = toRoundedCurrency(quickValue);
+    const provisionalPrivateBand = toRoundedCurrency(privateBand);
     return {
       normalizedVehicleInfo: input.vehicleInfo,
-      estimate: 0,
-      minimum: 0,
-      maximum: 0,
-      galleryValue: 0,
-      quickValue: 0,
-      privateBand: 0,
+      estimate: provisionalEstimate,
+      minimum: provisionalMinimum,
+      maximum: provisionalMaximum,
+      galleryValue: provisionalGalleryValue,
+      quickValue: provisionalQuickValue,
+      privateBand: provisionalPrivateBand,
       demand,
       saleWindow: 'Manuel İnceleme',
       paintedCount,
@@ -541,11 +548,16 @@ export async function estimateVehicleValue(
         insufficientComps
           ? `Yeterli emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS})`
           : 'Emsaller kalite eşiğini geçemedi',
+        provisionalEstimate > 0
+          ? `Sistem sadece ön referans değer üretti (${new Intl.NumberFormat('tr-TR').format(provisionalEstimate)} TL)`
+          : 'Ön referans değer üretilemedi',
         intelligence.reviewReason || 'Net fiyat yerine uzman incelemesi gerekiyor',
       ],
-      confidenceScore: 0,
+      confidenceScore: Math.max(12, Math.min(38, 20 + (marketCompSampleSize * 4) - (severityScore * 2))),
       pricingReady: false,
-      unavailableReason: intelligence.reviewReason || `Yeterli emsal bulunamadı. En az ${MIN_REQUIRED_MARKET_COMPS} doğrulanmış emsal gerekiyor.`,
+      unavailableReason: insufficientComps
+        ? `Yeterli emsal bulunamadı. Net fiyat yerine düşük güvenli ön referans üretildi; uzman incelemesi gerekiyor.`
+        : (intelligence.reviewReason || 'Net fiyat yerine uzman incelemesi gerekiyor.'),
       intelligence,
       marketComps: effectiveMarketStats
         ? {
