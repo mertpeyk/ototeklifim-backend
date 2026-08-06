@@ -238,16 +238,6 @@ function buildValuationSummary(
   input: ValuationEstimateInput,
   result: Awaited<ReturnType<typeof estimateVehicleValue>>,
 ) {
-  if (result.pricingReady === false) {
-    return [
-      `${input.vehicleInfo.year} ${input.vehicleInfo.brand} ${input.vehicleInfo.model}`,
-      `${new Intl.NumberFormat('tr-TR').format(input.vehicleInfo.mileage)} KM`,
-      'Yeterli emsal bulunamadi',
-      'Manuel inceleme gerekli',
-      result.estimate > 0 ? `On referans: ${new Intl.NumberFormat('tr-TR').format(result.estimate)} TL` : '',
-    ].join(' | ');
-  }
-
   return [
     `${input.vehicleInfo.year} ${input.vehicleInfo.brand} ${input.vehicleInfo.model}`,
     `${new Intl.NumberFormat('tr-TR').format(input.vehicleInfo.mileage)} KM`,
@@ -517,61 +507,14 @@ export async function estimateVehicleValue(
   ].filter(Boolean) as string[];
 
   const marketCompSampleSize = effectiveMarketSampleSize;
-  const pricingReady =
-    Boolean(effectiveMarketStats)
-    && marketCompSampleSize >= MIN_REQUIRED_MARKET_COMPS
-    && intelligence.reviewRecommendation !== 'manual_review';
-
-  if (!pricingReady) {
-    const insufficientComps = marketCompSampleSize < MIN_REQUIRED_MARKET_COMPS;
-    const provisionalEstimate = toRoundedCurrency(estimate);
-    const provisionalMinimum = toRoundedCurrency(minimum);
-    const provisionalMaximum = toRoundedCurrency(maximum);
-    const provisionalGalleryValue = toRoundedCurrency(galleryValue);
-    const provisionalQuickValue = toRoundedCurrency(quickValue);
-    const provisionalPrivateBand = toRoundedCurrency(privateBand);
-    return {
-      normalizedVehicleInfo: input.vehicleInfo,
-      estimate: provisionalEstimate,
-      minimum: provisionalMinimum,
-      maximum: provisionalMaximum,
-      galleryValue: provisionalGalleryValue,
-      quickValue: provisionalQuickValue,
-      privateBand: provisionalPrivateBand,
-      demand,
-      saleWindow: 'Manuel İnceleme',
-      paintedCount,
-      localCount,
-      changedCount,
-      positives: positives.length ? positives : ['Araç bilgileri operasyon ekibine iletildi'],
-      negatives: [
-        insufficientComps
-          ? `Yeterli emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS})`
-          : 'Emsaller kalite eşiğini geçemedi',
-        provisionalEstimate > 0
-          ? `Sistem sadece ön referans değer üretti (${new Intl.NumberFormat('tr-TR').format(provisionalEstimate)} TL)`
-          : 'Ön referans değer üretilemedi',
-        intelligence.reviewReason || 'Net fiyat yerine uzman incelemesi gerekiyor',
-      ],
-      confidenceScore: Math.max(12, Math.min(38, 20 + (marketCompSampleSize * 4) - (severityScore * 2))),
-      pricingReady: false,
-      unavailableReason: insufficientComps
-        ? `Yeterli emsal bulunamadı. Net fiyat yerine düşük güvenli ön referans üretildi; uzman incelemesi gerekiyor.`
-        : (intelligence.reviewReason || 'Net fiyat yerine uzman incelemesi gerekiyor.'),
-      intelligence,
-      marketComps: effectiveMarketStats
-        ? {
-          source: marketCompSource,
-          sourceUrl: marketCompSourceUrl,
-          sampleSize: marketCompSampleSize,
-          average: Number(effectiveMarketStats.average || 0),
-          median: Number(effectiveMarketStats.median || 0),
-          trimmedAverage: Number(effectiveMarketStats.trimmedAverage || 0),
-          fallbackUsed: marketCompFallbackUsed,
-        }
-        : null,
-    };
-  }
+  const pricingWarnings = [
+    marketCompSampleSize < MIN_REQUIRED_MARKET_COMPS
+      ? `Yeterli emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS})`
+      : null,
+    intelligence.reviewRecommendation === 'manual_review'
+      ? (intelligence.reviewReason || 'AI katmanı bu dosyayı dikkatli izliyor')
+      : null,
+  ].filter(Boolean) as string[];
 
   return {
     normalizedVehicleInfo: input.vehicleInfo,
@@ -587,13 +530,13 @@ export async function estimateVehicleValue(
     localCount,
     changedCount,
     positives: positives.length ? positives : ['Bakımlı görünüm ve güncel piyasa ilgisi'],
-    negatives: negatives.length ? negatives : ['Ek ekspertiz raporu ile fiyat daha da netleşebilir'],
+    negatives: [...pricingWarnings, ...(negatives.length ? negatives : ['Ek ekspertiz raporu ile fiyat daha da netleşebilir'])],
     pricingReady: true,
     unavailableReason: '',
     intelligence,
     confidenceScore: marketCompSampleSize
       ? Math.min(96, 54 + (marketCompSampleSize * 3) - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 8))
-      : Math.max(46, 62 - (severityScore * 3)),
+      : Math.max(32, 48 - (severityScore * 2)),
     marketComps: effectiveMarketStats
       ? {
         source: marketCompSource,
