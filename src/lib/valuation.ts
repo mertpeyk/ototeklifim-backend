@@ -196,6 +196,14 @@ function getLiquidityBoost(input: ValuationEstimateInput) {
     boost += 35000;
   }
 
+  if (brand === 'volkswagen' && model === 'passat') {
+    boost += 70000;
+    if (year >= 2014) boost += 15000;
+    if (isAutomatic) boost += 15000;
+    if (isModernBenzinTurbo) boost += 10000;
+    if (packageName.includes('highline') || packageName.includes('business')) boost += 15000;
+  }
+
   if (brand === 'renault' && model === 'clio' && isAutomatic && isCompactHatch) {
     boost += 30000;
   }
@@ -513,7 +521,7 @@ export function buildEstimatedFastSaleNumbers(input: ValuationEstimateInput) {
     estimatedMarketValue: result.estimate,
     quickSaleValue: result.quickValue,
     dealerBuyValue: result.galleryValue,
-    expectedPrice: result.estimate,
+    expectedPrice: 0,
     valuationSummary: buildValuationSummary(input, result),
   }));
 }

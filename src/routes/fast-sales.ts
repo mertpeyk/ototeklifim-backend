@@ -326,6 +326,8 @@ export async function fastSaleRoutes(app: FastifyInstance) {
       });
     }
 
+    const customerExpectedPrice = Number(payload.expectedPrice || 0);
+
     const fastSale = await prisma.fastSaleRequest.create({
       data: {
         requestNo,
@@ -334,7 +336,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         vehicleInfo: normalizedVehicleInfo,
         condition: payload.condition,
         photos: payload.photos,
-        expectedPrice: toDecimal(estimatedValues.expectedPrice),
+        expectedPrice: toDecimal(customerExpectedPrice),
         estimatedMarketValue: toDecimal(estimatedValues.estimatedMarketValue),
         quickSaleValue: toDecimal(estimatedValues.quickSaleValue),
         dealerBuyValue: toDecimal(estimatedValues.dealerBuyValue),
@@ -365,7 +367,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `KM: ${normalizedVehicleInfo.mileage}`,
         `Kasa: ${normalizedVehicleInfo.bodyType}`,
         `Renk: ${normalizedVehicleInfo.color}`,
-        `Beklenen fiyat: ${estimatedValues.expectedPrice} TL`,
+        `Kullanici beklentisi: ${customerExpectedPrice > 0 ? `${customerExpectedPrice} TL` : 'Belirtilmedi'}`,
         `Piyasa degeri: ${estimatedValues.estimatedMarketValue} TL`,
         `Hizli sat degeri: ${estimatedValues.quickSaleValue} TL`,
         `Bayi alim degeri: ${estimatedValues.dealerBuyValue} TL`,
@@ -404,7 +406,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `KM: ${normalizedVehicleInfo.mileage}`,
         `Kasa: ${normalizedVehicleInfo.bodyType}`,
         `Renk: ${normalizedVehicleInfo.color}`,
-        `Beklenen fiyat: ${estimatedValues.expectedPrice} TL`,
+        `Kullanici beklentisi: ${customerExpectedPrice > 0 ? `${customerExpectedPrice} TL` : 'Belirtilmedi'}`,
         `Piyasa degeri: ${estimatedValues.estimatedMarketValue} TL`,
         `Hizli sat degeri: ${estimatedValues.quickSaleValue} TL`,
         `Bayi alim degeri: ${estimatedValues.dealerBuyValue} TL`,
