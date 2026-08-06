@@ -59,6 +59,8 @@ type ValuationEstimateOptions = {
   skipModelCalibration?: boolean;
 };
 
+const MIN_REQUIRED_MARKET_COMPS = 3;
+
 type StructuralState = 'clean' | 'issue' | 'Belirtilmedi';
 
 function normalizeText(value: string | undefined) {
@@ -235,6 +237,15 @@ function buildValuationSummary(
   input: ValuationEstimateInput,
   result: Awaited<ReturnType<typeof estimateVehicleValue>>,
 ) {
+  if (result.pricingReady === false) {
+    return [
+      `${input.vehicleInfo.year} ${input.vehicleInfo.brand} ${input.vehicleInfo.model}`,
+      `${new Intl.NumberFormat('tr-TR').format(input.vehicleInfo.mileage)} KM`,
+      'Yeterli emsal bulunamadi',
+      'Manuel inceleme gerekli',
+    ].join(' | ');
+  }
+
   return [
     `${input.vehicleInfo.year} ${input.vehicleInfo.brand} ${input.vehicleInfo.model}`,
     `${new Intl.NumberFormat('tr-TR').format(input.vehicleInfo.mileage)} KM`,
@@ -482,6 +493,45 @@ export async function estimateVehicleValue(
     pillarState === 'issue' ? 'Direk işlemi alıcı güvenini düşürür' : null,
   ].filter(Boolean) as string[];
 
+  const marketCompSampleSize = Number(marketComps?.sampleSize || 0);
+  const pricingReady = Boolean(marketComps?.stats) && marketCompSampleSize >= MIN_REQUIRED_MARKET_COMPS;
+
+  if (!pricingReady) {
+    return {
+      normalizedVehicleInfo: input.vehicleInfo,
+      estimate: 0,
+      minimum: 0,
+      maximum: 0,
+      galleryValue: 0,
+      quickValue: 0,
+      privateBand: 0,
+      demand,
+      saleWindow: 'Manuel İnceleme',
+      paintedCount,
+      localCount,
+      changedCount,
+      positives: positives.length ? positives : ['Araç bilgileri operasyon ekibine iletildi'],
+      negatives: [
+        `Yeterli emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS})`,
+        'Net fiyat yerine uzman incelemesi gerekiyor',
+      ],
+      confidenceScore: 0,
+      pricingReady: false,
+      unavailableReason: `Yeterli emsal bulunamadı. En az ${MIN_REQUIRED_MARKET_COMPS} doğrulanmış emsal gerekiyor.`,
+      marketComps: marketComps?.stats
+        ? {
+          source: marketComps.source || 'arabam',
+          sourceUrl: marketComps.sourceUrl || '',
+          sampleSize: marketCompSampleSize,
+          average: Number(marketComps.stats.average || 0),
+          median: Number(marketComps.stats.median || 0),
+          trimmedAverage: Number(marketComps.stats.trimmedAverage || 0),
+          fallbackUsed: Boolean(marketComps.fallbackUsed),
+        }
+        : null,
+    };
+  }
+
   return {
     normalizedVehicleInfo: input.vehicleInfo,
     estimate: toRoundedCurrency(estimate),
@@ -497,6 +547,8 @@ export async function estimateVehicleValue(
     changedCount,
     positives: positives.length ? positives : ['Bakımlı görünüm ve güncel piyasa ilgisi'],
     negatives: negatives.length ? negatives : ['Ek ekspertiz raporu ile fiyat daha da netleşebilir'],
+    pricingReady: true,
+    unavailableReason: '',
     confidenceScore: marketComps?.sampleSize
       ? Math.min(92, 54 + (marketComps.sampleSize * 3) - (severityScore * 2))
       : Math.max(46, 62 - (severityScore * 3)),
