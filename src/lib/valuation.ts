@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { getMarketComps } from './market-comps.js';
 import { getValuationModelMultiplier } from './valuation-calibration.js';
+import { runValuationIntelligence } from './valuation-intelligence.js';
 import { normalizeVehicleInfoWithCatalog } from './valuation-reference.js';
 
 export const valuationVehicleInfoSchema = z.object({
@@ -251,7 +252,9 @@ function buildValuationSummary(
     `${new Intl.NumberFormat('tr-TR').format(input.vehicleInfo.mileage)} KM`,
     `${result.demand} talep`,
     `${result.saleWindow} satis penceresi`,
+    result.intelligence?.averageSimilarity ? `AI benzerlik ${result.intelligence.averageSimilarity}/100` : '',
     result.marketComps?.sampleSize ? `${result.marketComps.sampleSize} emsal ilan dogrulamasi` : '',
+    result.intelligence?.explanation ? `AI notu: ${result.intelligence.explanation}` : '',
     result.positives.length ? `Artilar: ${result.positives.join(', ')}` : '',
     result.negatives.length ? `Dikkat: ${result.negatives.join(', ')}` : '',
   ].filter(Boolean).join(' | ');
@@ -435,16 +438,30 @@ export async function estimateVehicleValue(
       packageName: input.vehicleInfo.packageName,
     }).catch(() => null);
 
+  const intelligence = await runValuationIntelligence({
+    input,
+    heuristicEstimate,
+    marketComps,
+    severityScore,
+    demand,
+  });
+
+  const effectiveMarketStats = intelligence.filteredStats || marketComps?.stats || null;
+  const effectiveMarketSampleSize = intelligence.filteredListings.length || Number(marketComps?.sampleSize || 0);
+  const marketCompSource = marketComps?.source || 'arabam';
+  const marketCompSourceUrl = marketComps?.sourceUrl || '';
+  const marketCompFallbackUsed = Boolean(marketComps?.fallbackUsed);
+
   let estimate = heuristicEstimate;
   let minimum = heuristicEstimate * (demand === 'Yüksek' ? 0.965 : 0.955);
   let maximum = heuristicEstimate * (demand === 'Yüksek' ? 1.055 : 1.045);
 
-  if (marketComps?.stats) {
-    const sampleSize = Number(marketComps.sampleSize || 0);
-    const trimmedAverage = Number(marketComps.stats.trimmedAverage || 0);
-    const medianValue = Number(marketComps.stats.median || 0);
-    const lowerBand = Number(marketComps.stats.lowerBand || medianValue || trimmedAverage || estimate);
-    const upperBand = Number(marketComps.stats.upperBand || medianValue || trimmedAverage || estimate);
+  if (effectiveMarketStats) {
+    const sampleSize = effectiveMarketSampleSize;
+    const trimmedAverage = Number(effectiveMarketStats.trimmedAverage || 0);
+    const medianValue = Number(effectiveMarketStats.median || 0);
+    const lowerBand = Number(effectiveMarketStats.lowerBand || medianValue || trimmedAverage || estimate);
+    const upperBand = Number(effectiveMarketStats.upperBand || medianValue || trimmedAverage || estimate);
     const spreadRatio = trimmedAverage > 0 ? Math.min(0.24, Math.max(0, (upperBand - lowerBand) / trimmedAverage)) : 0.12;
     const stabilityFactor = Math.max(0.38, 1 - (spreadRatio * 2.4));
     const confidence = Math.min(0.84, 0.24 + ((sampleSize / 12) * 0.52) + ((stabilityFactor - 0.38) * 0.28));
@@ -461,9 +478,10 @@ export async function estimateVehicleValue(
     ? 0
     : await getValuationModelMultiplier(input.vehicleInfo.brand, input.vehicleInfo.model);
   const calibrationMultiplier = 1 + (modelCalibrationPercent / 100);
-  estimate = Math.round(estimate * calibrationMultiplier);
-  minimum = Math.round(minimum * calibrationMultiplier);
-  maximum = Math.round(maximum * calibrationMultiplier);
+  const intelligenceMultiplier = 1 + (intelligence.adjustmentPercent / 100);
+  estimate = Math.round(estimate * calibrationMultiplier * intelligenceMultiplier);
+  minimum = Math.round(minimum * calibrationMultiplier * intelligenceMultiplier);
+  maximum = Math.round(maximum * calibrationMultiplier * intelligenceMultiplier);
 
   const galleryMultiplier = severityScore >= 4 ? 0.905 : demand === 'Yüksek' ? 0.945 : 0.932;
   const quickMultiplier = severityScore >= 4 ? 0.875 : demand === 'Yüksek' ? 0.918 : 0.902;
@@ -477,10 +495,12 @@ export async function estimateVehicleValue(
     input.vehicleInfo.packageName ? `${input.vehicleInfo.packageName} donanım seviyesi` : null,
     input.serviceHistory ? 'Yetkili/Belgeli bakım geçmişi' : null,
     input.vehicleInfo.transmission === 'Otomatik' ? 'Otomatik vites talebi destekliyor' : null,
-    marketComps?.sampleSize ? `${marketComps.sampleSize} emsal ilan ile piyasa doğrulaması yapıldı` : null,
+    effectiveMarketSampleSize ? `${effectiveMarketSampleSize} emsal ilan ile piyasa doğrulaması yapıldı` : null,
     regionalBoost > 0 ? `${input.vehicleInfo.city} bölgesinde talep primi uygulandı` : null,
     liquidityBoost > 0 ? 'Likiditesi yüksek model avantajı uygulandı' : null,
     modelCalibrationPercent !== 0 ? `Model kalibrasyonu %${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(modelCalibrationPercent)} uygulandı` : null,
+    intelligence.averageSimilarity ? `AI benzerlik skoru ortalama ${intelligence.averageSimilarity}/100` : null,
+    intelligence.parsedSignals.positives[0] || null,
   ].filter(Boolean) as string[];
 
   const negatives = [
@@ -491,12 +511,18 @@ export async function estimateVehicleValue(
     airbagState === 'issue' ? 'Airbag kaydı teklif seviyesini aşağı çeker' : null,
     chassisState === 'issue' ? 'Şase/Podye kaydı ciddi değer baskısı oluşturur' : null,
     pillarState === 'issue' ? 'Direk işlemi alıcı güvenini düşürür' : null,
+    intelligence.parsedSignals.negatives[0] || null,
+    intelligence.parsedSignals.riskFlags[0] || null,
   ].filter(Boolean) as string[];
 
-  const marketCompSampleSize = Number(marketComps?.sampleSize || 0);
-  const pricingReady = Boolean(marketComps?.stats) && marketCompSampleSize >= MIN_REQUIRED_MARKET_COMPS;
+  const marketCompSampleSize = effectiveMarketSampleSize;
+  const pricingReady =
+    Boolean(effectiveMarketStats)
+    && marketCompSampleSize >= MIN_REQUIRED_MARKET_COMPS
+    && intelligence.reviewRecommendation !== 'manual_review';
 
   if (!pricingReady) {
+    const insufficientComps = marketCompSampleSize < MIN_REQUIRED_MARKET_COMPS;
     return {
       normalizedVehicleInfo: input.vehicleInfo,
       estimate: 0,
@@ -512,21 +538,24 @@ export async function estimateVehicleValue(
       changedCount,
       positives: positives.length ? positives : ['Araç bilgileri operasyon ekibine iletildi'],
       negatives: [
-        `Yeterli emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS})`,
-        'Net fiyat yerine uzman incelemesi gerekiyor',
+        insufficientComps
+          ? `Yeterli emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS})`
+          : 'Emsaller kalite eşiğini geçemedi',
+        intelligence.reviewReason || 'Net fiyat yerine uzman incelemesi gerekiyor',
       ],
       confidenceScore: 0,
       pricingReady: false,
-      unavailableReason: `Yeterli emsal bulunamadı. En az ${MIN_REQUIRED_MARKET_COMPS} doğrulanmış emsal gerekiyor.`,
-      marketComps: marketComps?.stats
+      unavailableReason: intelligence.reviewReason || `Yeterli emsal bulunamadı. En az ${MIN_REQUIRED_MARKET_COMPS} doğrulanmış emsal gerekiyor.`,
+      intelligence,
+      marketComps: effectiveMarketStats
         ? {
-          source: marketComps.source || 'arabam',
-          sourceUrl: marketComps.sourceUrl || '',
+          source: marketCompSource,
+          sourceUrl: marketCompSourceUrl,
           sampleSize: marketCompSampleSize,
-          average: Number(marketComps.stats.average || 0),
-          median: Number(marketComps.stats.median || 0),
-          trimmedAverage: Number(marketComps.stats.trimmedAverage || 0),
-          fallbackUsed: Boolean(marketComps.fallbackUsed),
+          average: Number(effectiveMarketStats.average || 0),
+          median: Number(effectiveMarketStats.median || 0),
+          trimmedAverage: Number(effectiveMarketStats.trimmedAverage || 0),
+          fallbackUsed: marketCompFallbackUsed,
         }
         : null,
     };
@@ -549,18 +578,19 @@ export async function estimateVehicleValue(
     negatives: negatives.length ? negatives : ['Ek ekspertiz raporu ile fiyat daha da netleşebilir'],
     pricingReady: true,
     unavailableReason: '',
-    confidenceScore: marketComps?.sampleSize
-      ? Math.min(92, 54 + (marketComps.sampleSize * 3) - (severityScore * 2))
+    intelligence,
+    confidenceScore: marketCompSampleSize
+      ? Math.min(96, 54 + (marketCompSampleSize * 3) - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 8))
       : Math.max(46, 62 - (severityScore * 3)),
-    marketComps: marketComps?.stats
+    marketComps: effectiveMarketStats
       ? {
-        source: marketComps.source || 'arabam',
-        sourceUrl: marketComps.sourceUrl || '',
-        sampleSize: Number(marketComps.sampleSize || 0),
-        average: Number(marketComps.stats.average || 0),
-        median: Number(marketComps.stats.median || 0),
-        trimmedAverage: Number(marketComps.stats.trimmedAverage || 0),
-        fallbackUsed: Boolean(marketComps.fallbackUsed),
+        source: marketCompSource,
+        sourceUrl: marketCompSourceUrl,
+        sampleSize: marketCompSampleSize,
+        average: Number(effectiveMarketStats.average || 0),
+        median: Number(effectiveMarketStats.median || 0),
+        trimmedAverage: Number(effectiveMarketStats.trimmedAverage || 0),
+        fallbackUsed: marketCompFallbackUsed,
       }
       : null,
   };
