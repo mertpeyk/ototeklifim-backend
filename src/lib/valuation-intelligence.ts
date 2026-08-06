@@ -66,6 +66,7 @@ type OpenAiRefinement = {
 export type ValuationIntelligenceResult = {
   provider: 'deterministic' | 'openai' | 'hybrid';
   aiEnabled: boolean;
+  aiDiagnostic: string;
   averageSimilarity: number;
   filteredListings: IntelligenceListing[];
   filteredStats: MarketCompStats | null;
@@ -75,6 +76,10 @@ export type ValuationIntelligenceResult = {
   adjustmentPercent: number;
   parsedSignals: ParsedSignals;
 };
+
+type OpenAiAttemptResult =
+  | { refinement: OpenAiRefinement; diagnostic: string }
+  | { refinement: null; diagnostic: string };
 
 function normalizeText(value: string | undefined) {
   return String(value || '')
@@ -274,9 +279,11 @@ function buildPrompt(args: ValuationIntelligenceArgs, listings: IntelligenceList
   };
 }
 
-async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: IntelligenceListing[]): Promise<OpenAiRefinement | null> {
+async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: IntelligenceListing[]): Promise<OpenAiAttemptResult> {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    return { refinement: null, diagnostic: 'OPENAI_API_KEY_missing' };
+  }
 
   const model = process.env.OPENAI_VALUATION_MODEL || 'gpt-4.1-mini';
   const payload = buildPrompt(args, listings.slice(0, 6));
@@ -315,7 +322,9 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
       }),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      return { refinement: null, diagnostic: `openai_http_${response.status}` };
+    }
     const json = await response.json() as {
       choices?: Array<{
         message?: {
@@ -324,34 +333,40 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
       }>;
     };
     const content = json.choices?.[0]?.message?.content;
-    if (!content) return null;
+    if (!content) {
+      return { refinement: null, diagnostic: 'openai_empty_content' };
+    }
     const parsed = JSON.parse(content) as Partial<OpenAiRefinement> & {
       perListing?: OpenAiRefinement['perListing'];
     };
     if (!parsed.reviewRecommendation || !parsed.reviewReason || !parsed.explanation) {
-      return null;
+      return { refinement: null, diagnostic: 'openai_invalid_schema' };
     }
 
     return {
-      perListing: (Array.isArray(parsed.perListing) ? parsed.perListing : []).map((item) => ({
-        index: Number(item.index || 0),
-        similarityScore: Math.max(0, Math.min(100, Number(item.similarityScore || 0))),
-        note: String(item.note || '').trim(),
-      })),
-      reviewRecommendation: parsed.reviewRecommendation === 'manual_review' ? 'manual_review' : 'approve',
-      reviewReason: String(parsed.reviewReason || '').trim(),
-      explanation: String(parsed.explanation || '').trim(),
-      adjustmentPercent: Math.max(-6, Math.min(6, Number(parsed.adjustmentPercent || 0))),
+      refinement: {
+        perListing: (Array.isArray(parsed.perListing) ? parsed.perListing : []).map((item) => ({
+          index: Number(item.index || 0),
+          similarityScore: Math.max(0, Math.min(100, Number(item.similarityScore || 0))),
+          note: String(item.note || '').trim(),
+        })),
+        reviewRecommendation: parsed.reviewRecommendation === 'manual_review' ? 'manual_review' : 'approve',
+        reviewReason: String(parsed.reviewReason || '').trim(),
+        explanation: String(parsed.explanation || '').trim(),
+        adjustmentPercent: Math.max(-6, Math.min(6, Number(parsed.adjustmentPercent || 0))),
+      },
+      diagnostic: 'openai_ok',
     };
   } catch {
-    return null;
+    return { refinement: null, diagnostic: 'openai_exception' };
   }
 }
 
 export async function runValuationIntelligence(args: ValuationIntelligenceArgs): Promise<ValuationIntelligenceResult> {
   const parsedSignals = parseTextSignals(args.input);
   const baseListings = (args.marketComps?.listings || []).map((item) => scoreComparableListing(args.input, item));
-  const openAiRefinement = await refineWithOpenAi(args, baseListings);
+  const openAiAttempt = await refineWithOpenAi(args, baseListings);
+  const openAiRefinement = openAiAttempt.refinement;
 
   let listings = baseListings;
   let provider: ValuationIntelligenceResult['provider'] = 'deterministic';
@@ -425,6 +440,7 @@ export async function runValuationIntelligence(args: ValuationIntelligenceArgs):
   return {
     provider,
     aiEnabled: Boolean(process.env.OPENAI_API_KEY),
+    aiDiagnostic: openAiAttempt.diagnostic,
     averageSimilarity,
     filteredListings,
     filteredStats,
