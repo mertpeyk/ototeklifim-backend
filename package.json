@@ -10,6 +10,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx src/scripts/seed.ts",
+    "calibrate:valuation": "tsx src/scripts/valuation-auto-calibrate.ts",
     "test:valuation": "tsx src/scripts/valuation-smoke.ts",
     "test": "npm run build"
   },

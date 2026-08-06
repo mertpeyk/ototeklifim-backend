@@ -60,6 +60,7 @@ ADMIN_FULL_NAME="Mert Yönetim"
 ADMIN_PHONE=05550000010
 ADMIN_CITY=Istanbul
 ADMIN_DISTRICT=Kadikoy
+VALUATION_AUTO_CALIBRATION_ENABLED=1
 ```
 
 Railway start komutu `npm start` ile acilir; bu komut uygulama kalkmadan once otomatik `prisma db push` calistirir.
@@ -112,6 +113,17 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3001/api
 - `GET /api/admin/consignments`
 - `POST /api/admin/consignments/:id/status`
 - `GET /api/admin/dealers`
+
+## Degerleme motoru notlari
+
+- Market comps katmani artik cok kaynakli calisir: `arabam` ana kaynak, `sahibinden` ise challenge-aware ikinci kaynak olarak weighted blend akisina baglidir.
+- Emsal istatistikleri artik yil ve kilometre farkini comp katmaninda normalize ederek hesaplar; listing'ler relevance ve comparison weight ile agirliklandirilir.
+- Haftalik otomatik model kalibrasyonu acilis sonrasi arka planda kontrol edilir. Son 45 gundeki hizli sat taleplerinden yeterli ornek bulunan marka/model'lerde model multiplier otomatik guncellenir.
+- Elle kalibrasyon calistirmak icin:
+
+```bash
+npm run calibrate:valuation
+```
 
 ## Konsinye veri modeli
 

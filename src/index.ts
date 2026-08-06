@@ -1,7 +1,9 @@
 import { env } from './config.js';
 import { buildApp } from './app.js';
+import { startValuationCalibrationScheduler } from './lib/valuation-auto-calibration.js';
 
 const app = buildApp();
+startValuationCalibrationScheduler(app.log);
 
 const start = async () => {
   try {

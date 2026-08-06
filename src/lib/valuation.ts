@@ -54,6 +54,10 @@ export const valuationEstimateInputSchema = z.object({
 });
 
 export type ValuationEstimateInput = z.infer<typeof valuationEstimateInputSchema>;
+type ValuationEstimateOptions = {
+  skipMarketComps?: boolean;
+  skipModelCalibration?: boolean;
+};
 
 type StructuralState = 'clean' | 'issue' | 'Belirtilmedi';
 
@@ -234,7 +238,10 @@ function buildValuationSummary(
   ].filter(Boolean).join(' | ');
 }
 
-export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
+export async function estimateVehicleValue(
+  rawInput: ValuationEstimateInput,
+  options: ValuationEstimateOptions = {},
+) {
   const parsedInput = valuationEstimateInputSchema.parse(rawInput);
   const normalizedVehicleInfo = await normalizeVehicleInfoWithCatalog(parsedInput.vehicleInfo);
   const input: ValuationEstimateInput = {
@@ -394,18 +401,20 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
     || (input.vehicleInfo.brand === 'Renault' && input.vehicleInfo.model === 'Clio');
   const demand = highDemandBrands.includes(input.vehicleInfo.brand) || isHighDemandModel ? 'Yüksek' : 'Dengeli';
 
-  const marketComps = await getMarketComps({
-    brand: input.vehicleInfo.brand,
-    model: input.vehicleInfo.model,
-    year: input.vehicleInfo.year,
-    km: input.vehicleInfo.mileage,
-    vehicleType: input.vehicleInfo.vehicleType,
-    bodyType: input.vehicleInfo.bodyType,
-    fuelType: input.vehicleInfo.fuelType,
-    transmission: input.vehicleInfo.transmission,
-    engine: input.vehicleInfo.engineVolume,
-    packageName: input.vehicleInfo.packageName,
-  }).catch(() => null);
+  const marketComps = options.skipMarketComps
+    ? null
+    : await getMarketComps({
+      brand: input.vehicleInfo.brand,
+      model: input.vehicleInfo.model,
+      year: input.vehicleInfo.year,
+      km: input.vehicleInfo.mileage,
+      vehicleType: input.vehicleInfo.vehicleType,
+      bodyType: input.vehicleInfo.bodyType,
+      fuelType: input.vehicleInfo.fuelType,
+      transmission: input.vehicleInfo.transmission,
+      engine: input.vehicleInfo.engineVolume,
+      packageName: input.vehicleInfo.packageName,
+    }).catch(() => null);
 
   let estimate = heuristicEstimate;
   let minimum = heuristicEstimate * (demand === 'Yüksek' ? 0.965 : 0.955);
@@ -429,7 +438,9 @@ export async function estimateVehicleValue(rawInput: ValuationEstimateInput) {
     maximum = Math.round((upperBand * 0.88) + (estimate * 0.12));
   }
 
-  const modelCalibrationPercent = await getValuationModelMultiplier(input.vehicleInfo.brand, input.vehicleInfo.model);
+  const modelCalibrationPercent = options.skipModelCalibration
+    ? 0
+    : await getValuationModelMultiplier(input.vehicleInfo.brand, input.vehicleInfo.model);
   const calibrationMultiplier = 1 + (modelCalibrationPercent / 100);
   estimate = Math.round(estimate * calibrationMultiplier);
   minimum = Math.round(minimum * calibrationMultiplier);
