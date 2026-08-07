@@ -480,6 +480,9 @@ export async function estimateVehicleValue(
   const quickValue = estimate * quickMultiplier;
   const privateBand = estimate * 1.028;
   const saleWindow = severityScore >= 4 ? '28 - 45 Gün' : demand === 'Yüksek' ? '14 - 28 Gün' : '18 - 34 Gün';
+  const hasAiFallbackDecision =
+    intelligence.provider !== 'deterministic'
+    || (intelligence.aiEnabled && Boolean(intelligence.explanation?.trim()));
 
   const positives = [
     input.vehicleInfo.mileage && input.vehicleInfo.mileage < 50000 ? `Düşük kilometre (${new Intl.NumberFormat('tr-TR').format(input.vehicleInfo.mileage)} KM)` : null,
@@ -487,6 +490,7 @@ export async function estimateVehicleValue(
     input.serviceHistory ? 'Yetkili/Belgeli bakım geçmişi' : null,
     input.vehicleInfo.transmission === 'Otomatik' ? 'Otomatik vites talebi destekliyor' : null,
     effectiveMarketSampleSize ? `${effectiveMarketSampleSize} emsal ilan ile piyasa doğrulaması yapıldı` : null,
+    !effectiveMarketSampleSize && hasAiFallbackDecision ? 'AI destekli segment ve kondisyon değerlendirmesi uygulandı' : null,
     regionalBoost > 0 ? `${input.vehicleInfo.city} bölgesinde talep primi uygulandı` : null,
     liquidityBoost > 0 ? 'Likiditesi yüksek model avantajı uygulandı' : null,
     modelCalibrationPercent !== 0 ? `Model kalibrasyonu %${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(modelCalibrationPercent)} uygulandı` : null,
@@ -511,7 +515,11 @@ export async function estimateVehicleValue(
   const marketCompSampleSize = effectiveMarketSampleSize;
   const pricingWarnings = [
     marketCompSampleSize < MIN_REQUIRED_MARKET_COMPS
-      ? `Yeterli emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS})`
+      ? (
+        hasAiFallbackDecision
+          ? 'Canlı emsal akışı sınırlı kaldı, AI destekli değerleme uygulandı'
+          : `Yeterli emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS})`
+      )
       : null,
     intelligence.reviewRecommendation === 'manual_review'
       ? (intelligence.reviewReason || 'AI katmanı bu dosyayı dikkatli izliyor')
@@ -538,7 +546,9 @@ export async function estimateVehicleValue(
     intelligence,
     confidenceScore: marketCompSampleSize
       ? Math.min(96, 54 + (marketCompSampleSize * 3) - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 8))
-      : Math.max(32, 48 - (severityScore * 2)),
+      : hasAiFallbackDecision
+        ? Math.max(52, 60 - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 10))
+        : Math.max(32, 48 - (severityScore * 2)),
     marketComps: effectiveMarketStats
       ? {
         source: marketCompSource,

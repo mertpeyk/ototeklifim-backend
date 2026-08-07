@@ -221,7 +221,13 @@ function buildSahibindenPathCandidates(query: MarketCompsQuery) {
 
 function isCloudflareChallenge(html: string) {
   const normalized = String(html || '').toLowerCase();
-  return normalized.includes('just a moment') && normalized.includes('cf_chl_opt');
+  return (
+    normalized.includes('just a moment')
+    || normalized.includes('cf_chl_opt')
+    || normalized.includes('attention required')
+    || normalized.includes('captcha')
+    || normalized.includes('cloudflare')
+  );
 }
 
 async function fetchViaCurl(url: string) {
