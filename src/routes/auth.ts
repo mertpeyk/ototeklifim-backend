@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { AccountType, AuthOtpPurpose } from '@prisma/client';
+import { AccountType, AuthOtpPurpose, Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import { prisma } from '../db.js';
@@ -212,7 +212,13 @@ function authPayloadFromUser(user: {
 }
 
 async function ensureUniqueIdentity(email: string | undefined, phone: string) {
+  const phoneWithLeadingZero = phone.startsWith('0') ? phone : `0${phone}`;
   const orConditions = [{ phone }] as Array<{ phone?: string; email?: string }>;
+
+  if (phoneWithLeadingZero !== phone) {
+    orConditions.push({ phone: phoneWithLeadingZero });
+  }
+
   if (email) {
     orConditions.push({ email });
   }
@@ -226,6 +232,17 @@ async function ensureUniqueIdentity(email: string | undefined, phone: string) {
   if (exists) {
     throw new Error('Bu e-posta veya telefon zaten kayitli');
   }
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
+function isDuplicateIdentityError(error: unknown) {
+  return (
+    isUniqueConstraintError(error) ||
+    (error instanceof Error && error.message === 'Bu e-posta veya telefon zaten kayitli')
+  );
 }
 
 async function createOtpChallenge(input: {
@@ -344,48 +361,46 @@ export async function authRoutes(app: FastifyInstance) {
     const normalizedEmail = normalizeEmail(payload.email);
     const resolvedEmail = normalizedEmail ?? buildOptionalEmailPlaceholder(normalizedPhone);
 
-    const exists = await prisma.user.findFirst({
-      where: {
-        OR: normalizedEmail
-          ? [{ email: normalizedEmail }, { phone: normalizedPhone }]
-          : [{ phone: normalizedPhone }],
-      },
-    });
+    try {
+      await ensureUniqueIdentity(resolvedEmail, normalizedPhone);
 
-    if (exists) {
-      reply.code(409);
-      return { message: 'Bu e-posta veya telefon zaten kayitli' };
+      const user = await prisma.user.create({
+        data: {
+          fullName: payload.fullName.trim(),
+          email: resolvedEmail,
+          phone: normalizedPhone,
+          city: payload.city?.trim(),
+          district: payload.district?.trim(),
+          address: payload.address?.trim(),
+          companyName: payload.companyName?.trim(),
+          taxOffice: payload.taxOffice?.trim(),
+          taxNumber: payload.taxNumber?.trim(),
+          listingVolume: payload.listingVolume,
+          packagePlan: payload.packagePlan,
+          authorizedFirstName: payload.authorizedFirstName?.trim(),
+          authorizedLastName: payload.authorizedLastName?.trim(),
+          documentConfirmed: payload.documentConfirmation ?? false,
+          accountType: payload.accountType,
+          passwordHash: hashPassword(payload.password),
+          verifiedAt: new Date(),
+        },
+      });
+
+      const token = await createSession(user.id);
+
+      reply.code(201);
+      return {
+        token,
+        user: authPayloadFromUser(user),
+      };
+    } catch (error) {
+      if (isDuplicateIdentityError(error)) {
+        reply.code(409);
+        return { message: 'Bu e-posta veya telefon zaten kayitli' };
+      }
+
+      throw error;
     }
-
-    const user = await prisma.user.create({
-      data: {
-        fullName: payload.fullName.trim(),
-        email: resolvedEmail,
-        phone: normalizedPhone,
-        city: payload.city?.trim(),
-        district: payload.district?.trim(),
-        address: payload.address?.trim(),
-        companyName: payload.companyName?.trim(),
-        taxOffice: payload.taxOffice?.trim(),
-        taxNumber: payload.taxNumber?.trim(),
-        listingVolume: payload.listingVolume,
-        packagePlan: payload.packagePlan,
-        authorizedFirstName: payload.authorizedFirstName?.trim(),
-        authorizedLastName: payload.authorizedLastName?.trim(),
-        documentConfirmed: payload.documentConfirmation ?? false,
-        accountType: payload.accountType,
-        passwordHash: hashPassword(payload.password),
-        verifiedAt: new Date(),
-      },
-    });
-
-    const token = await createSession(user.id);
-
-    reply.code(201);
-    return {
-      token,
-      user: authPayloadFromUser(user),
-    };
   });
 
   app.post('/auth/register/request-phone-verification', async (request, reply) => {
@@ -401,7 +416,7 @@ export async function authRoutes(app: FastifyInstance) {
     const resolvedEmail = normalizedEmail ?? buildOptionalEmailPlaceholder(normalizedPhone);
 
     try {
-      await ensureUniqueIdentity(normalizedEmail, normalizedPhone);
+      await ensureUniqueIdentity(resolvedEmail, normalizedPhone);
 
       const pendingRegistration: PendingRegistrationPayload = {
         fullName: payload.fullName.trim(),
@@ -489,6 +504,11 @@ export async function authRoutes(app: FastifyInstance) {
         user: authPayloadFromUser(user),
       };
     } catch (error) {
+      if (isDuplicateIdentityError(error)) {
+        reply.code(409);
+        return { message: 'Bu e-posta veya telefon zaten kayitli' };
+      }
+
       reply.code(400);
       return { message: error instanceof Error ? error.message : 'Telefon dogrulanamadi' };
     }
