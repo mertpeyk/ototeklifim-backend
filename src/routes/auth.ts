@@ -13,8 +13,10 @@ import {
 import { env } from '../config.js';
 import { sendSms } from '../lib/sms.js';
 
-const OTP_TTL_MINUTES = 10;
+const OTP_TTL_MINUTES = 2;
 const OTP_RESEND_COOLDOWN_MS = 60_000;
+const OTP_REQUEST_WINDOW_MS = 5 * 60_000;
+const OTP_MAX_REQUESTS_PER_WINDOW = 2;
 const OTP_MAX_ATTEMPTS = 5;
 
 const registerSchema = z
@@ -245,6 +247,10 @@ function isDuplicateIdentityError(error: unknown) {
   );
 }
 
+function isOtpRateLimitError(error: unknown) {
+  return error instanceof Error && (error.message.includes('1 dakika') || error.message.includes('5 dakika'));
+}
+
 async function createOtpChallenge(input: {
   pendingPasswordHash?: string;
   pendingRegistration?: PendingRegistrationPayload;
@@ -252,6 +258,20 @@ async function createOtpChallenge(input: {
   purpose: AuthOtpPurpose;
   userId?: string;
 }) {
+  const recentRequestCount = await prisma.authOtpChallenge.count({
+    where: {
+      phone: input.phone,
+      purpose: input.purpose,
+      createdAt: {
+        gte: new Date(Date.now() - OTP_REQUEST_WINDOW_MS),
+      },
+    },
+  });
+
+  if (recentRequestCount >= OTP_MAX_REQUESTS_PER_WINDOW) {
+    throw new Error('5 dakika icinde en fazla 2 dogrulama kodu isteyebilirsiniz');
+  }
+
   const recentChallenge = await prisma.authOtpChallenge.findFirst({
     where: {
       phone: input.phone,
@@ -451,7 +471,7 @@ export async function authRoutes(app: FastifyInstance) {
         debugCode: code,
       };
     } catch (error) {
-      reply.code(error instanceof Error && error.message.includes('1 dakika') ? 429 : 409);
+      reply.code(isOtpRateLimitError(error) ? 429 : 409);
       return { message: error instanceof Error ? error.message : 'Kayit baslatilamadi' };
     }
   });
@@ -580,7 +600,7 @@ export async function authRoutes(app: FastifyInstance) {
         debugCode: code,
       };
     } catch (error) {
-      reply.code(error instanceof Error && error.message.includes('1 dakika') ? 429 : 400);
+      reply.code(isOtpRateLimitError(error) ? 429 : 400);
       return { message: error instanceof Error ? error.message : 'Sifirlama kodu gonderilemedi' };
     }
   });
@@ -668,7 +688,7 @@ export async function authRoutes(app: FastifyInstance) {
         debugCode: code,
       };
     } catch (error) {
-      reply.code(error instanceof Error && error.message.includes('1 dakika') ? 429 : 400);
+      reply.code(isOtpRateLimitError(error) ? 429 : 400);
       return { message: error instanceof Error ? error.message : 'Dogrulama kodu gonderilemedi' };
     }
   });
