@@ -58,6 +58,7 @@ export type ValuationEstimateInput = z.infer<typeof valuationEstimateInputSchema
 type ValuationEstimateOptions = {
   skipMarketComps?: boolean;
   skipModelCalibration?: boolean;
+  skipOpenAi?: boolean;
 };
 
 const MIN_REQUIRED_MARKET_COMPS = 3;
@@ -451,6 +452,7 @@ export async function estimateVehicleValue(
     marketComps,
     severityScore,
     demand,
+    skipOpenAi: options.skipOpenAi,
   });
 
   const effectiveMarketStats = intelligence.filteredStats || marketComps?.stats || null;
@@ -496,6 +498,18 @@ export async function estimateVehicleValue(
     maximum = Math.round((upperBand * 0.88) + (estimate * 0.12));
   }
 
+  if (!effectiveMarketStats && intelligence.marketEstimate && intelligence.sources.length >= 2) {
+    const agentAnchor = Math.max(
+      heuristicEstimate * 0.55,
+      Math.min(heuristicEstimate * 2.2, intelligence.marketEstimate),
+    );
+    estimate = Math.round((agentAnchor * 0.82) + (heuristicEstimate * 0.18));
+    const agentMinimum = intelligence.marketMinimum || agentAnchor * 0.95;
+    const agentMaximum = intelligence.marketMaximum || agentAnchor * 1.05;
+    minimum = Math.round((agentMinimum * 0.82) + (estimate * 0.18));
+    maximum = Math.round((agentMaximum * 0.82) + (estimate * 0.18));
+  }
+
   const modelCalibrationPercent = options.skipModelCalibration
     ? 0
     : await getValuationModelMultiplier(input.vehicleInfo.brand, input.vehicleInfo.model);
@@ -524,6 +538,7 @@ export async function estimateVehicleValue(
     input.vehicleInfo.transmission === 'Otomatik' ? 'Otomatik vites talebi destekliyor' : null,
     effectiveMarketSampleSize ? `${effectiveMarketSampleSize} emsal ilan ile piyasa doğrulaması yapıldı` : null,
     !effectiveMarketSampleSize && hasAiFallbackDecision ? 'AI destekli segment ve kondisyon değerlendirmesi uygulandı' : null,
+    intelligence.sources.length >= 2 ? `${intelligence.sources.length} güncel web kaynağı AI ajanı tarafından incelendi` : null,
     regionalBoost > 0 ? `${input.vehicleInfo.city} bölgesinde talep primi uygulandı` : null,
     liquidityBoost > 0 ? 'Likiditesi yüksek model avantajı uygulandı' : null,
     modelCalibrationPercent !== 0 ? `Model kalibrasyonu %${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(modelCalibrationPercent)} uygulandı` : null,
@@ -596,8 +611,8 @@ export async function estimateVehicleValue(
   };
 }
 
-export function buildEstimatedFastSaleNumbers(input: ValuationEstimateInput) {
-  return estimateVehicleValue(input).then((result) => ({
+export function buildEstimatedFastSaleNumbers(input: ValuationEstimateInput, options: ValuationEstimateOptions = {}) {
+  return estimateVehicleValue(input, options).then((result) => ({
     result,
     normalizedVehicleInfo: result.normalizedVehicleInfo,
     estimatedMarketValue: result.estimate,

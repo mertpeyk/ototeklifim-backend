@@ -108,6 +108,7 @@ const contactSchema = z.object({
 });
 
 const createFastSaleSchema = z.object({
+  submissionKey: z.string().trim().min(16).max(100).optional(),
   vehicleInfo: vehicleInfoSchema,
   condition: conditionSchema,
   photos: z.array(photoSchema).max(10).default([]),
@@ -243,22 +244,43 @@ export async function fastSaleRoutes(app: FastifyInstance) {
       condition: valuationConditionSchema,
       extraKey: z.boolean().optional().default(false),
       serviceHistory: z.boolean().optional().default(false),
+      fast: z.boolean().optional().default(false),
     }).parse(request.body);
 
-    return buildEstimatedFastSaleNumbers(valuationEstimateInputSchema.parse(payload));
+    return buildEstimatedFastSaleNumbers(
+      valuationEstimateInputSchema.parse(payload),
+      payload.fast ? { skipMarketComps: true, skipOpenAi: true } : {},
+    );
   });
 
   app.post('/fast-sales', async (request, reply) => {
     const payload = createFastSaleSchema.parse(request.body);
+    if (payload.submissionKey) {
+      const existingRequest = await prisma.fastSaleRequest.findUnique({
+        where: { idempotencyKey: payload.submissionKey },
+        include: { offers: { orderBy: { createdAt: 'desc' } } },
+      });
+
+      if (existingRequest) {
+        reply.header('x-idempotent-replay', 'true');
+        return serializeFastSaleWithDetails(
+          existingRequest,
+          await buildFastSaleMessageHistory(existingRequest.id),
+        );
+      }
+    }
+
     const estimatedValues = await buildEstimatedFastSaleNumbers({
-      vehicleInfo: payload.vehicleInfo,
-      condition: payload.condition,
-      extraKey: false,
-      serviceHistory:
-        payload.condition.mechanicalStatus.toLocaleLowerCase('tr-TR').includes('bakim')
-        || payload.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('bakim')
-        || payload.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('servis'),
-    });
+        vehicleInfo: payload.vehicleInfo,
+        condition: payload.condition,
+        extraKey: false,
+        serviceHistory:
+          payload.condition.mechanicalStatus.toLocaleLowerCase('tr-TR').includes('bakim')
+          || payload.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('bakim')
+          || payload.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('servis'),
+      },
+      { skipMarketComps: true },
+    );
     const normalizedVehicleInfo = estimatedValues.normalizedVehicleInfo;
     const requestNo = await createUniqueRequestNo();
     const fullName = `${payload.contact.firstName} ${payload.contact.lastName}`.trim();
@@ -328,26 +350,57 @@ export async function fastSaleRoutes(app: FastifyInstance) {
 
     const customerExpectedPrice = Number(payload.expectedPrice || 0);
 
-    const fastSale = await prisma.fastSaleRequest.create({
-      data: {
-        requestNo,
-        userId,
-        status: FastSaleStatus.NEW,
-        vehicleInfo: normalizedVehicleInfo,
-        condition: payload.condition,
-        photos: payload.photos,
-        expectedPrice: toDecimal(customerExpectedPrice),
-        estimatedMarketValue: toDecimal(estimatedValues.estimatedMarketValue),
-        quickSaleValue: toDecimal(estimatedValues.quickSaleValue),
-        dealerBuyValue: toDecimal(estimatedValues.dealerBuyValue),
-        valuationSummary: payload.valuationSummary || estimatedValues.valuationSummary,
-      },
-      include: {
-        offers: {
-          orderBy: { createdAt: 'desc' },
+    const createFastSale = () => prisma.fastSaleRequest.create({
+        data: {
+          requestNo,
+          idempotencyKey: payload.submissionKey,
+          userId,
+          status: FastSaleStatus.NEW,
+          vehicleInfo: normalizedVehicleInfo,
+          condition: payload.condition,
+          photos: payload.photos,
+          expectedPrice: toDecimal(customerExpectedPrice),
+          estimatedMarketValue: toDecimal(estimatedValues.estimatedMarketValue),
+          quickSaleValue: toDecimal(estimatedValues.quickSaleValue),
+          dealerBuyValue: toDecimal(estimatedValues.dealerBuyValue),
+          valuationSummary: estimatedValues.valuationSummary,
         },
-      },
-    });
+        include: {
+          offers: {
+            orderBy: { createdAt: 'desc' as const },
+          },
+        },
+      });
+    let fastSale: Awaited<ReturnType<typeof createFastSale>>;
+
+    try {
+      fastSale = await createFastSale();
+    } catch (error) {
+      const isDuplicateSubmission = payload.submissionKey
+        && typeof error === 'object'
+        && error !== null
+        && 'code' in error
+        && error.code === 'P2002';
+
+      if (!isDuplicateSubmission) {
+        throw error;
+      }
+
+      const existingRequest = await prisma.fastSaleRequest.findUnique({
+        where: { idempotencyKey: payload.submissionKey },
+        include: { offers: { orderBy: { createdAt: 'desc' } } },
+      });
+
+      if (!existingRequest) {
+        throw error;
+      }
+
+      reply.header('x-idempotent-replay', 'true');
+      return serializeFastSaleWithDetails(
+        existingRequest,
+        await buildFastSaleMessageHistory(existingRequest.id),
+      );
+    }
 
     void notifyNewApplicationViaWhatsapp({
       type: 'hizli-sat',
@@ -380,7 +433,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `Direk durumu: ${payload.condition.pillarCondition}`,
         `Ekspertiz notu: ${payload.condition.appraisalReport || '-'}`,
         `Foto sayisi: ${payload.photos.length}`,
-        `Degerleme notu: ${payload.valuationSummary || estimatedValues.valuationSummary}`,
+        `Degerleme notu: ${estimatedValues.valuationSummary}`,
       ],
     }).catch((error) => {
       request.log.error(
@@ -419,7 +472,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `Direk durumu: ${payload.condition.pillarCondition}`,
         `Ekspertiz notu: ${payload.condition.appraisalReport || '-'}`,
         `Foto sayisi: ${payload.photos.length}`,
-        `Degerleme notu: ${payload.valuationSummary || estimatedValues.valuationSummary}`,
+        `Degerleme notu: ${estimatedValues.valuationSummary}`,
       ],
     }).catch((error) => {
       request.log.error(

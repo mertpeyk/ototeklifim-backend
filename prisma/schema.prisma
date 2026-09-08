@@ -379,6 +379,7 @@ model ConsignmentTimeline {
 model FastSaleRequest {
   id                   String          @id @default(cuid())
   requestNo            String          @unique
+  idempotencyKey       String?         @unique @db.VarChar(100)
   userId               String
   status               FastSaleStatus  @default(NEW)
   vehicleInfo          Json
