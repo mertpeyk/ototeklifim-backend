@@ -295,7 +295,9 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
   }
 
   const model = process.env.OPENAI_VALUATION_MODEL || 'gpt-4.1-mini';
+  const webSearchModel = process.env.OPENAI_VALUATION_WEB_MODEL || 'gpt-5.4-mini';
   const payload = buildPrompt(args, listings.slice(0, 6));
+  let webSearchDiagnostic = 'web_search_not_attempted';
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -306,10 +308,9 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
       },
       signal: AbortSignal.timeout(18000),
       body: JSON.stringify({
-        model,
+        model: webSearchModel,
         store: false,
         max_output_tokens: 1200,
-        max_tool_calls: 4,
         tools: [{ type: 'web_search' }],
         tool_choice: 'auto',
         include: ['web_search_call.action.sources'],
@@ -332,6 +333,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
     });
 
     if (response.ok) {
+      webSearchDiagnostic = 'web_search_response_received';
       const json = await response.json() as {
         output?: Array<{
           type?: string;
@@ -384,8 +386,12 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
           };
         }
       }
+      webSearchDiagnostic = 'web_search_invalid_output';
+    } else {
+      webSearchDiagnostic = `web_search_http_${response.status}`;
     }
   } catch {
+    webSearchDiagnostic = 'web_search_exception';
     // Fall back to the existing no-web refinement below.
   }
 
@@ -460,7 +466,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
         marketMaximum: null,
         sources: [],
       },
-      diagnostic: 'openai_ok',
+      diagnostic: `openai_ok_after_${webSearchDiagnostic}`,
     };
   } catch {
     return { refinement: null, diagnostic: 'openai_exception' };
