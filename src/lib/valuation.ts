@@ -98,23 +98,28 @@ function parseEngineScore(engineValue: string, enginePower: string) {
   return literBoost + powerBoost + turboBoost + premiumEngineBoost;
 }
 
-function getYearAdjustment(year: number) {
+function getAgeMultiplier(year: number) {
   const currentYear = new Date().getFullYear();
-  const age = year ? currentYear - Number(year) : 0;
-  if (!age || age <= 0) return 120000;
-  if (age === 1) return 80000;
-  if (age === 2) return 40000;
-  if (age === 3) return 0;
-  if (age <= 5) return -(age - 3) * 25000;
-  return -50000 - ((age - 5) * 40000);
+  const age = Math.max(0, currentYear - Number(year || currentYear));
+
+  if (age === 0) return 1.13;
+  if (age === 1) return 1.09;
+  if (age === 2) return 1.045;
+  if (age === 3) return 1;
+  if (age <= 6) return 1 - ((age - 3) * 0.045);
+  if (age <= 10) return 0.865 - ((age - 6) * 0.05);
+  if (age <= 15) return 0.665 - ((age - 10) * 0.04);
+  return Math.max(0.28, 0.465 - ((age - 15) * 0.022));
 }
 
-function getKmPenalty(km: number) {
-  if (!km) return 0;
-  if (km <= 50000) return km * 0.55;
-  if (km <= 100000) return 27500 + ((km - 50000) * 0.95);
-  if (km <= 180000) return 75000 + ((km - 100000) * 1.25);
-  return 175000 + ((Math.min(km, 260000) - 180000) * 1.55);
+function getMileageAdjustment(year: number, km: number, ageAdjustedBase: number) {
+  const currentYear = new Date().getFullYear();
+  const age = Math.max(0, currentYear - Number(year || currentYear));
+  const expectedKm = Math.min(240000, Math.max(5000, age * 14500));
+  const deviationInTenThousands = (expectedKm - Math.max(0, km)) / 10000;
+  const adjustmentRatio = Math.max(-0.18, Math.min(0.08, deviationInTenThousands * 0.008));
+
+  return Math.round(ageAdjustedBase * adjustmentRatio);
 }
 
 function getPackageTierBoost(packageName: string, brand: string, model: string) {
@@ -231,7 +236,7 @@ function getLiquidityBoost(input: ValuationEstimateInput) {
 }
 
 function toRoundedCurrency(value: number) {
-  return Math.max(0, Math.round(value));
+  return Math.max(0, Math.round(value / 1000) * 1000);
 }
 
 function buildValuationSummary(
@@ -334,11 +339,9 @@ export async function estimateVehicleValue(
     'Land Rover|Defender': 1180000,
   };
 
-  const brandBase = baseByBrand[input.vehicleInfo.brand] || 1520000;
+  const brandBase = baseByBrand[input.vehicleInfo.brand] || 1300000;
   const modelBase = modelAdjustments[`${input.vehicleInfo.brand}|${input.vehicleInfo.model}`] || 0;
   const bodyTypeBase = bodyTypeAdjustments[input.vehicleInfo.bodyType] || bodyTypeAdjustments[input.vehicleInfo.vehicleType] || 0;
-  const yearAdjustment = getYearAdjustment(input.vehicleInfo.year);
-  const kmPenalty = getKmPenalty(input.vehicleInfo.mileage);
   const engineBoost = parseEngineScore(input.vehicleInfo.engineVolume, input.vehicleInfo.enginePower || '');
   const normalizedFuel = input.vehicleInfo.fuelType.toLocaleLowerCase('tr-TR');
   const fuelBoost =
@@ -353,50 +356,63 @@ export async function estimateVehicleValue(
         : 0;
 
   const packageBoost = getPackageTierBoost(input.vehicleInfo.packageName, input.vehicleInfo.brand, input.vehicleInfo.model);
-  const regionalBoost = getRegionalAdjustment(input.vehicleInfo.city, input.vehicleInfo.district || '', brandBase, input.vehicleInfo.bodyType, input.vehicleInfo.brand);
   const ownershipDemandBoost = getOwnershipDemandBoost(input);
   const liquidityBoost = getLiquidityBoost(input);
+  const cleanVehicleBase = Math.max(
+    180000,
+    brandBase
+      + modelBase
+      + bodyTypeBase
+      + engineBoost
+      + fuelBoost
+      + transmissionBoost
+      + packageBoost
+      + ownershipDemandBoost
+      + liquidityBoost,
+  );
+  const ageAdjustedBase = cleanVehicleBase * getAgeMultiplier(input.vehicleInfo.year);
+  const mileageAdjustment = getMileageAdjustment(input.vehicleInfo.year, input.vehicleInfo.mileage, ageAdjustedBase);
+  const regionalBoost = getRegionalAdjustment(input.vehicleInfo.city, input.vehicleInfo.district || '', ageAdjustedBase, input.vehicleInfo.bodyType, input.vehicleInfo.brand);
   const maintenanceBoost = input.serviceHistory ? 25000 : input.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('mevcut') ? 18000 : -20000;
   const extraKeyBoost = input.extraKey ? 10000 : -8000;
+  const cleanAdjustedEstimate = Math.max(
+    125000,
+    ageAdjustedBase + mileageAdjustment + regionalBoost + maintenanceBoost + extraKeyBoost,
+  );
 
   const damageParts = input.condition.damageParts || [];
   const paintedCount = damageParts.filter((part) => part.status === 'Boyali' || part.status === 'Onarimli').length || input.condition.paintedParts.length;
   const localCount = damageParts.filter((part) => part.status === 'Lokal Boyali').length;
   const changedCount = damageParts.filter((part) => part.status === 'Degisen').length || input.condition.changedParts.length;
-  const conditionPenalty = (paintedCount * 9000) + (localCount * 6000) + (changedCount * 32000);
+  const conditionPenalty = cleanAdjustedEstimate * Math.min(
+    0.24,
+    (paintedCount * 0.008) + (localCount * 0.0045) + (changedCount * 0.026),
+  );
 
   const airbagState = normalizeStructuralState(input.condition.airbagCondition);
   const chassisState = normalizeStructuralState(input.condition.chassisPodyeCondition);
   const pillarState = normalizeStructuralState(input.condition.pillarCondition);
-  const structuralPenalty =
-    (airbagState === 'issue' ? 90000 : 0)
-    + (chassisState === 'issue' ? 180000 : 0)
-    + (pillarState === 'issue' ? 140000 : 0);
+  const structuralPenalty = cleanAdjustedEstimate * Math.min(
+    0.30,
+    (airbagState === 'issue' ? 0.06 : 0)
+      + (chassisState === 'issue' ? 0.12 : 0)
+      + (pillarState === 'issue' ? 0.09 : 0),
+  );
 
-  const tramerRatio = brandBase > 0 ? Math.min(0.22, input.condition.tramerAmount / brandBase) : 0;
-  const tramerPenalty = Math.min(brandBase * 0.22, (input.condition.tramerAmount * 0.55) + (brandBase * tramerRatio * 0.12));
-  const severeDamagePenalty = input.condition.severeDamage ? Math.max(85000, brandBase * 0.055) : 0;
+  const tramerRatio = cleanAdjustedEstimate > 0 ? input.condition.tramerAmount / cleanAdjustedEstimate : 0;
+  const tramerPenalty = Math.min(
+    cleanAdjustedEstimate * 0.18,
+    (input.condition.tramerAmount * 0.45) + (cleanAdjustedEstimate * Math.min(0.08, tramerRatio * 0.08)),
+  );
+  const severeDamagePenalty = input.condition.severeDamage ? cleanAdjustedEstimate * 0.08 : 0;
+  const totalConditionPenalty = Math.min(
+    cleanAdjustedEstimate * 0.46,
+    conditionPenalty + structuralPenalty + tramerPenalty + severeDamagePenalty,
+  );
 
   const heuristicEstimate = Math.max(
-    520000,
-    brandBase
-      + modelBase
-      + bodyTypeBase
-      + yearAdjustment
-      + engineBoost
-      + fuelBoost
-      + transmissionBoost
-      + packageBoost
-      + regionalBoost
-      + ownershipDemandBoost
-      + liquidityBoost
-      + maintenanceBoost
-      + extraKeyBoost
-      - kmPenalty
-      - tramerPenalty
-      - conditionPenalty
-      - structuralPenalty
-      - severeDamagePenalty,
+    125000,
+    cleanAdjustedEstimate - totalConditionPenalty,
   );
 
   const severityScore =
@@ -455,11 +471,26 @@ export async function estimateVehicleValue(
     const upperBand = Number(effectiveMarketStats.upperBand || medianValue || trimmedAverage || estimate);
     const spreadRatio = trimmedAverage > 0 ? Math.min(0.24, Math.max(0, (upperBand - lowerBand) / trimmedAverage)) : 0.12;
     const stabilityFactor = Math.max(0.38, 1 - (spreadRatio * 2.4));
-    const confidence = Math.min(0.84, 0.24 + ((sampleSize / 12) * 0.52) + ((stabilityFactor - 0.38) * 0.28));
+    const sampleConfidence = sampleSize < MIN_REQUIRED_MARKET_COMPS
+      ? 0.12 + (sampleSize * 0.06)
+      : 0.28 + (Math.min(sampleSize, 12) / 12) * 0.44;
+    const similarityConfidence = intelligence.averageSimilarity
+      ? Math.max(0.55, intelligence.averageSimilarity / 100)
+      : 0.58;
+    const fallbackDiscount = marketCompFallbackUsed ? 0.72 : 1;
+    const confidence = Math.min(
+      0.84,
+      (sampleConfidence + ((stabilityFactor - 0.38) * 0.22)) * similarityConfidence * fallbackDiscount,
+    );
     const marketAnchorBase = spreadRatio > 0.08
       ? (trimmedAverage * 0.45) + (medianValue * 0.55)
       : (trimmedAverage * 0.72) + (medianValue * 0.28);
-    const marketAnchor = Math.round(marketAnchorBase);
+    const strongMarketEvidence = sampleSize >= 5 && intelligence.averageSimilarity >= 72 && !marketCompFallbackUsed;
+    const maximumAnchorDrift = strongMarketEvidence ? 0.34 : 0.20;
+    const marketAnchor = Math.round(Math.max(
+      heuristicEstimate * (1 - maximumAnchorDrift),
+      Math.min(heuristicEstimate * (1 + maximumAnchorDrift), marketAnchorBase),
+    ));
     estimate = Math.round((marketAnchor * confidence) + (heuristicEstimate * (1 - confidence)));
     minimum = Math.round((lowerBand * 0.88) + (estimate * 0.12));
     maximum = Math.round((upperBand * 0.88) + (estimate * 0.12));
@@ -473,6 +504,8 @@ export async function estimateVehicleValue(
   estimate = Math.round(estimate * calibrationMultiplier * intelligenceMultiplier);
   minimum = Math.round(minimum * calibrationMultiplier * intelligenceMultiplier);
   maximum = Math.round(maximum * calibrationMultiplier * intelligenceMultiplier);
+  minimum = Math.max(estimate * 0.84, Math.min(estimate * 0.985, minimum));
+  maximum = Math.min(estimate * 1.16, Math.max(estimate * 1.015, maximum));
 
   const galleryMultiplier = severityScore >= 4 ? 0.905 : demand === 'Yüksek' ? 0.945 : 0.932;
   const quickMultiplier = severityScore >= 4 ? 0.875 : demand === 'Yüksek' ? 0.918 : 0.902;

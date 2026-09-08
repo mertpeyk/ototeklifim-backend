@@ -90,6 +90,10 @@ async function collectCalibrationSamples() {
       createdAt: {
         gte: cutoff,
       },
+      OR: [
+        { status: 'ACCEPTED' },
+        { offers: { some: { status: 'ACCEPTED' } } },
+      ],
     },
     orderBy: {
       createdAt: 'desc',
@@ -100,6 +104,14 @@ async function collectCalibrationSamples() {
       vehicleInfo: true,
       condition: true,
       createdAt: true,
+      status: true,
+      offers: {
+        orderBy: { createdAt: 'desc' },
+        select: {
+          amount: true,
+          status: true,
+        },
+      },
     },
   });
 
@@ -115,23 +127,20 @@ async function collectCalibrationSamples() {
       skipMarketComps: true,
       skipModelCalibration: true,
     });
-    const marketAware = await estimateVehicleValue(parsedInput as ValuationEstimateInput, {
-      skipModelCalibration: true,
-    });
+    const acceptedOffer = request.offers.find((offer) => offer.status === 'ACCEPTED')
+      || (request.status === 'ACCEPTED' ? request.offers[0] : undefined);
+    const acceptedAmount = Number(acceptedOffer?.amount || 0);
 
-    if (!marketAware.marketComps?.sampleSize || marketAware.marketComps.sampleSize < 3) {
+    if (!acceptedAmount || !heuristic.quickValue) {
       continue;
     }
 
-    if (!heuristic.estimate) {
-      continue;
-    }
-
-    const deltaPercent = ((marketAware.estimate - heuristic.estimate) / heuristic.estimate) * 100;
+    const rawDeltaPercent = ((acceptedAmount - heuristic.quickValue) / heuristic.quickValue) * 100;
+    const deltaPercent = Math.max(-25, Math.min(25, rawDeltaPercent));
     samples.push({
-      key: buildValuationModelKey(marketAware.normalizedVehicleInfo.brand, marketAware.normalizedVehicleInfo.model),
-      brand: marketAware.normalizedVehicleInfo.brand,
-      model: marketAware.normalizedVehicleInfo.model,
+      key: buildValuationModelKey(heuristic.normalizedVehicleInfo.brand, heuristic.normalizedVehicleInfo.model),
+      brand: heuristic.normalizedVehicleInfo.brand,
+      model: heuristic.normalizedVehicleInfo.model,
       deltaPercent,
     });
   }
@@ -170,9 +179,13 @@ export async function runWeeklyValuationCalibration(logger?: FastifyBaseLogger |
       continue;
     }
 
-    const averageDelta = entries.reduce((sum, item) => sum + item.deltaPercent, 0) / entries.length;
+    const sortedDeltas = entries.map((item) => item.deltaPercent).sort((left, right) => left - right);
+    const middle = Math.floor(sortedDeltas.length / 2);
+    const medianDelta = sortedDeltas.length % 2
+      ? sortedDeltas[middle]!
+      : (sortedDeltas[middle - 1]! + sortedDeltas[middle]!) / 2;
     const current = currentMultipliers[key] ?? 0;
-    const smoothed = clampPercent((current * 0.35) + (averageDelta * 0.65));
+    const smoothed = clampPercent((current * 0.45) + (medianDelta * 0.55));
     const [first] = entries;
     if (!first) {
       continue;

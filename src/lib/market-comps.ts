@@ -452,30 +452,50 @@ function isSuspiciousCommercialListing(advert: ParsedListing) {
   ].some((token) => haystack.includes(token));
 }
 
-function calculateYearNormalization(advertYear: number | null | undefined, queryYear: number | undefined) {
+function calculateYearNormalization(advertYear: number | null | undefined, queryYear: number | undefined, advertPrice: number) {
   if (!advertYear || !queryYear) return 0;
   const diff = queryYear - advertYear;
   if (diff === 0) return 0;
-  const perYear = queryYear >= 2022 ? 55000 : 42000;
+  const perYear = Math.max(30000, Math.min(220000, advertPrice * (queryYear >= 2022 ? 0.05 : 0.042)));
   return diff * perYear;
 }
 
-function calculateKmNormalization(advertKm: number | null | undefined, queryKm: number | undefined) {
+function calculateKmNormalization(
+  advertKm: number | null | undefined,
+  queryKm: number | undefined,
+  advertPrice: number,
+) {
   if (!advertKm || !queryKm) return 0;
-  const diff = queryKm - advertKm;
-  const ratePerKm =
-    queryKm <= 60000 ? 1.2
-      : queryKm <= 100000 ? 0.95
-        : 0.75;
+  const diff = advertKm - queryKm;
+  const segmentRate = advertPrice * 0.0075 / 10000;
+  const ratePerKm = Math.max(0.55, Math.min(2.5, segmentRate));
   return Math.round(diff * ratePerKm);
+}
+
+export function normalizeComparablePriceForTarget(input: {
+  advertPrice: number;
+  advertYear?: number | null;
+  advertKm?: number | null;
+  targetYear?: number;
+  targetKm?: number;
+}) {
+  return Math.max(
+    0,
+    input.advertPrice
+      + calculateYearNormalization(input.advertYear, input.targetYear, input.advertPrice)
+      + calculateKmNormalization(input.advertKm, input.targetKm, input.advertPrice),
+  );
 }
 
 function buildComparableListing(advert: ParsedListing, query: MarketCompsQuery) {
   const relevanceScore = scoreAdvertRelevance(advert, query);
-  const adjustedPrice = Math.max(
-    0,
-    advert.price + calculateYearNormalization(advert.year, query.year) + calculateKmNormalization(advert.approxKm, query.km),
-  );
+  const adjustedPrice = normalizeComparablePriceForTarget({
+    advertPrice: advert.price,
+    advertYear: advert.year,
+    advertKm: advert.approxKm,
+    targetYear: query.year,
+    targetKm: query.km,
+  });
 
   let comparisonWeight = Math.max(0.35, 1 + (relevanceScore / 8));
   if (advert.year) comparisonWeight += 0.2;
