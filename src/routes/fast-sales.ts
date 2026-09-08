@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { AccountType, FastSaleStatus } from '@prisma/client';
 import { z } from 'zod';
@@ -168,6 +168,12 @@ async function createUniqueRequestNo() {
   throw new Error('Unique fast sale request number could not be generated');
 }
 
+function buildIdempotentRequestNo(submissionKey: string) {
+  const year = new Date().getFullYear();
+  const digest = createHash('sha256').update(submissionKey).digest('hex').slice(0, 12).toUpperCase();
+  return `HS-${year}-${digest}`;
+}
+
 function serializeFastSaleWithDetails(
   fastSale: {
     id: string;
@@ -256,8 +262,9 @@ export async function fastSaleRoutes(app: FastifyInstance) {
   app.post('/fast-sales', async (request, reply) => {
     const payload = createFastSaleSchema.parse(request.body);
     if (payload.submissionKey) {
+      const idempotentRequestNo = buildIdempotentRequestNo(payload.submissionKey);
       const existingRequest = await prisma.fastSaleRequest.findUnique({
-        where: { idempotencyKey: payload.submissionKey },
+        where: { requestNo: idempotentRequestNo },
         include: { offers: { orderBy: { createdAt: 'desc' } } },
       });
 
@@ -282,7 +289,9 @@ export async function fastSaleRoutes(app: FastifyInstance) {
       { skipMarketComps: true },
     );
     const normalizedVehicleInfo = estimatedValues.normalizedVehicleInfo;
-    const requestNo = await createUniqueRequestNo();
+    const requestNo = payload.submissionKey
+      ? buildIdempotentRequestNo(payload.submissionKey)
+      : await createUniqueRequestNo();
     const fullName = `${payload.contact.firstName} ${payload.contact.lastName}`.trim();
     const normalizedEmail = payload.contact.email.trim().toLowerCase();
     const normalizedPhone = normalizePhone(payload.contact.phone);
@@ -353,7 +362,6 @@ export async function fastSaleRoutes(app: FastifyInstance) {
     const createFastSale = () => prisma.fastSaleRequest.create({
         data: {
           requestNo,
-          idempotencyKey: payload.submissionKey,
           userId,
           status: FastSaleStatus.NEW,
           vehicleInfo: normalizedVehicleInfo,
@@ -387,7 +395,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
       }
 
       const existingRequest = await prisma.fastSaleRequest.findUnique({
-        where: { idempotencyKey: payload.submissionKey },
+        where: { requestNo },
         include: { offers: { orderBy: { createdAt: 'desc' } } },
       });
 
