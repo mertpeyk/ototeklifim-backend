@@ -70,12 +70,40 @@ const damaged = await estimateVehicleValue({
   },
 }, { skipMarketComps: true, skipModelCalibration: true });
 
+const lowMileageCorsa = await estimateVehicleValue({
+  ...baseInput,
+  vehicleInfo: {
+    vehicleType: 'Otomobil',
+    brand: 'Opel',
+    model: 'Corsa',
+    packageName: 'Enjoy',
+    year: 2013,
+    mileage: 68000,
+    fuelType: 'Benzin',
+    transmission: 'Otomatik',
+    bodyType: 'Hatchback',
+    engineVolume: '1.4 Twinport',
+    enginePower: '100 hp',
+    color: 'Gri',
+    city: 'İstanbul',
+    district: '',
+  },
+  condition: {
+    ...baseInput.condition,
+    mechanicalStatus: 'Periyodik bakım geçmişi mevcut',
+    maintenanceHistory: 'Karışık servis geçmişi',
+  },
+  extraKey: false,
+  serviceHistory: true,
+}, { skipMarketComps: true, skipModelCalibration: true, skipOpenAi: true });
+
 assert.ok(newer.estimate > clean.estimate, 'Newer model year must increase the estimate');
 assert.ok(clean.estimate > older.estimate, 'Older model year must decrease the estimate');
 assert.ok(lowMileage.estimate > highMileage.estimate, 'Lower mileage must increase the estimate');
 assert.ok(damaged.estimate < clean.estimate * 0.8, 'Structural damage must materially reduce the estimate');
+assert.ok(lowMileageCorsa.estimate >= 850000 && lowMileageCorsa.estimate <= 900000, 'Low-mileage 2013 Opel Corsa benchmark must stay near the observed retail market');
 
-for (const result of [clean, newer, older, lowMileage, highMileage, damaged]) {
+for (const result of [clean, newer, older, lowMileage, highMileage, damaged, lowMileageCorsa]) {
   assert.ok(result.minimum <= result.estimate, 'Minimum must not exceed the estimate');
   assert.ok(result.maximum >= result.estimate, 'Maximum must not be below the estimate');
   assert.equal(result.estimate % 1000, 0, 'Displayed estimates must be rounded to 1,000 TL');
@@ -115,4 +143,5 @@ console.log(JSON.stringify({
   lowMileage: lowMileage.estimate,
   highMileage: highMileage.estimate,
   damaged: damaged.estimate,
+  lowMileageCorsa: lowMileageCorsa.estimate,
 }, null, 2));

@@ -118,7 +118,9 @@ function getMileageAdjustment(year: number, km: number, ageAdjustedBase: number)
   const age = Math.max(0, currentYear - Number(year || currentYear));
   const expectedKm = Math.min(240000, Math.max(5000, age * 14500));
   const deviationInTenThousands = (expectedKm - Math.max(0, km)) / 10000;
-  const adjustmentRatio = Math.max(-0.18, Math.min(0.08, deviationInTenThousands * 0.008));
+  const lowMileagePremiumCap = age >= 10 ? 0.20 : 0.11;
+  const mileageSensitivity = age >= 10 ? 0.015 : 0.009;
+  const adjustmentRatio = Math.max(-0.18, Math.min(lowMileagePremiumCap, deviationInTenThousands * mileageSensitivity));
 
   return Math.round(ageAdjustedBase * adjustmentRatio);
 }
@@ -231,6 +233,11 @@ function getLiquidityBoost(input: ValuationEstimateInput) {
 
   if (brand === 'hyundai' && model === 'i20' && isAutomatic) {
     boost += 25000;
+  }
+
+  if (brand === 'opel' && model === 'corsa' && isAutomatic) {
+    boost += 70000;
+    if (year <= 2014 && engine.includes('twinport')) boost += 30000;
   }
 
   return boost;
@@ -464,6 +471,7 @@ export async function estimateVehicleValue(
   let estimate = heuristicEstimate;
   let minimum = heuristicEstimate * (demand === 'Yüksek' ? 0.965 : 0.955);
   let maximum = heuristicEstimate * (demand === 'Yüksek' ? 1.055 : 1.045);
+  let usedAgentMarketEstimate = false;
 
   if (effectiveMarketStats) {
     const sampleSize = effectiveMarketSampleSize;
@@ -499,9 +507,16 @@ export async function estimateVehicleValue(
   }
 
   if (!effectiveMarketStats && intelligence.marketEstimate && intelligence.sources.length >= 2) {
+    usedAgentMarketEstimate = true;
+    const vehicleAge = Math.max(0, new Date().getFullYear() - input.vehicleInfo.year);
+    const expectedMileage = Math.min(240000, Math.max(5000, vehicleAge * 14500));
+    const hasExceptionalLowMileage = vehicleAge >= 8 && input.vehicleInfo.mileage <= expectedMileage * 0.55;
+    const normalizedAgentEstimate = hasExceptionalLowMileage
+      ? Math.max(heuristicEstimate, intelligence.marketEstimate)
+      : intelligence.marketEstimate;
     const agentAnchor = Math.max(
       heuristicEstimate * 0.55,
-      Math.min(heuristicEstimate * 2.2, intelligence.marketEstimate),
+      Math.min(heuristicEstimate * 2.2, normalizedAgentEstimate),
     );
     estimate = Math.round((agentAnchor * 0.82) + (heuristicEstimate * 0.18));
     const agentMinimum = intelligence.marketMinimum || agentAnchor * 0.95;
@@ -514,7 +529,9 @@ export async function estimateVehicleValue(
     ? 0
     : await getValuationModelMultiplier(input.vehicleInfo.brand, input.vehicleInfo.model);
   const calibrationMultiplier = 1 + (modelCalibrationPercent / 100);
-  const intelligenceMultiplier = 1 + (intelligence.adjustmentPercent / 100);
+  const intelligenceMultiplier = usedAgentMarketEstimate
+    ? 1
+    : 1 + (intelligence.adjustmentPercent / 100);
   estimate = Math.round(estimate * calibrationMultiplier * intelligenceMultiplier);
   minimum = Math.round(minimum * calibrationMultiplier * intelligenceMultiplier);
   maximum = Math.round(maximum * calibrationMultiplier * intelligenceMultiplier);

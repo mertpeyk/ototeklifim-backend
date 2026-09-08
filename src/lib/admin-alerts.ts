@@ -15,6 +15,7 @@ type NewApplicationAlertInput = {
   city?: string | null;
   district?: string | null;
   details?: string[];
+  compact?: boolean;
 };
 
 async function resolveAlertPhone() {
@@ -42,17 +43,21 @@ async function resolveAlertPhone() {
   return normalizeTurkeyPhone(adminUser?.phone);
 }
 
-function buildApplicationAlertMessage(input: NewApplicationAlertInput) {
+export function buildApplicationAlertMessage(input: NewApplicationAlertInput) {
+  const applicationType = input.type === 'hizli-sat' ? 'hızlı satış' : 'konsinye';
   const lines = [
-    `Yeni ${input.type} basvurusu geldi`,
-    `No: ${input.referenceNo}`,
-    `Musteri: ${input.customerName}`,
+    `${input.compact ? '🚗 ' : ''}Yeni ${applicationType} başvurusu`,
+    `Talep No: ${input.referenceNo}`,
+    `Müşteri: ${input.customerName}`,
     `Telefon: ${input.customerPhone || '-'}`,
-    `E-posta: ${input.customerEmail || '-'}`,
-    `Arac: ${input.vehicleSummary}`,
+    `Araç: ${input.vehicleSummary}`,
   ];
 
-  if (input.city) {
+  if (!input.compact) {
+    lines.splice(4, 0, `E-posta: ${input.customerEmail || '-'}`);
+  }
+
+  if (!input.compact && input.city) {
     lines.push(`Konum: ${input.city}${input.district ? ` / ${input.district}` : ''}`);
   }
 
@@ -60,7 +65,7 @@ function buildApplicationAlertMessage(input: NewApplicationAlertInput) {
     lines.push(...input.details);
   }
 
-  lines.push('Admin panelden kontrol edebilirsin.');
+  lines.push('Admin panelinden kontrol edebilirsin.');
 
   return lines.join('\n');
 }
