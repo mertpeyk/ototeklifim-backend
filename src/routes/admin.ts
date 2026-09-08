@@ -19,6 +19,7 @@ import {
   removeValuationModelMultiplier,
   upsertValuationModelMultiplier,
 } from '../lib/valuation-calibration.js';
+import { sendFastSaleOfferSms } from '../lib/fast-sale-offer-notification.js';
 
 const adminPermissions = [
   'listings.view',
@@ -150,7 +151,7 @@ const fastSaleStatusSchema = z.object({
 });
 
 const fastSaleOfferSchema = z.object({
-  amount: z.number().nonnegative(),
+  amount: z.number().positive(),
   validHours: z.number().int().positive(),
   appraisalRequired: z.boolean(),
   pickupOption: z.string().min(1),
@@ -1524,6 +1525,29 @@ export async function adminRoutes(app: FastifyInstance) {
     return updated;
   });
 
+  app.post('/admin/consignments/read-all', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const result = await prisma.consignmentRequest.updateMany({
+      where: { status: 'PENDING' },
+      data: { status: 'UNDER_REVIEW' },
+    });
+    await appendActivityLog({
+      adminId: admin.id,
+      adminName: admin.fullName,
+      action: 'CONSIGNMENT_READ_ALL',
+      module: 'Konsinye',
+      recordId: 'bulk',
+      previousValue: 'Yeni',
+      newValue: 'İnceleniyor',
+      description: `${result.count} yeni konsinye talebi topluca okundu olarak işaretlendi.`,
+    });
+    return { updatedCount: result.count };
+  });
+
   app.post('/admin/consignments/:id/feedback', async (request, reply) => {
     const admin = await requireAdmin(request, reply);
     if (!admin) {
@@ -1651,6 +1675,29 @@ export async function adminRoutes(app: FastifyInstance) {
     return requestModel;
   });
 
+  app.post('/admin/fast-sales/read-all', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const result = await prisma.fastSaleRequest.updateMany({
+      where: { status: 'NEW' },
+      data: { status: 'UNDER_REVIEW' },
+    });
+    await appendActivityLog({
+      adminId: admin.id,
+      adminName: admin.fullName,
+      action: 'FAST_SALE_READ_ALL',
+      module: 'Hızlı Sat',
+      recordId: 'bulk',
+      previousValue: 'Yeni',
+      newValue: 'İnceleniyor',
+      description: `${result.count} yeni hızlı sat talebi topluca okundu olarak işaretlendi.`,
+    });
+    return { updatedCount: result.count };
+  });
+
   app.post('/admin/fast-sales/:id/offers', async (request, reply) => {
     const admin = await requireAdmin(request, reply);
     if (!admin) {
@@ -1658,22 +1705,62 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
     const payload = fastSaleOfferSchema.parse(request.body);
-    const offer = await prisma.fastSaleOffer.create({
-      data: {
-        requestId: params.id,
-        amount: payload.amount,
-        status: OfferStatus.SENT,
-        validUntil: new Date(Date.now() + payload.validHours * 60 * 60 * 1000),
-        appraisalRequired: payload.appraisalRequired,
-        pickupOption: payload.pickupOption,
-        paymentMethod: payload.paymentMethod,
-        adminNote: payload.adminNote ?? '',
-        message: payload.message,
+    const fastSale = await prisma.fastSaleRequest.findUnique({
+      where: { id: params.id },
+      select: {
+        requestNo: true,
+        vehicleInfo: true,
+        user: {
+          select: {
+            fullName: true,
+            phone: true,
+          },
+        },
       },
     });
-    await prisma.fastSaleRequest.update({
-      where: { id: params.id },
-      data: { status: 'OFFER_SENT' },
+
+    if (!fastSale) {
+      reply.code(404);
+      return { message: 'Hızlı sat talebi bulunamadı.' };
+    }
+
+    const validUntil = new Date(Date.now() + payload.validHours * 60 * 60 * 1000);
+    const [offer] = await prisma.$transaction([
+      prisma.fastSaleOffer.create({
+        data: {
+          requestId: params.id,
+          amount: payload.amount,
+          status: OfferStatus.SENT,
+          validUntil,
+          appraisalRequired: payload.appraisalRequired,
+          pickupOption: payload.pickupOption,
+          paymentMethod: payload.paymentMethod,
+          adminNote: payload.adminNote ?? '',
+          message: payload.message,
+        },
+      }),
+      prisma.fastSaleRequest.update({
+        where: { id: params.id },
+        data: { status: 'OFFER_SENT' },
+      }),
+    ]);
+
+    const vehicle = fastSale.vehicleInfo && typeof fastSale.vehicleInfo === 'object' && !Array.isArray(fastSale.vehicleInfo)
+      ? fastSale.vehicleInfo as Record<string, unknown>
+      : {};
+    const vehicleSummary = [vehicle.year, vehicle.brand, vehicle.model]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .join(' ')
+      || 'Aracınız';
+    const sms = await sendFastSaleOfferSms({
+      amount: payload.amount,
+      customerName: fastSale.user.fullName,
+      customMessage: payload.message,
+      phone: fastSale.user.phone,
+      requestNo: fastSale.requestNo,
+      validUntil,
+      vehicleSummary,
     });
     await appendActivityLog({
       adminId: admin.id,
@@ -1683,9 +1770,10 @@ export async function adminRoutes(app: FastifyInstance) {
       recordId: params.id,
       previousValue: '',
       newValue: String(payload.amount),
-      description: `${params.id} için fiyat teklifi gönderildi.`,
+      description: `${params.id} için fiyat teklifi gönderildi. ${sms.message}`,
     });
-    return offer;
+    reply.code(201);
+    return { offer, sms };
   });
 
   app.post('/admin/users/:id/status', async (request, reply) => {
