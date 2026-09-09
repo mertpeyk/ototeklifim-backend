@@ -93,6 +93,30 @@ const conditionSchema = z.object({
   damageParts: z.array(damagePartSchema).default([]),
 });
 
+function summarizeDamageCondition(condition: z.infer<typeof conditionSchema>) {
+  const unique = (values: string[]) => [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+  const paintStatusLabels: Record<'Lokal Boyali' | 'Boyali' | 'Onarimli', string> = {
+    'Lokal Boyali': 'Lokal boyalı',
+    Boyali: 'Boyalı',
+    Onarimli: 'Onarımlı',
+  };
+
+  const detailedPaintedParts = condition.damageParts
+    .filter((part) => part.status === 'Lokal Boyali' || part.status === 'Boyali' || part.status === 'Onarimli')
+    .map((part) => `${part.label} (${paintStatusLabels[part.status as keyof typeof paintStatusLabels]})`);
+  const detailedChangedParts = condition.damageParts
+    .filter((part) => part.status === 'Degisen')
+    .map((part) => part.label);
+
+  const paintedParts = unique(detailedPaintedParts.length ? detailedPaintedParts : condition.paintedParts);
+  const changedParts = unique(detailedChangedParts.length ? detailedChangedParts : condition.changedParts);
+
+  return {
+    painted: paintedParts.length ? paintedParts.join(', ') : 'Yok',
+    changed: changedParts.length ? changedParts.join(', ') : 'Yok',
+  };
+}
+
 const photoSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -449,6 +473,8 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         'WhatsApp hizli sat bildirimi gonderilemedi',
       );
     });
+    const telegramDamageSummary = summarizeDamageCondition(payload.condition);
+
     void notifyNewApplicationViaTelegram({
       type: 'hizli-sat',
       compact: true,
@@ -464,6 +490,8 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `Yakıt / Vites: ${normalizedVehicleInfo.fuelType} / ${normalizedVehicleInfo.transmission}`,
         `KM: ${new Intl.NumberFormat('tr-TR').format(normalizedVehicleInfo.mileage)}`,
         `Tramer: ${new Intl.NumberFormat('tr-TR').format(payload.condition.tramerAmount)} TL`,
+        `Boya: ${telegramDamageSummary.painted}`,
+        `Değişen: ${telegramDamageSummary.changed}`,
         `Piyasa değeri: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.estimatedMarketValue)} TL`,
         `Hızlı satış değeri: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.quickSaleValue)} TL`,
       ],
