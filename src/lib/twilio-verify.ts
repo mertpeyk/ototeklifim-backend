@@ -53,6 +53,22 @@ async function resolveVerifyServiceSid() {
       );
 
       if (typeof existing?.sid === 'string') {
+        if (existing.friendly_name !== 'OtoTeklifim') {
+          const updateResponse = await fetch(`https://verify.twilio.com/v2/Services/${existing.sid}`, {
+            method: 'POST',
+            headers: {
+              Authorization: authorizationHeader(),
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({ FriendlyName: 'OtoTeklifim' }),
+          });
+          const updatePayload = await updateResponse.json().catch(() => null) as TwilioVerifyPayload | null;
+
+          if (!updateResponse.ok) {
+            throw new Error(verifyFailureMessage(updateResponse.status, updatePayload));
+          }
+        }
+
         return existing.sid;
       }
 
@@ -62,7 +78,7 @@ async function resolveVerifyServiceSid() {
           Authorization: authorizationHeader(),
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({ FriendlyName: 'OtoTeklifim Verify' }),
+        body: new URLSearchParams({ FriendlyName: 'OtoTeklifim' }),
       });
       const createPayload = await createResponse.json().catch(() => null) as TwilioVerifyPayload | null;
 
