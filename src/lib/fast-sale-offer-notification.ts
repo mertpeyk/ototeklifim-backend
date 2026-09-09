@@ -49,7 +49,7 @@ export function buildFastSaleOfferSmsMessage(input: Omit<FastSaleOfferNotificati
     `${vehicleSummary} aracınız için hızlı satış teklifimiz ${amount} TL'dir.`,
     customMessage,
     `Teklif ${validUntil} tarihine kadar geçerlidir. Talep No: ${input.requestNo}.`,
-    'Detaylar: https://www.ototeklifim.com/tekliflerim',
+    'Teklif detaylarını OtoTeklifim hesabınızdan görüntüleyebilirsiniz.',
     'OtoTeklifim',
   ].filter(Boolean).join(' ');
 }

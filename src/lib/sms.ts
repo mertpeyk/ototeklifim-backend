@@ -75,7 +75,7 @@ async function confirmTwilioAcceptance(messageSid: string, initialStatus: string
   let status = initialStatus;
   let latestPayload: Record<string, unknown> | null = null;
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
     if (attempt > 0 || status === 'queued' || status === 'accepted') {
       await new Promise((resolve) => setTimeout(resolve, 900));
     }
@@ -86,7 +86,7 @@ async function confirmTwilioAcceptance(messageSid: string, initialStatus: string
       const errorCode = latestPayload?.error_code;
       throw new Error(twilioFailureMessage(400, { code: errorCode || status }));
     }
-    if (status === 'delivered' || status === 'sent') break;
+    if (status === 'delivered') break;
   }
 
   return status;
@@ -96,13 +96,13 @@ export async function sendSms({ message, phone }: SmsPayload): Promise<SmsSendRe
   const to = normalizeTurkishMobilePhone(phone);
 
   if (env.SMS_PROVIDER === 'twilio') {
-    if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_FROM_NUMBER) {
+    if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_SMS_SENDER) {
       throw new Error('Twilio SMS ayarlari eksik');
     }
 
     const body = new URLSearchParams({
       To: to,
-      From: env.TWILIO_FROM_NUMBER,
+      From: env.TWILIO_SMS_SENDER,
       Body: message,
     });
 

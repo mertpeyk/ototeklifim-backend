@@ -22,10 +22,14 @@ const envSchema = z.object({
 });
 
 const parsedEnv = envSchema.parse(process.env);
+const twilioSmsSender = /^[A-Za-z0-9 +\-&_.]{1,11}$/.test(parsedEnv.SMS_SENDER_ID)
+  && /[A-Za-z]/.test(parsedEnv.SMS_SENDER_ID)
+  ? parsedEnv.SMS_SENDER_ID
+  : parsedEnv.TWILIO_FROM_NUMBER;
 const hasTwilioSmsCredentials = Boolean(
   parsedEnv.TWILIO_ACCOUNT_SID &&
   parsedEnv.TWILIO_AUTH_TOKEN &&
-  parsedEnv.TWILIO_FROM_NUMBER,
+  twilioSmsSender,
 );
 
 export const env = {
@@ -35,10 +39,11 @@ export const env = {
   SMS_PROVIDER: parsedEnv.SMS_PROVIDER === 'twilio' || hasTwilioSmsCredentials
     ? 'twilio' as const
     : 'log' as const,
+  TWILIO_SMS_SENDER: twilioSmsSender,
 };
 
 export const smsConfiguration = {
   configured: hasTwilioSmsCredentials,
   provider: env.SMS_PROVIDER,
-  senderType: parsedEnv.TWILIO_FROM_NUMBER?.startsWith('+') ? 'numeric' : 'alphanumeric',
+  senderType: twilioSmsSender?.startsWith('+') ? 'numeric' : 'alphanumeric',
 };
