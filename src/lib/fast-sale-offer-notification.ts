@@ -69,12 +69,16 @@ export async function sendFastSaleOfferSms(input: FastSaleOfferNotificationInput
 
   try {
     const result = await sendSms({ phone, message: smsMessage });
+    const providerStatus = result.providerStatus?.toLowerCase();
+    const isConfirmedDelivered = result.provider === 'twilio' && providerStatus === 'delivered';
     return {
-      delivered: result.delivered,
+      delivered: isConfirmedDelivered,
       provider: result.provider,
-      message: result.delivered
-        ? 'Teklif SMS’i müşterinin kayıtlı telefonuna gönderim kuyruğuna alındı.'
-        : 'Teklif kaydedildi; SMS sağlayıcısı log modunda olduğu için gerçek gönderim yapılmadı.',
+      message: isConfirmedDelivered
+        ? 'Teklif SMS’i müşterinin kayıtlı telefonuna teslim edildi.'
+        : result.delivered
+          ? 'Teklif Twilio’ya iletildi; operatör teslim onayı bekleniyor.'
+          : 'Teklif kaydedildi; SMS sağlayıcısı log modunda olduğu için gerçek gönderim yapılmadı.',
     };
   } catch (error) {
     console.error('[fast-sale-offer-sms] gönderim başarısız', {
