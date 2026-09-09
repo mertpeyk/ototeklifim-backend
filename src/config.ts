@@ -36,8 +36,7 @@ const hasTwilioSmsCredentials = Boolean(
 );
 const hasTwilioVerifyCredentials = Boolean(
   parsedEnv.TWILIO_ACCOUNT_SID &&
-  parsedEnv.TWILIO_AUTH_TOKEN &&
-  parsedEnv.TWILIO_VERIFY_SERVICE_SID,
+  parsedEnv.TWILIO_AUTH_TOKEN,
 );
 
 export const env = {
@@ -55,4 +54,5 @@ export const smsConfiguration = {
   provider: env.SMS_PROVIDER,
   senderType: twilioSmsSender?.startsWith('+') ? 'numeric' : 'alphanumeric',
   twilioVerifyConfigured: hasTwilioVerifyCredentials,
+  twilioVerifyServiceMode: parsedEnv.TWILIO_VERIFY_SERVICE_SID ? 'explicit' : 'automatic',
 };

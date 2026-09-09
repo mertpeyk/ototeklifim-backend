@@ -14,9 +14,71 @@ const verifyErrorMessages: Record<string, string> = {
 
 export const isTwilioVerifyConfigured = Boolean(
   env.TWILIO_ACCOUNT_SID &&
-  env.TWILIO_AUTH_TOKEN &&
-  env.TWILIO_VERIFY_SERVICE_SID,
+  env.TWILIO_AUTH_TOKEN,
 );
+
+let serviceSidPromise: Promise<string> | undefined;
+
+function authorizationHeader() {
+  return `Basic ${Buffer.from(
+    `${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`,
+  ).toString('base64')}`;
+}
+
+async function resolveVerifyServiceSid() {
+  if (env.TWILIO_VERIFY_SERVICE_SID) {
+    return env.TWILIO_VERIFY_SERVICE_SID;
+  }
+
+  if (!isTwilioVerifyConfigured) {
+    throw new Error('Twilio Verify ayarları eksik.');
+  }
+
+  if (!serviceSidPromise) {
+    serviceSidPromise = (async () => {
+      const listResponse = await fetch('https://verify.twilio.com/v2/Services?PageSize=50', {
+        headers: { Authorization: authorizationHeader() },
+      });
+      const listPayload = await listResponse.json().catch(() => null) as TwilioVerifyPayload | null;
+
+      if (!listResponse.ok) {
+        throw new Error(verifyFailureMessage(listResponse.status, listPayload));
+      }
+
+      const services = Array.isArray(listPayload?.services)
+        ? listPayload.services as TwilioVerifyPayload[]
+        : [];
+      const existing = services.find((service) =>
+        service.friendly_name === 'OtoTeklifim Verify' || service.friendly_name === 'OtoTeklifim',
+      );
+
+      if (typeof existing?.sid === 'string') {
+        return existing.sid;
+      }
+
+      const createResponse = await fetch('https://verify.twilio.com/v2/Services', {
+        method: 'POST',
+        headers: {
+          Authorization: authorizationHeader(),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ FriendlyName: 'OtoTeklifim Verify' }),
+      });
+      const createPayload = await createResponse.json().catch(() => null) as TwilioVerifyPayload | null;
+
+      if (!createResponse.ok || typeof createPayload?.sid !== 'string') {
+        throw new Error(verifyFailureMessage(createResponse.status, createPayload));
+      }
+
+      return createPayload.sid;
+    })().catch((error) => {
+      serviceSidPromise = undefined;
+      throw error;
+    });
+  }
+
+  return serviceSidPromise;
+}
 
 function normalizeVerifyPhone(phone: string) {
   const digits = String(phone || '').replace(/\D/g, '');
@@ -44,14 +106,13 @@ async function verifyRequest(path: string, body: URLSearchParams) {
     throw new Error('Twilio Verify ayarları eksik.');
   }
 
+  const serviceSid = await resolveVerifyServiceSid();
   const response = await fetch(
-    `https://verify.twilio.com/v2/Services/${env.TWILIO_VERIFY_SERVICE_SID}/${path}`,
+    `https://verify.twilio.com/v2/Services/${serviceSid}/${path}`,
     {
       method: 'POST',
       headers: {
-        Authorization: `Basic ${Buffer.from(
-          `${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`,
-        ).toString('base64')}`,
+        Authorization: authorizationHeader(),
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body,
