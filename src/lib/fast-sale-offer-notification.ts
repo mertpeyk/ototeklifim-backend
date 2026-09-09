@@ -33,25 +33,33 @@ function compactMessage(value: string, maxLength: number) {
   return `${compact.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 }
 
+function toGsmSafeText(value: string) {
+  return String(value || '')
+    .replace(/[çÇ]/g, (character) => character === 'ç' ? 'c' : 'C')
+    .replace(/[ğĞ]/g, (character) => character === 'ğ' ? 'g' : 'G')
+    .replace(/[ıİ]/g, (character) => character === 'ı' ? 'i' : 'I')
+    .replace(/[öÖ]/g, (character) => character === 'ö' ? 'o' : 'O')
+    .replace(/[şŞ]/g, (character) => character === 'ş' ? 's' : 'S')
+    .replace(/[üÜ]/g, (character) => character === 'ü' ? 'u' : 'U')
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function buildFastSaleOfferSmsMessage(input: Omit<FastSaleOfferNotificationInput, 'phone'>) {
-  const firstName = compactMessage(input.customerName, 50).split(' ')[0] || 'Değerli müşterimiz';
-  const vehicleSummary = compactMessage(input.vehicleSummary, 90);
-  const customMessage = compactMessage(input.customMessage, 220);
+  const firstName = toGsmSafeText(compactMessage(input.customerName, 30)).split(' ')[0] || 'Musterimiz';
+  const vehicleSummary = toGsmSafeText(compactMessage(input.vehicleSummary, 90));
   const amount = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(input.amount);
   const validUntil = new Intl.DateTimeFormat('tr-TR', {
     dateStyle: 'short',
-    timeStyle: 'short',
     timeZone: 'Europe/Istanbul',
   }).format(input.validUntil);
+  const prefix = `OtoTeklifim: Merhaba ${firstName}, `;
+  const suffix = ` icin hizli satis teklifimiz ${amount} TL. Son: ${validUntil}. No: ${input.requestNo}.`;
+  const maxVehicleLength = Math.max(12, 160 - prefix.length - suffix.length);
+  const compactVehicle = vehicleSummary.slice(0, maxVehicleLength).trim();
 
-  return [
-    `Merhaba ${firstName},`,
-    `${vehicleSummary} aracınız için hızlı satış teklifimiz ${amount} TL'dir.`,
-    customMessage,
-    `Teklif ${validUntil} tarihine kadar geçerlidir. Talep No: ${input.requestNo}.`,
-    'Teklif detaylarını OtoTeklifim hesabınızdan görüntüleyebilirsiniz.',
-    'OtoTeklifim',
-  ].filter(Boolean).join(' ');
+  return `${prefix}${compactVehicle}${suffix}`;
 }
 
 export async function sendFastSaleOfferSms(input: FastSaleOfferNotificationInput): Promise<FastSaleOfferNotificationResult> {
