@@ -1,3 +1,6 @@
+import { existsSync, unlinkSync } from 'node:fs';
+import path from 'node:path';
+
 import type { FastifyInstance } from 'fastify';
 import {
   FastSaleStatus,
@@ -1837,7 +1840,15 @@ export async function adminRoutes(app: FastifyInstance) {
 
     const user = await prisma.user.findUnique({
       where: { id: params.id },
-      select: { id: true, fullName: true, email: true, accountType: true },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        accountType: true,
+        listings: { select: { images: { select: { imageUrl: true } } } },
+        consignmentRequests: { select: { photos: { select: { imageUrl: true } } } },
+        fastSaleRequests: { select: { photos: true } },
+      },
     });
 
     if (!user) {
@@ -1850,8 +1861,29 @@ export async function adminRoutes(app: FastifyInstance) {
       return { message: 'Admin hesapları kullanıcı ekranından silinemez.' };
     }
 
+    const uploadFilenames = new Set<string>();
+    const collectUploadFilename = (rawUrl: unknown) => {
+      const match = String(rawUrl || '').match(/\/uploads\/([^/?#]+)/i);
+      if (!match?.[1]) return;
+      const filename = decodeURIComponent(match[1]);
+      if (/^[a-zA-Z0-9._-]+$/.test(filename) && filename !== '.' && filename !== '..') {
+        uploadFilenames.add(filename);
+      }
+    };
+
+    user.listings.forEach((listing) => listing.images.forEach((image) => collectUploadFilename(image.imageUrl)));
+    user.consignmentRequests.forEach((consignment) => consignment.photos.forEach((photo) => collectUploadFilename(photo.imageUrl)));
+    user.fastSaleRequests.forEach((fastSale) => {
+      parseArray<Record<string, unknown>>(fastSale.photos).forEach((photo) => collectUploadFilename(photo.url ?? photo.imageUrl));
+    });
+
     await prisma.$transaction(async (transaction) => {
       await transaction.user.delete({ where: { id: user.id } });
+      if (uploadFilenames.size) {
+        await transaction.uploadedImage.deleteMany({
+          where: { filename: { in: Array.from(uploadFilenames) } },
+        });
+      }
       await transaction.adminActivityLog.create({
         data: {
           adminId: admin.id,
@@ -1866,6 +1898,18 @@ export async function adminRoutes(app: FastifyInstance) {
           description: `${user.fullName} kullanıcısı ve ilişkili kayıtları kalıcı olarak silindi.`,
         },
       });
+    });
+
+    const uploadDirectory = path.resolve(process.cwd(), 'uploads');
+    uploadFilenames.forEach((filename) => {
+      const localPath = path.join(uploadDirectory, filename);
+      if (path.dirname(localPath) === uploadDirectory && existsSync(localPath)) {
+        try {
+          unlinkSync(localPath);
+        } catch {
+          // Database removal is authoritative; a deployment restart clears orphaned local files.
+        }
+      }
     });
 
     return { ok: true };
