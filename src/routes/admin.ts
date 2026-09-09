@@ -1823,6 +1823,54 @@ export async function adminRoutes(app: FastifyInstance) {
     return note;
   });
 
+  app.delete('/admin/users/:id', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const params = z.object({ id: z.string().min(1) }).parse(request.params);
+    if (params.id === admin.id) {
+      reply.code(403);
+      return { message: 'Kendi admin hesabınızı silemezsiniz.' };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: params.id },
+      select: { id: true, fullName: true, email: true, accountType: true },
+    });
+
+    if (!user) {
+      reply.code(404);
+      return { message: 'Kullanıcı bulunamadı.' };
+    }
+
+    if (user.accountType === 'ADMIN') {
+      reply.code(403);
+      return { message: 'Admin hesapları kullanıcı ekranından silinemez.' };
+    }
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.user.delete({ where: { id: user.id } });
+      await transaction.adminActivityLog.create({
+        data: {
+          adminId: admin.id,
+          adminName: admin.fullName,
+          role: mapUserRole(),
+          action: 'USER_DELETE',
+          module: 'Kullanıcı',
+          recordId: user.id,
+          previousValue: JSON.stringify({ fullName: user.fullName, email: user.email }),
+          newValue: 'DELETED',
+          ipAddress: '10.24.18.42',
+          description: `${user.fullName} kullanıcısı ve ilişkili kayıtları kalıcı olarak silindi.`,
+        },
+      });
+    });
+
+    return { ok: true };
+  });
+
   app.post('/admin/dealers/:id/status', async (request, reply) => {
     const admin = await requireAdmin(request, reply);
     if (!admin) {

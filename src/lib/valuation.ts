@@ -393,18 +393,18 @@ export async function estimateVehicleValue(
   const localCount = damageParts.filter((part) => part.status === 'Lokal Boyali').length;
   const changedCount = damageParts.filter((part) => part.status === 'Degisen').length || input.condition.changedParts.length;
   const conditionPenalty = cleanAdjustedEstimate * Math.min(
-    0.24,
-    (paintedCount * 0.008) + (localCount * 0.0045) + (changedCount * 0.026),
+    0.36,
+    (paintedCount * 0.015) + (localCount * 0.008) + (changedCount * 0.04),
   );
 
   const airbagState = normalizeStructuralState(input.condition.airbagCondition);
   const chassisState = normalizeStructuralState(input.condition.chassisPodyeCondition);
   const pillarState = normalizeStructuralState(input.condition.pillarCondition);
   const structuralPenalty = cleanAdjustedEstimate * Math.min(
-    0.30,
-    (airbagState === 'issue' ? 0.06 : 0)
-      + (chassisState === 'issue' ? 0.12 : 0)
-      + (pillarState === 'issue' ? 0.09 : 0),
+    0.46,
+    (airbagState === 'issue' ? 0.10 : 0)
+      + (chassisState === 'issue' ? 0.18 : 0)
+      + (pillarState === 'issue' ? 0.14 : 0),
   );
 
   const tramerRatio = cleanAdjustedEstimate > 0 ? input.condition.tramerAmount / cleanAdjustedEstimate : 0;
@@ -412,9 +412,9 @@ export async function estimateVehicleValue(
     cleanAdjustedEstimate * 0.18,
     (input.condition.tramerAmount * 0.45) + (cleanAdjustedEstimate * Math.min(0.08, tramerRatio * 0.08)),
   );
-  const severeDamagePenalty = input.condition.severeDamage ? cleanAdjustedEstimate * 0.08 : 0;
+  const severeDamagePenalty = input.condition.severeDamage ? cleanAdjustedEstimate * 0.15 : 0;
   const totalConditionPenalty = Math.min(
-    cleanAdjustedEstimate * 0.46,
+    cleanAdjustedEstimate * 0.62,
     conditionPenalty + structuralPenalty + tramerPenalty + severeDamagePenalty,
   );
 

@@ -70,6 +70,26 @@ const damaged = await estimateVehicleValue({
   },
 }, { skipMarketComps: true, skipModelCalibration: true });
 
+async function estimateCondition(overrides: Partial<ValuationEstimateInput['condition']>) {
+  return estimateVehicleValue({
+    ...baseInput,
+    condition: { ...baseInput.condition, ...overrides },
+  }, { skipMarketComps: true, skipModelCalibration: true, skipOpenAi: true });
+}
+
+const localPainted = await estimateCondition({
+  damageParts: [{ key: 'front-left-fender', label: 'Sol ön çamurluk', status: 'Lokal Boyali' }],
+});
+const painted = await estimateCondition({
+  damageParts: [{ key: 'front-left-fender', label: 'Sol ön çamurluk', status: 'Boyali' }],
+});
+const changed = await estimateCondition({
+  damageParts: [{ key: 'front-left-fender', label: 'Sol ön çamurluk', status: 'Degisen' }],
+});
+const airbagIssue = await estimateCondition({ airbagCondition: 'issue' });
+const chassisIssue = await estimateCondition({ chassisPodyeCondition: 'issue' });
+const pillarIssue = await estimateCondition({ pillarCondition: 'issue' });
+
 const lowMileageCorsa = await estimateVehicleValue({
   ...baseInput,
   vehicleInfo: {
@@ -101,9 +121,15 @@ assert.ok(newer.estimate > clean.estimate, 'Newer model year must increase the e
 assert.ok(clean.estimate > older.estimate, 'Older model year must decrease the estimate');
 assert.ok(lowMileage.estimate > highMileage.estimate, 'Lower mileage must increase the estimate');
 assert.ok(damaged.estimate < clean.estimate * 0.8, 'Structural damage must materially reduce the estimate');
+assert.ok(localPainted.estimate < clean.estimate, 'Local paint must reduce the estimate');
+assert.ok(painted.estimate < localPainted.estimate, 'Full paint must reduce value more than local paint');
+assert.ok(changed.estimate < painted.estimate, 'A replaced part must reduce value more than paint');
+assert.ok(airbagIssue.estimate <= clean.estimate * 0.91, 'Airbag work must materially reduce value');
+assert.ok(chassisIssue.estimate <= clean.estimate * 0.83, 'Chassis/podye work must strongly reduce value');
+assert.ok(pillarIssue.estimate <= clean.estimate * 0.87, 'Pillar work must strongly reduce value');
 assert.ok(lowMileageCorsa.estimate >= 850000 && lowMileageCorsa.estimate <= 900000, 'Low-mileage 2013 Opel Corsa benchmark must stay near the observed retail market');
 
-for (const result of [clean, newer, older, lowMileage, highMileage, damaged, lowMileageCorsa]) {
+for (const result of [clean, newer, older, lowMileage, highMileage, damaged, localPainted, painted, changed, airbagIssue, chassisIssue, pillarIssue, lowMileageCorsa]) {
   assert.ok(result.minimum <= result.estimate, 'Minimum must not exceed the estimate');
   assert.ok(result.maximum >= result.estimate, 'Maximum must not be below the estimate');
   assert.equal(result.estimate % 1000, 0, 'Displayed estimates must be rounded to 1,000 TL');
