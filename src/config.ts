@@ -40,4 +40,5 @@ export const env = {
 export const smsConfiguration = {
   configured: hasTwilioSmsCredentials,
   provider: env.SMS_PROVIDER,
+  senderType: parsedEnv.TWILIO_FROM_NUMBER?.startsWith('+') ? 'numeric' : 'alphanumeric',
 };

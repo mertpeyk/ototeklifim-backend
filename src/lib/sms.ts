@@ -41,9 +41,55 @@ function twilioFailureMessage(status: number, payload: unknown) {
     '21610': 'Müşteri SMS almayı reddetmiş.',
     '21614': 'Girilen numara SMS alabilen bir cep telefonu değil.',
     '21617': 'SMS metni sağlayıcı sınırını aşıyor.',
+    '30003': 'Müşteri telefonu ulaşılamıyor veya kapalı.',
+    '30005': 'Müşteri telefon numarası operatör tarafından tanınmadı.',
+    '30006': 'Girilen numara sabit hat olduğu için SMS alamıyor.',
+    '30007': 'SMS, operatör veya Twilio filtresine takıldı.',
+    '30008': 'Operatör SMS’i teslim edemedi.',
   };
 
   return `SMS sağlayıcısı hatası (${code}): ${knownMessages[code] || 'Gönderim kabul edilmedi.'}`;
+}
+
+const terminalFailureStatuses = new Set(['failed', 'undelivered', 'canceled']);
+
+async function getTwilioMessageStatus(messageSid: string) {
+  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN) return null;
+
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages/${messageSid}.json`,
+    {
+      headers: {
+        Authorization: `Basic ${Buffer.from(
+          `${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`,
+        ).toString('base64')}`,
+      },
+    },
+  );
+
+  if (!response.ok) return null;
+  return await response.json().catch(() => null) as Record<string, unknown> | null;
+}
+
+async function confirmTwilioAcceptance(messageSid: string, initialStatus: string) {
+  let status = initialStatus;
+  let latestPayload: Record<string, unknown> | null = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt > 0 || status === 'queued' || status === 'accepted') {
+      await new Promise((resolve) => setTimeout(resolve, 900));
+    }
+    latestPayload = await getTwilioMessageStatus(messageSid);
+    status = typeof latestPayload?.status === 'string' ? latestPayload.status : status;
+
+    if (terminalFailureStatuses.has(status)) {
+      const errorCode = latestPayload?.error_code;
+      throw new Error(twilioFailureMessage(400, { code: errorCode || status }));
+    }
+    if (status === 'delivered' || status === 'sent') break;
+  }
+
+  return status;
 }
 
 export async function sendSms({ message, phone }: SmsPayload): Promise<SmsSendResult> {
@@ -81,7 +127,10 @@ export async function sendSms({ message, phone }: SmsPayload): Promise<SmsSendRe
     }
 
     const providerMessageId = typeof responsePayload?.sid === 'string' ? responsePayload.sid : undefined;
-    const providerStatus = typeof responsePayload?.status === 'string' ? responsePayload.status : 'queued';
+    const initialStatus = typeof responsePayload?.status === 'string' ? responsePayload.status : 'queued';
+    const providerStatus = providerMessageId
+      ? await confirmTwilioAcceptance(providerMessageId, initialStatus)
+      : initialStatus;
 
     return {
       delivered: true,
