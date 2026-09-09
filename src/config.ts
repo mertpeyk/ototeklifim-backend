@@ -26,9 +26,11 @@ const parsedEnv = envSchema.parse(process.env);
 const normalizedBrandSender = parsedEnv.SMS_SENDER_ID
   .replace(/[^A-Za-z0-9]/g, '')
   .slice(0, 11);
-const twilioSmsSender = /[A-Za-z]/.test(normalizedBrandSender)
-  ? normalizedBrandSender
-  : 'OtoTeklifim';
+// Use the provisioned Twilio number by default. An unregistered alphanumeric
+// sender can be accepted by Twilio and then rejected by Turkish carriers with
+// error 30008. The numeric sender was the previously working production path.
+const twilioSmsSender = parsedEnv.TWILIO_FROM_NUMBER
+  || (/[A-Za-z]/.test(normalizedBrandSender) ? normalizedBrandSender : undefined);
 const hasTwilioSmsCredentials = Boolean(
   parsedEnv.TWILIO_ACCOUNT_SID &&
   parsedEnv.TWILIO_AUTH_TOKEN &&
