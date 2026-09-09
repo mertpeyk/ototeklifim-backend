@@ -9,6 +9,7 @@ const envSchema = z.object({
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_FROM_NUMBER: z.string().optional(),
+  TWILIO_VERIFY_SERVICE_SID: z.string().optional(),
   TWILIO_WHATSAPP_FROM_NUMBER: z.string().optional(),
   WHATSAPP_ALERT_PHONE: z.string().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
@@ -33,6 +34,11 @@ const hasTwilioSmsCredentials = Boolean(
   parsedEnv.TWILIO_AUTH_TOKEN &&
   twilioSmsSender,
 );
+const hasTwilioVerifyCredentials = Boolean(
+  parsedEnv.TWILIO_ACCOUNT_SID &&
+  parsedEnv.TWILIO_AUTH_TOKEN &&
+  parsedEnv.TWILIO_VERIFY_SERVICE_SID,
+);
 
 export const env = {
   ...parsedEnv,
@@ -48,4 +54,5 @@ export const smsConfiguration = {
   configured: hasTwilioSmsCredentials,
   provider: env.SMS_PROVIDER,
   senderType: twilioSmsSender?.startsWith('+') ? 'numeric' : 'alphanumeric',
+  twilioVerifyConfigured: hasTwilioVerifyCredentials,
 };

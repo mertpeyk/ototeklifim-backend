@@ -12,8 +12,14 @@ import {
 } from '../lib/auth.js';
 import { env } from '../config.js';
 import { sendSms } from '../lib/sms.js';
+import {
+  checkTwilioVerification,
+  isTwilioVerifyConfigured,
+  startTwilioVerification,
+} from '../lib/twilio-verify.js';
 
 const OTP_TTL_MINUTES = 2;
+const TWILIO_VERIFY_TTL_MINUTES = 10;
 const OTP_RESEND_COOLDOWN_MS = 60_000;
 const OTP_REQUEST_WINDOW_MS = 5 * 60_000;
 const OTP_MAX_REQUESTS_PER_WINDOW = 2;
@@ -185,8 +191,8 @@ function otpHash(code: string) {
   return hashToken(`otp:${code}`);
 }
 
-function expiresAtFromNow() {
-  return new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
+function expiresAtFromNow(minutes = OTP_TTL_MINUTES) {
+  return new Date(Date.now() + minutes * 60 * 1000);
 }
 
 function buildSmsMessage(code: string) {
@@ -291,11 +297,18 @@ async function createOtpChallenge(input: {
   }
 
   const code = generateOtpCode();
-  const smsMessage = buildSmsMessage(code);
-  const delivery = await sendSms({
-    phone: input.phone,
-    message: smsMessage,
-  });
+  let provider: 'log' | 'twilio' | 'twilio-verify';
+
+  if (isTwilioVerifyConfigured) {
+    await startTwilioVerification(input.phone);
+    provider = 'twilio-verify';
+  } else {
+    const delivery = await sendSms({
+      phone: input.phone,
+      message: buildSmsMessage(code),
+    });
+    provider = delivery.provider;
+  }
 
   const challenge = await prisma.authOtpChallenge.create({
     data: {
@@ -303,7 +316,9 @@ async function createOtpChallenge(input: {
       purpose: input.purpose,
       phone: input.phone,
       codeHash: otpHash(code),
-      expiresAt: expiresAtFromNow(),
+      expiresAt: expiresAtFromNow(
+        isTwilioVerifyConfigured ? TWILIO_VERIFY_TTL_MINUTES : OTP_TTL_MINUTES,
+      ),
       pendingRegistration: input.pendingRegistration,
       pendingPasswordHash: input.pendingPasswordHash,
     },
@@ -311,8 +326,8 @@ async function createOtpChallenge(input: {
 
   return {
     challenge,
-    code: env.SMS_PROVIDER === 'twilio' ? undefined : code,
-    provider: delivery.provider,
+    code: !isTwilioVerifyConfigured && env.SMS_PROVIDER === 'log' ? code : undefined,
+    provider,
   };
 }
 
@@ -343,7 +358,11 @@ async function verifyOtpChallenge(input: {
     throw new Error('Cok fazla hatali deneme yaptiniz');
   }
 
-  if (challenge.codeHash !== otpHash(input.code)) {
+  const isCodeValid = isTwilioVerifyConfigured
+    ? await checkTwilioVerification(challenge.phone, input.code)
+    : challenge.codeHash === otpHash(input.code);
+
+  if (!isCodeValid) {
     await prisma.authOtpChallenge.update({
       where: {
         id: challenge.id,
@@ -467,7 +486,7 @@ export async function authRoutes(app: FastifyInstance) {
       return {
         challengeId: challenge.id,
         phone: maskPhone(normalizedPhone),
-        expiresInSeconds: OTP_TTL_MINUTES * 60,
+        expiresInSeconds: (isTwilioVerifyConfigured ? TWILIO_VERIFY_TTL_MINUTES : OTP_TTL_MINUTES) * 60,
         debugCode: code,
       };
     } catch (error) {
@@ -596,7 +615,7 @@ export async function authRoutes(app: FastifyInstance) {
       return {
         challengeId: challenge.id,
         phone: maskPhone(normalizedPhone),
-        expiresInSeconds: OTP_TTL_MINUTES * 60,
+        expiresInSeconds: (isTwilioVerifyConfigured ? TWILIO_VERIFY_TTL_MINUTES : OTP_TTL_MINUTES) * 60,
         debugCode: code,
       };
     } catch (error) {
@@ -684,7 +703,7 @@ export async function authRoutes(app: FastifyInstance) {
       return {
         challengeId: challenge.id,
         phone: maskPhone(normalizedPhone),
-        expiresInSeconds: OTP_TTL_MINUTES * 60,
+        expiresInSeconds: (isTwilioVerifyConfigured ? TWILIO_VERIFY_TTL_MINUTES : OTP_TTL_MINUTES) * 60,
         debugCode: code,
       };
     } catch (error) {
