@@ -73,7 +73,7 @@ export async function sendFastSaleOfferSms(input: FastSaleOfferNotificationInput
       delivered: result.delivered,
       provider: result.provider,
       message: result.delivered
-        ? 'Teklif SMS’i müşterinin kayıtlı telefonuna gönderildi.'
+        ? 'Teklif SMS’i müşterinin kayıtlı telefonuna gönderim kuyruğuna alındı.'
         : 'Teklif kaydedildi; SMS sağlayıcısı log modunda olduğu için gerçek gönderim yapılmadı.',
     };
   } catch (error) {
@@ -84,7 +84,9 @@ export async function sendFastSaleOfferSms(input: FastSaleOfferNotificationInput
     return {
       delivered: false,
       provider: 'none',
-      message: 'Teklif kaydedildi ancak SMS gönderimi tamamlanamadı.',
+      message: error instanceof Error
+        ? `Teklif kaydedildi ancak ${error.message}`
+        : 'Teklif kaydedildi ancak SMS gönderimi tamamlanamadı.',
     };
   }
 }

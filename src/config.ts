@@ -4,7 +4,7 @@ import { z } from 'zod';
 const envSchema = z.object({
   DATABASE_URL: z.url(),
   PORT: z.coerce.number().default(3001),
-  SMS_PROVIDER: z.enum(['log', 'twilio']).default('log'),
+  SMS_PROVIDER: z.enum(['log', 'twilio']).optional(),
   SMS_SENDER_ID: z.string().default('OtoTeklifim'),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
@@ -21,4 +21,23 @@ const envSchema = z.object({
   ADMIN_DISTRICT: z.string().optional(),
 });
 
-export const env = envSchema.parse(process.env);
+const parsedEnv = envSchema.parse(process.env);
+const hasTwilioSmsCredentials = Boolean(
+  parsedEnv.TWILIO_ACCOUNT_SID &&
+  parsedEnv.TWILIO_AUTH_TOKEN &&
+  parsedEnv.TWILIO_FROM_NUMBER,
+);
+
+export const env = {
+  ...parsedEnv,
+  // Railway'de Twilio bilgileri mevcutken SMS_PROVIDER unutulursa sessizce
+  // log moduna düşmek gerçek SMS gönderimini engelliyordu.
+  SMS_PROVIDER: parsedEnv.SMS_PROVIDER === 'twilio' || hasTwilioSmsCredentials
+    ? 'twilio' as const
+    : 'log' as const,
+};
+
+export const smsConfiguration = {
+  configured: hasTwilioSmsCredentials,
+  provider: env.SMS_PROVIDER,
+};
