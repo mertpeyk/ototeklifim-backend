@@ -22,10 +22,12 @@ const envSchema = z.object({
 });
 
 const parsedEnv = envSchema.parse(process.env);
-const twilioSmsSender = /^[A-Za-z0-9 +\-&_.]{1,11}$/.test(parsedEnv.SMS_SENDER_ID)
-  && /[A-Za-z]/.test(parsedEnv.SMS_SENDER_ID)
-  ? parsedEnv.SMS_SENDER_ID
-  : parsedEnv.TWILIO_FROM_NUMBER;
+const normalizedBrandSender = parsedEnv.SMS_SENDER_ID
+  .replace(/[^A-Za-z0-9]/g, '')
+  .slice(0, 11);
+const twilioSmsSender = /[A-Za-z]/.test(normalizedBrandSender)
+  ? normalizedBrandSender
+  : 'OtoTeklifim';
 const hasTwilioSmsCredentials = Boolean(
   parsedEnv.TWILIO_ACCOUNT_SID &&
   parsedEnv.TWILIO_AUTH_TOKEN &&
