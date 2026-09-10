@@ -171,6 +171,11 @@ const userNoteSchema = z.object({
   note: z.string().min(1),
 });
 
+const userMessageSchema = z.object({
+  subject: z.string().trim().min(3).max(120),
+  message: z.string().trim().min(5).max(2000),
+});
+
 const dealerStatusSchema = z.object({
   status: z.enum(['Aktif', 'Askıda']),
 });
@@ -598,7 +603,7 @@ async function buildAdminRepository() {
     fastSaleCount: user.fastSaleRequests.length,
     acceptedOffers: 0,
     rejectedOffers: 0,
-    status: 'Aktif',
+    status: user.isSuspended ? 'Askıda' : 'Aktif',
     adminNotes: notesByUser.get(user.id) ?? [],
   }));
 
@@ -1786,17 +1791,97 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
     const payload = userStatusSchema.parse(request.body);
+    if (params.id === admin.id) {
+      reply.code(403);
+      return { message: 'Kendi admin hesabınızı askıya alamazsınız.' };
+    }
+
+    const target = await prisma.user.findUnique({
+      where: { id: params.id },
+      select: { id: true, fullName: true, accountType: true, isSuspended: true },
+    });
+
+    if (!target) {
+      reply.code(404);
+      return { message: 'Kullanıcı bulunamadı.' };
+    }
+
+    if (target.accountType === 'ADMIN') {
+      reply.code(403);
+      return { message: 'Admin hesapları kullanıcı ekranından askıya alınamaz.' };
+    }
+
+    const shouldSuspend = payload.status === 'Askıda';
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: target.id },
+        data: {
+          isSuspended: shouldSuspend,
+          suspendedAt: shouldSuspend ? new Date() : null,
+        },
+      });
+
+      if (shouldSuspend) {
+        await tx.authSession.updateMany({
+          where: { userId: target.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+    });
     await appendActivityLog({
       adminId: admin.id,
       adminName: admin.fullName,
       action: 'USER_STATUS',
       module: 'Kullanıcı',
       recordId: params.id,
-      previousValue: '',
+      previousValue: target.isSuspended ? 'Askıda' : 'Aktif',
       newValue: payload.status,
       description: `${params.id} kullanıcısı ${payload.status} durumuna alındı.`,
     });
     return { ok: true };
+  });
+
+  app.post('/admin/users/:id/messages', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const params = z.object({ id: z.string().min(1) }).parse(request.params);
+    const payload = userMessageSchema.parse(request.body);
+    const target = await prisma.user.findUnique({
+      where: { id: params.id },
+      select: { id: true, fullName: true, accountType: true },
+    });
+
+    if (!target || target.accountType === 'ADMIN') {
+      reply.code(404);
+      return { message: 'Kullanıcı bulunamadı.' };
+    }
+
+    const notification = await prisma.adminNotification.create({
+      data: {
+        title: payload.subject,
+        body: payload.message,
+        target: `USER:${target.id}`,
+        delivery: 'Gönderildi',
+        channels: ['IN_APP'],
+      },
+    });
+
+    await appendActivityLog({
+      adminId: admin.id,
+      adminName: admin.fullName,
+      action: 'USER_MESSAGE_SEND',
+      module: 'Kullanıcı',
+      recordId: target.id,
+      previousValue: '',
+      newValue: payload.subject,
+      description: `${target.fullName} kullanıcısına uygulama içi mesaj gönderildi.`,
+    });
+
+    reply.code(201);
+    return notification;
   });
 
   app.post('/admin/users/:id/notes', async (request, reply) => {

@@ -576,6 +576,14 @@ export async function authRoutes(app: FastifyInstance) {
       return { message: 'E-posta veya sifre hatali' };
     }
 
+    if (user.isSuspended) {
+      reply.code(403);
+      return {
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'Hesabınız askıya alınmıştır. Lütfen bizimle iletişime geçin.',
+      };
+    }
+
     const token = await createSession(user.id);
 
     return {
@@ -772,5 +780,30 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     return { user: authUser };
+  });
+
+  app.get('/auth/me/notifications', async (request, reply) => {
+    const authUser = await requireAuth(request, reply);
+
+    if (!authUser) {
+      return;
+    }
+
+    const notifications = await prisma.adminNotification.findMany({
+      where: {
+        target: `USER:${authUser.id}`,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    return notifications.map((notification) => ({
+      id: notification.id,
+      title: notification.title,
+      description: notification.body,
+      category: 'sistem',
+      createdAt: notification.createdAt.toISOString(),
+      href: '/bildirimler',
+    }));
   });
 }

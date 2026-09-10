@@ -15,6 +15,7 @@ export type AuthUser = {
   phone?: string | null;
   city?: string | null;
   district?: string | null;
+  isSuspended: boolean;
 };
 
 export function hashPassword(password: string) {
@@ -99,6 +100,7 @@ export async function resolveAuthUser(request: FastifyRequest) {
     phone: session.user.phone,
     city: session.user.city,
     district: session.user.district,
+    isSuspended: session.user.isSuspended,
   } satisfies AuthUser;
 }
 
@@ -108,6 +110,14 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
   if (!user) {
     reply.code(401);
     return reply.send({ message: 'Unauthorized' });
+  }
+
+  if (user.isSuspended) {
+    reply.code(403);
+    return reply.send({
+      code: 'ACCOUNT_SUSPENDED',
+      message: 'Hesabınız askıya alınmıştır. Lütfen bizimle iletişime geçin.',
+    });
   }
 
   request.authUser = user;
