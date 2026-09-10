@@ -1,3 +1,6 @@
+import { existsSync, unlinkSync } from 'node:fs';
+import path from 'node:path';
+
 import type { FastifyInstance } from 'fastify';
 import { AccountType, AuthOtpPurpose, Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -122,6 +125,10 @@ const changePasswordRequestSchema = z
     message: 'Yeni sifre mevcut sifre ile ayni olamaz',
     path: ['newPassword'],
   });
+
+const deleteAccountSchema = z.object({
+  password: z.string().min(6),
+});
 
 type PendingRegistrationPayload = {
   accountType: AccountType;
@@ -780,6 +787,97 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     return { user: authUser };
+  });
+
+  app.delete('/auth/me', async (request, reply) => {
+    const authUser = await requireAuth(request, reply);
+
+    if (!authUser) {
+      return;
+    }
+
+    if (authUser.accountType === AccountType.ADMIN) {
+      reply.code(403);
+      return { message: 'Admin hesapları bu alandan silinemez.' };
+    }
+
+    const payload = deleteAccountSchema.parse(request.body);
+    const user = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: {
+        id: true,
+        passwordHash: true,
+        listings: { select: { images: { select: { imageUrl: true } } } },
+        consignmentRequests: { select: { photos: { select: { imageUrl: true } } } },
+        fastSaleRequests: { select: { photos: true } },
+      },
+    });
+
+    if (!user || !verifyPassword(payload.password, user.passwordHash)) {
+      reply.code(400);
+      return { message: 'Mevcut şifreniz hatalı.' };
+    }
+
+    const uploadFilenames = new Set<string>();
+    const collectUploadFilename = (rawUrl: unknown) => {
+      const match = String(rawUrl || '').match(/\/uploads\/([^/?#]+)/i);
+      if (!match?.[1]) return;
+      const filename = decodeURIComponent(match[1]);
+      if (/^[a-zA-Z0-9._-]+$/.test(filename) && filename !== '.' && filename !== '..') {
+        uploadFilenames.add(filename);
+      }
+    };
+    const collectFastSalePhotos = (rawPhotos: unknown) => {
+      const photos = Array.isArray(rawPhotos)
+        ? rawPhotos
+        : typeof rawPhotos === 'string'
+          ? (() => {
+              try {
+                const parsed = JSON.parse(rawPhotos) as unknown;
+                return Array.isArray(parsed) ? parsed : [];
+              } catch {
+                return [];
+              }
+            })()
+          : [];
+
+      photos.forEach((photo) => {
+        if (typeof photo === 'string') {
+          collectUploadFilename(photo);
+        } else if (photo && typeof photo === 'object') {
+          const record = photo as Record<string, unknown>;
+          collectUploadFilename(record.url ?? record.imageUrl);
+        }
+      });
+    };
+
+    user.listings.forEach((listing) => listing.images.forEach((image) => collectUploadFilename(image.imageUrl)));
+    user.consignmentRequests.forEach((consignment) => consignment.photos.forEach((photo) => collectUploadFilename(photo.imageUrl)));
+    user.fastSaleRequests.forEach((fastSale) => collectFastSalePhotos(fastSale.photos));
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.adminNotification.deleteMany({ where: { target: `USER:${user.id}` } });
+      await transaction.user.delete({ where: { id: user.id } });
+      if (uploadFilenames.size) {
+        await transaction.uploadedImage.deleteMany({
+          where: { filename: { in: Array.from(uploadFilenames) } },
+        });
+      }
+    });
+
+    const uploadDirectory = path.resolve(process.cwd(), 'uploads');
+    uploadFilenames.forEach((filename) => {
+      const localPath = path.join(uploadDirectory, filename);
+      if (path.dirname(localPath) === uploadDirectory && existsSync(localPath)) {
+        try {
+          unlinkSync(localPath);
+        } catch {
+          // Database deletion is authoritative; orphan cleanup can retry later.
+        }
+      }
+    });
+
+    return { ok: true, message: 'Hesabınız ve ilişkili verileriniz silindi.' };
   });
 
   app.get('/auth/me/notifications', async (request, reply) => {
