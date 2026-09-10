@@ -12,6 +12,13 @@ export type SmsSendResult = {
   providerStatus?: string;
 };
 
+export type SmsFinalStatus = {
+  delivered: boolean;
+  failed: boolean;
+  status: string;
+  error?: string;
+};
+
 function normalizeTurkishMobilePhone(phone: string) {
   const digits = String(phone || '').replace(/\D/g, '');
   const normalized = digits.startsWith('90') && digits.length === 12
@@ -69,6 +76,35 @@ async function getTwilioMessageStatus(messageSid: string) {
 
   if (!response.ok) return null;
   return await response.json().catch(() => null) as Record<string, unknown> | null;
+}
+
+export async function waitForSmsFinalStatus(
+  messageSid: string,
+  initialStatus = 'sent',
+): Promise<SmsFinalStatus> {
+  let status = initialStatus;
+
+  for (let attempt = 0; attempt < 18; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
+    const payload = await getTwilioMessageStatus(messageSid);
+    status = typeof payload?.status === 'string' ? payload.status : status;
+
+    if (status === 'delivered') {
+      return { delivered: true, failed: false, status };
+    }
+
+    if (terminalFailureStatuses.has(status)) {
+      const errorCode = payload?.error_code;
+      return {
+        delivered: false,
+        failed: true,
+        status,
+        error: twilioFailureMessage(400, { code: errorCode || status }),
+      };
+    }
+  }
+
+  return { delivered: false, failed: false, status };
 }
 
 async function confirmTwilioAcceptance(messageSid: string, initialStatus: string) {
@@ -133,7 +169,7 @@ export async function sendSms({ message, phone }: SmsPayload): Promise<SmsSendRe
       : initialStatus;
 
     return {
-      delivered: true,
+      delivered: providerStatus === 'delivered',
       provider: 'twilio',
       providerMessageId,
       providerStatus,

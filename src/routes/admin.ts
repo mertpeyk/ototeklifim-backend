@@ -23,7 +23,7 @@ import {
   upsertValuationModelMultiplier,
 } from '../lib/valuation-calibration.js';
 import { sendFastSaleOfferSms } from '../lib/fast-sale-offer-notification.js';
-import { sendSms } from '../lib/sms.js';
+import { sendSms, waitForSmsFinalStatus } from '../lib/sms.js';
 
 const adminPermissions = [
   'listings.view',
@@ -1899,6 +1899,23 @@ export async function adminRoutes(app: FastifyInstance) {
             channels: ['IN_APP', 'SMS'],
           },
         });
+
+        if (result.providerMessageId && result.providerStatus !== 'delivered') {
+          void waitForSmsFinalStatus(result.providerMessageId, result.providerStatus)
+            .then(async (finalStatus) => {
+              await prisma.adminNotification.update({
+                where: { id: notification.id },
+                data: {
+                  delivery: finalStatus.delivered
+                    ? 'SMS teslim edildi'
+                    : finalStatus.failed
+                      ? `SMS teslim edilemedi: ${finalStatus.error || finalStatus.status}`
+                      : 'SMS gönderildi, teslim raporu bekleniyor',
+                },
+              });
+            })
+            .catch(() => undefined);
+        }
       } catch (error) {
         smsDelivery.error = error instanceof Error ? error.message : 'SMS gönderilemedi.';
         await prisma.adminNotification.update({
