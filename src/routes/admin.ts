@@ -23,6 +23,7 @@ import {
   upsertValuationModelMultiplier,
 } from '../lib/valuation-calibration.js';
 import { sendFastSaleOfferSms } from '../lib/fast-sale-offer-notification.js';
+import { sendSms } from '../lib/sms.js';
 
 const adminPermissions = [
   'listings.view',
@@ -173,7 +174,8 @@ const userNoteSchema = z.object({
 
 const userMessageSchema = z.object({
   subject: z.string().trim().min(3).max(120),
-  message: z.string().trim().min(5).max(2000),
+  message: z.string().trim().min(5).max(500),
+  sendSms: z.boolean().default(true),
 });
 
 const dealerStatusSchema = z.object({
@@ -1851,7 +1853,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const payload = userMessageSchema.parse(request.body);
     const target = await prisma.user.findUnique({
       where: { id: params.id },
-      select: { id: true, fullName: true, accountType: true },
+      select: { id: true, fullName: true, phone: true, accountType: true },
     });
 
     if (!target || target.accountType === 'ADMIN') {
@@ -1869,6 +1871,43 @@ export async function adminRoutes(app: FastifyInstance) {
       },
     });
 
+    let smsDelivery: {
+      requested: boolean;
+      delivered: boolean;
+      status?: string;
+      error?: string;
+    } = { requested: false, delivered: false };
+
+    if (payload.sendSms) {
+      smsDelivery = { requested: true, delivered: false };
+      try {
+        if (!target.phone) {
+          throw new Error('Kullanıcının kayıtlı telefon numarası bulunamadı.');
+        }
+        const smsText = `OtoTeklifim - ${payload.subject}: ${payload.message}`;
+        const result = await sendSms({ phone: target.phone, message: smsText });
+        smsDelivery = {
+          requested: true,
+          delivered: result.delivered,
+          status: result.providerStatus,
+        };
+
+        await prisma.adminNotification.update({
+          where: { id: notification.id },
+          data: {
+            delivery: result.providerStatus === 'delivered' ? 'SMS teslim edildi' : 'SMS operatöre iletildi',
+            channels: ['IN_APP', 'SMS'],
+          },
+        });
+      } catch (error) {
+        smsDelivery.error = error instanceof Error ? error.message : 'SMS gönderilemedi.';
+        await prisma.adminNotification.update({
+          where: { id: notification.id },
+          data: { delivery: 'Uygulama içi gönderildi, SMS başarısız' },
+        });
+      }
+    }
+
     await appendActivityLog({
       adminId: admin.id,
       adminName: admin.fullName,
@@ -1877,11 +1916,11 @@ export async function adminRoutes(app: FastifyInstance) {
       recordId: target.id,
       previousValue: '',
       newValue: payload.subject,
-      description: `${target.fullName} kullanıcısına uygulama içi mesaj gönderildi.`,
+      description: `${target.fullName} kullanıcısına uygulama içi mesaj${payload.sendSms ? ' ve SMS' : ''} gönderildi.`,
     });
 
     reply.code(201);
-    return notification;
+    return { notification, smsDelivery };
   });
 
   app.post('/admin/users/:id/notes', async (request, reply) => {
