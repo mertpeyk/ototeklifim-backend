@@ -82,17 +82,36 @@ function normalizeStructuralState(value: string | undefined): StructuralState {
 }
 
 function parseEngineScore(engineValue: string, enginePower: string) {
-  const normalized = `${engineValue || ''} ${enginePower || ''}`.replace(',', '.').toLocaleLowerCase('tr-TR');
+  const normalized = `${engineValue || ''} ${enginePower || ''}`
+    .replace(/,/g, '.')
+    .toLocaleLowerCase('tr-TR');
   if (!normalized.trim()) return 0;
 
-  const literMatch = normalized.match(/(\d+(?:\.\d+)?)/);
-  const powerMatch = normalized.match(/(\d{2,3})\s*(hp|bg|ps|kw)/);
-  const literBoost = literMatch ? Math.max(-45000, (Number(literMatch[1]) - 1.2) * 90000) : 0;
-  const powerBoost = powerMatch ? Math.max(-25000, (Number(powerMatch[1]) - 100) * 900) : 0;
-  const turboBoost = normalized.includes('turbo') || normalized.includes('tsi') || normalized.includes('ecoboost') || normalized.includes('tce') ? 18000 : 0;
-  const premiumEngineBoost = normalized.includes('tdi') || normalized.includes('tsi') || normalized.includes('hybrid') || normalized.includes('hibrit') ? 12000 : 0;
+  const decimalDisplacement = normalized.match(/\b([0-8](?:\.\d{1,2}))\b/);
+  const ccDisplacement = normalized.match(/\b([6-8]\d{2}|[1-7]\d{3})\s*(?:cc|cm3|cm³)?\b/);
+  const displacement = decimalDisplacement
+    ? Number(decimalDisplacement[1])
+    : ccDisplacement
+      ? Number(ccDisplacement[1]) / 1000
+      : null;
 
-  if (normalized.includes('electric') || normalized.includes('elektrik') || normalized.includes('ev')) {
+  const explicitPower = normalized.match(/\b(\d{2,3})\s*(hp|bg|ps|kw)\b/);
+  const trailingPower = explicitPower ? null : normalized.match(/(?:^|\s)(\d{2,3})\s*$/);
+  const rawPower = explicitPower ? Number(explicitPower[1]) : trailingPower ? Number(trailingPower[1]) : null;
+  const power = rawPower && explicitPower?.[2] === 'kw' ? rawPower * 1.341 : rawPower;
+
+  const literBoost = displacement === null
+    ? 0
+    : Math.max(-45000, Math.min(420000, (displacement - 1.2) * 90000));
+  const powerBoost = power === null
+    ? 0
+    : Math.max(-25000, Math.min(240000, (power - 100) * 900));
+  const turboBoost = ['turbo', 'tsi', 'tfsi', 'ecoboost', 'tce', 'puretech', 'multiair', 'kompressor']
+    .some((token) => normalized.includes(token)) ? 18000 : 0;
+  const premiumEngineBoost = ['tdi', 'tsi', 'dci', 'hdi', 'crdi', 'cdti', 'multijet', 'hybrid', 'hibrit']
+    .some((token) => normalized.includes(token)) ? 12000 : 0;
+
+  if (normalized.includes('electric') || normalized.includes('elektrik') || /\bev\b/.test(normalized)) {
     return literBoost + powerBoost + 120000;
   }
 
@@ -128,6 +147,7 @@ function getMileageAdjustment(year: number, km: number, ageAdjustedBase: number)
 function getPackageTierBoost(packageName: string, brand: string, model: string) {
   const normalized = normalizeText(packageName);
   if (!normalized) return 0;
+  if (normalized === 'diger' || normalized.includes('listede yok') || normalized.includes('belirtilmedi')) return 0;
 
   const premiumKeywords = ['premium', 'prestige', 'executive', 'exclusive', 'elite', 'design', 'excellence', 'flagship', 'autobiography', 'platinum', 'quattro', 'x pack', 'highline', 'advance', 'luxury', 'summit'];
   const sportKeywords = ['m sport', 'amg', 's line', 'gt line', 'fr', 'r line', 'black edition', 'veloce', 'f sport', 'gts', 'rs', 'sportback', 'track'];
@@ -422,6 +442,9 @@ export async function estimateVehicleValue(
     125000,
     cleanAdjustedEstimate - totalConditionPenalty,
   );
+  const conditionMultiplier = cleanAdjustedEstimate > 0
+    ? Math.max(0.38, Math.min(1, heuristicEstimate / cleanAdjustedEstimate))
+    : 1;
 
   const severityScore =
     (input.vehicleInfo.mileage > 120000 ? 1 : 0)
@@ -469,8 +492,8 @@ export async function estimateVehicleValue(
   const marketCompFallbackUsed = Boolean(marketComps?.fallbackUsed);
 
   let estimate = heuristicEstimate;
-  let minimum = heuristicEstimate * (demand === 'Yüksek' ? 0.965 : 0.955);
-  let maximum = heuristicEstimate * (demand === 'Yüksek' ? 1.055 : 1.045);
+  let minimum = heuristicEstimate * (demand === 'Yüksek' ? 0.92 : 0.90);
+  let maximum = heuristicEstimate * (demand === 'Yüksek' ? 1.08 : 1.10);
   let usedAgentMarketEstimate = false;
 
   if (effectiveMarketStats) {
@@ -498,10 +521,10 @@ export async function estimateVehicleValue(
     const strongMarketEvidence = sampleSize >= 5 && intelligence.averageSimilarity >= 72 && !marketCompFallbackUsed;
     const maximumAnchorDrift = strongMarketEvidence ? 0.34 : 0.20;
     const marketAnchor = Math.round(Math.max(
-      heuristicEstimate * (1 - maximumAnchorDrift),
-      Math.min(heuristicEstimate * (1 + maximumAnchorDrift), marketAnchorBase),
+      cleanAdjustedEstimate * (1 - maximumAnchorDrift),
+      Math.min(cleanAdjustedEstimate * (1 + maximumAnchorDrift), marketAnchorBase),
     ));
-    estimate = Math.round((marketAnchor * confidence) + (heuristicEstimate * (1 - confidence)));
+    estimate = Math.round((marketAnchor * confidence) + (cleanAdjustedEstimate * (1 - confidence)));
     minimum = Math.round((lowerBand * 0.88) + (estimate * 0.12));
     maximum = Math.round((upperBand * 0.88) + (estimate * 0.12));
   }
@@ -512,17 +535,23 @@ export async function estimateVehicleValue(
     const expectedMileage = Math.min(240000, Math.max(5000, vehicleAge * 14500));
     const hasExceptionalLowMileage = vehicleAge >= 8 && input.vehicleInfo.mileage <= expectedMileage * 0.55;
     const normalizedAgentEstimate = hasExceptionalLowMileage
-      ? Math.max(heuristicEstimate, intelligence.marketEstimate)
+      ? Math.max(cleanAdjustedEstimate, intelligence.marketEstimate)
       : intelligence.marketEstimate;
     const agentAnchor = Math.max(
-      heuristicEstimate * 0.55,
-      Math.min(heuristicEstimate * 2.2, normalizedAgentEstimate),
+      cleanAdjustedEstimate * 0.55,
+      Math.min(cleanAdjustedEstimate * 2.2, normalizedAgentEstimate),
     );
-    estimate = Math.round((agentAnchor * 0.82) + (heuristicEstimate * 0.18));
+    estimate = Math.round((agentAnchor * 0.82) + (cleanAdjustedEstimate * 0.18));
     const agentMinimum = intelligence.marketMinimum || agentAnchor * 0.95;
     const agentMaximum = intelligence.marketMaximum || agentAnchor * 1.05;
     minimum = Math.round((agentMinimum * 0.82) + (estimate * 0.18));
     maximum = Math.round((agentMaximum * 0.82) + (estimate * 0.18));
+  }
+
+  if (effectiveMarketStats || usedAgentMarketEstimate) {
+    estimate = Math.round(estimate * conditionMultiplier);
+    minimum = Math.round(minimum * conditionMultiplier);
+    maximum = Math.round(maximum * conditionMultiplier);
   }
 
   const modelCalibrationPercent = options.skipModelCalibration
@@ -547,10 +576,13 @@ export async function estimateVehicleValue(
   const hasAiFallbackDecision =
     intelligence.provider !== 'deterministic'
     || (intelligence.aiEnabled && Boolean(intelligence.explanation?.trim()));
+  const hasUnverifiedPackage = normalizeText(input.vehicleInfo.packageName).includes('listede yok');
+  const hasUnverifiedEngine = normalizeText(input.vehicleInfo.engineVolume).includes('listede yok');
+  const catalogUncertaintyPenalty = (hasUnverifiedPackage ? 5 : 0) + (hasUnverifiedEngine ? 7 : 0);
 
   const positives = [
     input.vehicleInfo.mileage && input.vehicleInfo.mileage < 50000 ? `Düşük kilometre (${new Intl.NumberFormat('tr-TR').format(input.vehicleInfo.mileage)} KM)` : null,
-    input.vehicleInfo.packageName ? `${input.vehicleInfo.packageName} donanım seviyesi` : null,
+    input.vehicleInfo.packageName && !hasUnverifiedPackage ? `${input.vehicleInfo.packageName} donanım seviyesi` : null,
     input.serviceHistory ? 'Yetkili/Belgeli bakım geçmişi' : null,
     input.vehicleInfo.transmission === 'Otomatik' ? 'Otomatik vites talebi destekliyor' : null,
     effectiveMarketSampleSize ? `${effectiveMarketSampleSize} emsal ilan ile piyasa doğrulaması yapıldı` : null,
@@ -575,6 +607,8 @@ export async function estimateVehicleValue(
     intelligence.adjustmentPercent < 0 ? `AI fiyat düzeltmesi %${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(intelligence.adjustmentPercent)} uygulandı` : null,
     intelligence.parsedSignals.negatives[0] || null,
     intelligence.parsedSignals.riskFlags[0] || null,
+    hasUnverifiedPackage ? 'Paket listede bulunamadığı için fiyat aralığı daha temkinli hesaplandı' : null,
+    hasUnverifiedEngine ? 'Motor listede bulunamadığı için uzman kontrolü önerilir' : null,
   ].filter(Boolean) as string[];
 
   const marketCompSampleSize = effectiveMarketSampleSize;
@@ -593,6 +627,7 @@ export async function estimateVehicleValue(
 
   return {
     normalizedVehicleInfo: input.vehicleInfo,
+    conditionMultiplier: Number(conditionMultiplier.toFixed(4)),
     estimate: toRoundedCurrency(estimate),
     minimum: toRoundedCurrency(minimum),
     maximum: toRoundedCurrency(maximum),
@@ -610,10 +645,10 @@ export async function estimateVehicleValue(
     unavailableReason: '',
     intelligence,
     confidenceScore: marketCompSampleSize
-      ? Math.min(96, 54 + (marketCompSampleSize * 3) - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 8))
+      ? Math.max(32, Math.min(96, 54 + (marketCompSampleSize * 3) - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 8) - catalogUncertaintyPenalty))
       : hasAiFallbackDecision
-        ? Math.max(52, 60 - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 10))
-        : Math.max(32, 48 - (severityScore * 2)),
+        ? Math.max(36, 60 - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 10) - catalogUncertaintyPenalty)
+        : Math.max(28, 48 - (severityScore * 2) - catalogUncertaintyPenalty),
     marketComps: effectiveMarketStats
       ? {
         source: marketCompSource,
