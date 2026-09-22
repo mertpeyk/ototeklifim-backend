@@ -32,6 +32,10 @@ export const valuationConditionSchema = z.object({
   mechanicalStatus: z.string().min(1).default('Bilgi paylasilmadi'),
   maintenanceHistory: z.string().min(1).default('Bilgi paylasilmadi'),
   appraisalReport: z.string().optional().default(''),
+  tireCondition: z.enum(['Belirtilmedi', 'Yeni', 'İyi', 'Orta', 'Zayıf']).optional(),
+  inspectionDate: z.string().optional(),
+  ownerCount: z.number().int().min(0).max(30).optional(),
+  documentedService: z.boolean().optional(),
   airbagCondition: structuralConditionSchema.optional().default('Belirtilmedi'),
   chassisPodyeCondition: structuralConditionSchema.optional().default('Belirtilmedi'),
   pillarCondition: structuralConditionSchema.optional().default('Belirtilmedi'),
@@ -402,10 +406,16 @@ export async function estimateVehicleValue(
   const mileageAdjustment = getMileageAdjustment(input.vehicleInfo.year, input.vehicleInfo.mileage, ageAdjustedBase);
   const regionalBoost = getRegionalAdjustment(input.vehicleInfo.city, input.vehicleInfo.district || '', ageAdjustedBase, input.vehicleInfo.bodyType, input.vehicleInfo.brand);
   const maintenanceBoost = input.serviceHistory ? 25000 : input.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('mevcut') ? 18000 : -20000;
+  const documentedServiceBoost = input.condition.documentedService ? 18000 : 0;
+  const tirePenalty = input.condition.tireCondition === 'Zayıf' ? cleanVehicleBase * 0.018
+    : input.condition.tireCondition === 'Orta' ? cleanVehicleBase * 0.006
+      : 0;
+  const ownerCount = input.condition.ownerCount || 0;
+  const ownerPenalty = ownerCount > 3 ? cleanVehicleBase * 0.012 : ownerCount === 3 ? cleanVehicleBase * 0.006 : 0;
   const extraKeyBoost = input.extraKey ? 10000 : -8000;
   const cleanAdjustedEstimate = Math.max(
     125000,
-    ageAdjustedBase + mileageAdjustment + regionalBoost + maintenanceBoost + extraKeyBoost,
+    ageAdjustedBase + mileageAdjustment + regionalBoost + maintenanceBoost + documentedServiceBoost + extraKeyBoost - tirePenalty - ownerPenalty,
   );
 
   const damageParts = input.condition.damageParts || [];
@@ -600,6 +610,7 @@ export async function estimateVehicleValue(
     intelligence.adjustmentPercent > 0 ? `AI fiyat düzeltmesi +%${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(intelligence.adjustmentPercent)} uygulandı` : null,
     intelligence.averageSimilarity ? `AI benzerlik skoru ortalama ${intelligence.averageSimilarity}/100` : null,
     intelligence.parsedSignals.positives[0] || null,
+    input.condition.documentedService ? 'Belgeli bakım geçmişi' : null,
   ].filter(Boolean) as string[];
 
   const negatives = [
@@ -613,6 +624,8 @@ export async function estimateVehicleValue(
     intelligence.adjustmentPercent < 0 ? `AI fiyat düzeltmesi %${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(intelligence.adjustmentPercent)} uygulandı` : null,
     intelligence.parsedSignals.negatives[0] || null,
     intelligence.parsedSignals.riskFlags[0] || null,
+    input.condition.tireCondition === 'Zayıf' ? 'Lastik yenileme maliyeti fiyatı aşağı çekiyor' : null,
+    ownerCount > 3 ? `${ownerCount} sahip bilgisi likiditeyi azaltıyor` : null,
     hasUnverifiedPackage ? 'Paket listede bulunamadığı için fiyat aralığı daha temkinli hesaplandı' : null,
     hasUnverifiedEngine ? 'Motor listede bulunamadığı için uzman kontrolü önerilir' : null,
   ].filter(Boolean) as string[];
