@@ -427,11 +427,19 @@ function scoreAdvertRelevance(advert: ParsedListing, query: MarketCompsQuery) {
 }
 
 function isYearKmCompatible(advert: ParsedListing, query: MarketCompsQuery) {
-  if (advert.year && query.year && Math.abs(advert.year - query.year) > 2) {
+  const hasExactVariantInputs = Boolean(
+    String(query.packageName || '').trim()
+    || String(query.engine || '').trim()
+    || String(query.fuelType || '').trim(),
+  );
+  const maxYearGap = hasExactVariantInputs ? 1 : 2;
+  const maxKmGap = hasExactVariantInputs ? 60000 : 80000;
+
+  if (advert.year && query.year && Math.abs(advert.year - query.year) > maxYearGap) {
     return false;
   }
 
-  if (advert.approxKm && query.km && Math.abs(advert.approxKm - query.km) > 80000) {
+  if (advert.approxKm && query.km && Math.abs(advert.approxKm - query.km) > maxKmGap) {
     return false;
   }
 
@@ -489,13 +497,17 @@ export function normalizeComparablePriceForTarget(input: {
 
 function buildComparableListing(advert: ParsedListing, query: MarketCompsQuery) {
   const relevanceScore = scoreAdvertRelevance(advert, query);
-  const adjustedPrice = normalizeComparablePriceForTarget({
+  const normalizedPrice = normalizeComparablePriceForTarget({
     advertPrice: advert.price,
     advertYear: advert.year,
     advertKm: advert.approxKm,
     targetYear: query.year,
     targetKm: query.km,
   });
+  // Advertised prices generally include negotiation room. Apply this only
+  // to market-comparison values, keeping the public normalization helper
+  // mathematically transparent and regression-testable.
+  const adjustedPrice = normalizedPrice * (advert.source === 'sahibinden' ? 0.94 : 0.96);
 
   let comparisonWeight = Math.max(0.35, 1 + (relevanceScore / 8));
   if (advert.year) comparisonWeight += 0.2;

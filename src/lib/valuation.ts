@@ -572,14 +572,20 @@ export async function estimateVehicleValue(
   const galleryValue = estimate * galleryMultiplier;
   const quickValue = estimate * quickMultiplier;
   const privateBand = estimate * 1.028;
-  const saleWindow = severityScore >= 4 ? '28 - 45 Gün' : demand === 'Yüksek' ? '14 - 28 Gün' : '18 - 34 Gün';
+  const marketCompSampleSize = effectiveMarketSampleSize;
   const hasAiFallbackDecision =
     intelligence.provider !== 'deterministic'
     || (intelligence.aiEnabled && Boolean(intelligence.explanation?.trim()));
   const hasUnverifiedPackage = normalizeText(input.vehicleInfo.packageName).includes('listede yok');
   const hasUnverifiedEngine = normalizeText(input.vehicleInfo.engineVolume).includes('listede yok');
   const catalogUncertaintyPenalty = (hasUnverifiedPackage ? 5 : 0) + (hasUnverifiedEngine ? 7 : 0);
-
+  const confidenceScore = marketCompSampleSize
+    ? Math.max(32, Math.min(96, 54 + (marketCompSampleSize * 3) - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 8) - catalogUncertaintyPenalty))
+    : hasAiFallbackDecision
+      ? Math.max(36, 60 - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 10) - catalogUncertaintyPenalty)
+      : Math.max(28, 48 - (severityScore * 2) - catalogUncertaintyPenalty);
+  const confidenceLabel = confidenceScore >= 80 ? 'Yüksek' : confidenceScore >= 60 ? 'Orta' : 'Düşük';
+  const saleWindow = severityScore >= 4 ? '28 - 45 Gün' : demand === 'Yüksek' ? '14 - 28 Gün' : '18 - 34 Gün';
   const positives = [
     input.vehicleInfo.mileage && input.vehicleInfo.mileage < 50000 ? `Düşük kilometre (${new Intl.NumberFormat('tr-TR').format(input.vehicleInfo.mileage)} KM)` : null,
     input.vehicleInfo.packageName && !hasUnverifiedPackage ? `${input.vehicleInfo.packageName} donanım seviyesi` : null,
@@ -611,7 +617,6 @@ export async function estimateVehicleValue(
     hasUnverifiedEngine ? 'Motor listede bulunamadığı için uzman kontrolü önerilir' : null,
   ].filter(Boolean) as string[];
 
-  const marketCompSampleSize = effectiveMarketSampleSize;
   const pricingWarnings = [
     marketCompSampleSize < MIN_REQUIRED_MARKET_COMPS
       ? (
@@ -644,11 +649,19 @@ export async function estimateVehicleValue(
     pricingReady: true,
     unavailableReason: '',
     intelligence,
-    confidenceScore: marketCompSampleSize
-      ? Math.max(32, Math.min(96, 54 + (marketCompSampleSize * 3) - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 8) - catalogUncertaintyPenalty))
-      : hasAiFallbackDecision
-        ? Math.max(36, 60 - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 10) - catalogUncertaintyPenalty)
-        : Math.max(28, 48 - (severityScore * 2) - catalogUncertaintyPenalty),
+    confidenceScore,
+    confidenceLabel,
+    confidenceReasons: [
+      marketCompSampleSize >= MIN_REQUIRED_MARKET_COMPS ? `${marketCompSampleSize} uyumlu emsal` : 'Sınırlı emsal',
+      intelligence.averageSimilarity >= 72 ? 'Yüksek araç benzerliği' : 'Benzerlik verisi sınırlı',
+      catalogUncertaintyPenalty ? 'Versiyon/motor kataloğu belirsizliği' : 'Versiyon ve motor bilgisi işlendi',
+    ],
+    priceScenarios: {
+      quickSale: toRoundedCurrency(quickValue),
+      market: toRoundedCurrency(estimate),
+      patientSale: toRoundedCurrency(privateBand),
+      dealer: toRoundedCurrency(galleryValue),
+    },
     marketComps: effectiveMarketStats
       ? {
         source: marketCompSource,
