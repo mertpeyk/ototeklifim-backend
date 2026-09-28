@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import sharp from 'sharp';
 import { prisma } from '../db.js';
 
 const uploadDir = path.resolve(process.cwd(), 'uploads');
@@ -19,6 +20,7 @@ function getUploadPublicUrl(request: FastifyRequest, fileName: string) {
 export async function publicUploadRoutes(app: FastifyInstance) {
   app.get('/uploads/:filename', async (request, reply) => {
     const filename = String((request.params as { filename?: string }).filename || '').trim();
+    const variant = String((request.query as { variant?: string })?.variant || '').trim().toLowerCase();
 
     if (!filename) {
       reply.code(400);
@@ -31,6 +33,14 @@ export async function publicUploadRoutes(app: FastifyInstance) {
 
     if (uploadedImage) {
       reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+      if (variant === 'thumb') {
+        reply.type('image/webp');
+        return reply.send(await sharp(Buffer.from(uploadedImage.content))
+          .rotate()
+          .resize({ width: 640, height: 480, fit: 'cover', withoutEnlargement: true })
+          .webp({ quality: 72 })
+          .toBuffer());
+      }
       reply.type(uploadedImage.contentType);
       return reply.send(Buffer.from(uploadedImage.content));
     }
