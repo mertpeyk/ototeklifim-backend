@@ -2,7 +2,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import sharp from 'sharp';
 import { prisma } from '../db.js';
 
 const uploadDir = path.resolve(process.cwd(), 'uploads');
@@ -34,6 +33,9 @@ export async function publicUploadRoutes(app: FastifyInstance) {
     if (uploadedImage) {
       reply.header('Cache-Control', 'public, max-age=31536000, immutable');
       if (variant === 'thumb') {
+        // Keep the API healthcheck/startup fast; load the image processor only
+        // when a thumbnail is actually requested.
+        const { default: sharp } = await import('sharp');
         reply.type('image/webp');
         return reply.send(await sharp(Buffer.from(uploadedImage.content))
           .rotate()
