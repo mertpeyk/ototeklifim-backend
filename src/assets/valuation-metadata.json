@@ -271,11 +271,17 @@
       "Takumi"
     ],
     "Mercedes-Benz": [
+      "Base",
       "Style",
       "Progressive",
       "Avantgarde",
       "AMG",
+      "AMG Line",
+      "Edition 1",
+      "Exclusive",
+      "Luxury",
       "Night Package"
+      ,"Premium"
     ],
     "Mitsubishi": [
       "Invite",
@@ -1354,46 +1360,72 @@
       "Style",
       "Progressive",
       "AMG",
-      "AMG Performance"
+      "AMG Performance",
+      "AMG Line",
+      "Edition 1",
+      "Night Package"
     ],
     "Mercedes-Benz|C Serisi": [
       "Avantgarde",
       "AMG",
-      "Edition 1"
+      "Edition 1",
+      "AMG Line",
+      "Exclusive",
+      "Night Package"
     ],
     "Mercedes-Benz|CLA": [
       "Style",
       "Progressive",
       "AMG",
-      "Night Package"
+      "Night Package",
+      "AMG Line",
+      "Edition 1",
+      "Exclusive"
     ],
     "Mercedes-Benz|E Serisi": [
       "Avantgarde",
       "Exclusive",
       "AMG",
-      "Edition 1"
+      "Edition 1",
+      "AMG Line",
+      "Night Package",
+      "Premium"
     ],
     "Mercedes-Benz|GLA": [
       "Progressive",
       "AMG",
-      "Night Package"
+      "Night Package",
+      "AMG Line",
+      "Edition 1",
+      "Exclusive"
     ],
     "Mercedes-Benz|GLB": [
       "Progressive",
       "AMG",
-      "Night Package"
+      "Night Package",
+      "AMG Line",
+      "Edition 1",
+      "Exclusive"
     ],
     "Mercedes-Benz|GLC": [
       "Progressive",
       "4MATIC",
       "AMG",
-      "Coupé AMG"
+      "Coupé AMG",
+      "AMG Line",
+      "Edition 1",
+      "Night Package",
+      "Exclusive"
     ],
     "Mercedes-Benz|GLC Coupe": [
       "Progressive",
       "4MATIC",
       "AMG",
-      "Coupe AMG"
+      "Coupe AMG",
+      "AMG Line",
+      "Edition 1",
+      "Night Package",
+      "Exclusive"
     ],
     "Mitsubishi|ASX": [
       "Invite",
