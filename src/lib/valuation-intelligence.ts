@@ -324,6 +324,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
         model: webSearchModel,
         store: false,
         max_output_tokens: 1200,
+        text: { format: { type: 'json_object' } },
         tools: [{ type: 'web_search' }],
         tool_choice: 'auto',
         include: ['web_search_call.action.sources'],
