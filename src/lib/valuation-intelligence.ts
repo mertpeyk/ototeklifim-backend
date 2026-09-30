@@ -434,7 +434,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
           {
             role: 'user',
             content: JSON.stringify({
-              task: 'If comparable listings exist, score listing similarity from 0 to 100. If listings are missing or weak, still evaluate the vehicle and condition payload conservatively. Recommend approve or manual_review, provide a short Turkish reason, a concise Turkish explanation, and a safe adjustmentPercent between -6 and 6. Use small adjustments unless the condition/package/risk signals clearly justify otherwise.',
+            task: 'If comparable listings exist, score listing similarity from 0 to 100. If webSearchEvidence contains listing evidence, extract each credible listing into comparableListings with title, price, year, approxKm, url, variant, similarityScore and note. If listings are missing or weak, still evaluate the vehicle and condition payload conservatively. Recommend approve or manual_review, provide a short Turkish reason, a concise Turkish explanation, and a safe adjustmentPercent between -6 and 6. Use small adjustments unless the condition/package/risk signals clearly justify otherwise.',
               payload,
               schema: {
                 perListing: [{ index: 0, similarityScore: 76, note: 'trim and engine close match' }],
