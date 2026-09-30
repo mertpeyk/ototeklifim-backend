@@ -348,6 +348,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
     if (response.ok) {
       webSearchDiagnostic = 'web_search_response_received';
       const json = await response.json() as {
+        output_text?: string;
         output?: Array<{
           type?: string;
           action?: { sources?: Array<{ title?: string; url?: string }> };
@@ -358,7 +359,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
           }>;
         }>;
       };
-      const content = (json.output || [])
+      const content = json.output_text || (json.output || [])
         .flatMap((item) => item.content || [])
         .find((item) => item.type === 'output_text')?.text;
 
