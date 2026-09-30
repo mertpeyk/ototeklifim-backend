@@ -289,6 +289,18 @@ function buildPrompt(args: ValuationIntelligenceArgs, listings: IntelligenceList
   };
 }
 
+function parseJsonObject(text: string): Record<string, unknown> {
+  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  try {
+    return JSON.parse(cleaned) as Record<string, unknown>;
+  } catch {
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start < 0 || end <= start) throw new Error('AI JSON object not found');
+    return JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
+  }
+}
+
 async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: IntelligenceListing[]): Promise<OpenAiAttemptResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -351,7 +363,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
         .find((item) => item.type === 'output_text')?.text;
 
       if (content) {
-        const parsed = JSON.parse(content.replace(/^```json\s*|\s*```$/g, '')) as Partial<OpenAiRefinement>;
+        const parsed = parseJsonObject(content) as Partial<OpenAiRefinement>;
         if (parsed.reviewRecommendation && parsed.reviewReason && parsed.explanation) {
           const toolSources = (json.output || []).flatMap((item) => item.action?.sources || []);
           const annotationSources = (json.output || [])
