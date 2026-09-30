@@ -215,6 +215,7 @@ function serializeFastSaleWithDetails(
     quickSaleValue: unknown;
     dealerBuyValue: unknown;
     valuationSummary: string;
+    valuationAudit: unknown;
     createdAt: Date;
     offers: Array<{
       id: string;
@@ -236,7 +237,8 @@ function serializeFastSaleWithDetails(
     expectedPrice: toDecimal(Number(fastSale.expectedPrice)),
     estimatedMarketValue: toDecimal(Number(fastSale.estimatedMarketValue)),
     quickSaleValue: toDecimal(Number(fastSale.quickSaleValue)),
-    dealerBuyValue: toDecimal(Number(fastSale.dealerBuyValue)),
+          dealerBuyValue: toDecimal(Number(fastSale.dealerBuyValue)),
+          valuationAudit: fastSale.valuationAudit,
     currentOffer: fastSale.offers[0] ? toDecimal(Number(fastSale.offers[0].amount)) : 0,
     previousOffers: fastSale.offers.map((offer) => ({
       id: offer.id,
@@ -400,6 +402,24 @@ export async function fastSaleRoutes(app: FastifyInstance) {
           quickSaleValue: toDecimal(estimatedValues.quickSaleValue),
           dealerBuyValue: toDecimal(estimatedValues.dealerBuyValue),
           valuationSummary: estimatedValues.valuationSummary,
+          valuationAudit: {
+            provider: estimatedValues.result.intelligence.provider,
+            aiEnabled: estimatedValues.result.intelligence.aiEnabled,
+            aiDiagnostic: estimatedValues.result.intelligence.aiDiagnostic,
+            model: estimatedValues.result.intelligence.provider === 'deterministic'
+              ? 'fallback-deterministic'
+              : (process.env.OPENAI_VALUATION_WEB_MODEL || 'gpt-5.4-mini'),
+            fallbackModel: process.env.OPENAI_VALUATION_MODEL || 'gpt-4.1-mini',
+            marketCompSampleSize: estimatedValues.result.marketComps?.sampleSize || 0,
+            marketMedian: estimatedValues.result.marketComps?.median || 0,
+            averageSimilarity: estimatedValues.result.intelligence.averageSimilarity,
+            confidenceScore: estimatedValues.result.confidenceScore,
+            reviewRecommendation: estimatedValues.result.intelligence.reviewRecommendation,
+            reviewReason: estimatedValues.result.intelligence.reviewReason,
+            explanation: estimatedValues.result.intelligence.explanation,
+            offerDiscountPercent: 10,
+            recommendedOffer: estimatedValues.result.recommendedOffer,
+          },
         },
         include: {
           offers: {
