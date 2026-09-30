@@ -296,7 +296,7 @@ function parseJsonObject(text: string): Record<string, unknown> {
   } catch {
     const start = cleaned.indexOf('{');
     const end = cleaned.lastIndexOf('}');
-    if (start < 0 || end <= start) throw new Error('AI JSON object not found');
+    if (start < 0 || end <= start) return {};
     return JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
   }
 }
@@ -311,6 +311,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
   const webSearchModel = process.env.OPENAI_VALUATION_WEB_MODEL || 'gpt-4.1-mini';
   const payload = buildPrompt(args, listings.slice(0, 6));
   let webSearchDiagnostic = 'web_search_not_attempted';
+  let webEvidence = '';
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -362,6 +363,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
       const content = json.output_text || (json.output || [])
         .flatMap((item) => item.content || [])
         .find((item) => item.type === 'output_text')?.text;
+      webEvidence = content || JSON.stringify(json.output || []).slice(0, 12000);
 
       if (content) {
         const parsed = parseJsonObject(content) as Partial<OpenAiRefinement>;
@@ -439,6 +441,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
                 explanation: 'string',
                 adjustmentPercent: 0,
               },
+              webSearchEvidence: webEvidence || null,
             }),
           },
         ],
