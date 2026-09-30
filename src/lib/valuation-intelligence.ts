@@ -296,7 +296,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
   }
 
   const model = process.env.OPENAI_VALUATION_MODEL || 'gpt-4.1-mini';
-  const webSearchModel = process.env.OPENAI_VALUATION_WEB_MODEL || 'gpt-5.4-mini';
+  const webSearchModel = process.env.OPENAI_VALUATION_WEB_MODEL || 'gpt-4.1-mini';
   const payload = buildPrompt(args, listings.slice(0, 6));
   let webSearchDiagnostic = 'web_search_not_attempted';
 
@@ -307,7 +307,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
         'content-type': 'application/json',
         authorization: `Bearer ${apiKey}`,
       },
-      signal: AbortSignal.timeout(18000),
+      signal: AbortSignal.timeout(30000),
       body: JSON.stringify({
         model: webSearchModel,
         store: false,
@@ -389,10 +389,12 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
       }
       webSearchDiagnostic = 'web_search_invalid_output';
     } else {
-      webSearchDiagnostic = `web_search_http_${response.status}`;
+      const errorText = (await response.text()).slice(0, 240).replace(/\s+/g, ' ');
+      webSearchDiagnostic = `web_search_http_${response.status}${errorText ? `: ${errorText}` : ''}`;
     }
-  } catch {
-    webSearchDiagnostic = 'web_search_exception';
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    webSearchDiagnostic = `web_search_exception: ${message.slice(0, 180)}`;
     // Fall back to the existing no-web refinement below.
   }
 
