@@ -517,6 +517,9 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `Boya: ${telegramDamageSummary.painted}`,
         `Değişen: ${telegramDamageSummary.changed}`,
         `Piyasa değeri: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.estimatedMarketValue)} TL`,
+        `AI piyasa fiyatı: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.estimatedMarketValue)} TL`,
+        `AI önerilen bayi teklifi (%10 aşağı): ${new Intl.NumberFormat('tr-TR').format(estimatedValues.result.recommendedOffer)} TL`,
+        `AI durumu: ${estimatedValues.result.intelligence.aiEnabled ? 'Aktif' : 'Fallback'} · ${estimatedValues.result.intelligence.aiDiagnostic}`,
         `Hızlı satış değeri: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.quickSaleValue)} TL`,
       ],
     }).catch((error) => {
