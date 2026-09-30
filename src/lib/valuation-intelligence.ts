@@ -53,6 +53,7 @@ type IntelligenceListing = MarketCompListing & {
 };
 
 type OpenAiRefinement = {
+  comparableListings?: Array<{ title: string; price: number; year?: number | null; approxKm?: number | null; url?: string; variant?: string; source?: string; similarityScore?: number; note?: string }>;
   perListing: Array<{
     index: number;
     similarityScore: number;
@@ -333,7 +334,8 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
           task: 'Find current Turkish used-car comparables and calculate the realistic clean-condition advertised retail market value in TRY, not a dealer purchase or quick-sale price. Give the strongest weight to an active exact year+engine+package+transmission listing. Normalize comparable prices for mileage: an unusually low-mileage older vehicle must be valued above otherwise similar average-mileage examples, with the premium capped conservatively. Use at least two credible direct listings when available, but do not dilute an exact fresh match with unrelated variants. If reliable price evidence is insufficient, set marketEstimate, marketMinimum and marketMaximum to null. Structured mileage, package, paint, replacement, tramer, airbag, chassis/podye, pillar and severe-damage effects are already calculated deterministically; do not include them again in adjustmentPercent. Use adjustmentPercent only for residual market evidence not represented by those fields, between -8 and 8.',
           payload,
           outputSchema: {
-            perListing: [{ index: 0, similarityScore: 76, note: 'string' }],
+                perListing: [{ index: 0, similarityScore: 76, note: 'string' }],
+                comparableListings: [{ title: 'string', price: 0, year: 0, approxKm: 0, url: 'string', variant: 'string', similarityScore: 76, note: 'string' }],
             reviewRecommendation: 'approve | manual_review',
             reviewReason: 'string',
             explanation: 'short Turkish string',
@@ -436,6 +438,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
               payload,
               schema: {
                 perListing: [{ index: 0, similarityScore: 76, note: 'trim and engine close match' }],
+                comparableListings: [{ title: 'string', price: 0, year: 0, approxKm: 0, url: 'string', variant: 'string', similarityScore: 76, note: 'string' }],
                 reviewRecommendation: 'approve',
                 reviewReason: 'string',
                 explanation: 'string',
@@ -513,6 +516,27 @@ export async function runValuationIntelligence(args: ValuationIntelligenceArgs):
 
   if (openAiRefinement) {
     provider = baseListings.length ? 'hybrid' : 'openai';
+    if (!baseListings.length && Array.isArray(openAiRefinement.comparableListings)) {
+      listings = openAiRefinement.comparableListings
+        .filter((item) => Number(item.price) >= 100000)
+        .slice(0, 10)
+        .map((item, index) => ({
+          source: item.source === 'sahibinden' ? 'sahibinden' : 'arabam',
+          id: null,
+          title: String(item.title || `AI emsal ${index + 1}`),
+          price: Math.round(Number(item.price)),
+          formattedPrice: `${Math.round(Number(item.price)).toLocaleString('tr-TR')} TL`,
+          categoryName: 'AI web emsali',
+          variant: String(item.variant || ''),
+          url: item.url,
+          year: item.year == null ? null : Number(item.year),
+          approxKm: item.approxKm == null ? null : Number(item.approxKm),
+          similarityScore: Math.max(0, Math.min(100, Number(item.similarityScore || 60))),
+          similarityReason: String(item.note || 'AI web emsali'),
+          comparisonWeight: 1,
+          adjustedPrice: Math.round(Number(item.price)),
+        }));
+    }
     const aiMap = new Map(openAiRefinement.perListing.map((item) => [item.index, item]));
     listings = baseListings.map((item, index) => {
       const ai = aiMap.get(index);
