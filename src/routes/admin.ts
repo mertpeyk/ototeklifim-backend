@@ -868,6 +868,7 @@ async function buildAdminRepository() {
         city: String(vehicle.city ?? ''),
         createdAt: request.createdAt.toISOString(),
         valuationSummary: request.valuationSummary,
+        valuationAudit: request.valuationAudit,
         previousOffers: request.offers.map((offer) => ({
           id: offer.id,
           amount: toNumber(offer.amount),
