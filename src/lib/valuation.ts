@@ -577,7 +577,10 @@ export async function estimateVehicleValue(
   minimum = Math.max(estimate * 0.84, Math.min(estimate * 0.985, minimum));
   maximum = Math.min(estimate * 1.16, Math.max(estimate * 1.015, maximum));
 
-  const galleryMultiplier = severityScore >= 4 ? 0.905 : demand === 'Yüksek' ? 0.945 : 0.932;
+  // OtoTeklifim'in önerilen bayi alım fiyatı, doğrulanmış piyasa değerinin
+  // %10 altında olmalı. AI/emsal katmanı `estimate` değerini piyasa referansı
+  // olarak üretir; teklif marjını burada deterministik tutuyoruz.
+  const galleryMultiplier = 0.90;
   const quickMultiplier = severityScore >= 4 ? 0.875 : demand === 'Yüksek' ? 0.918 : 0.902;
   const galleryValue = estimate * galleryMultiplier;
   const quickValue = estimate * quickMultiplier;
@@ -650,6 +653,7 @@ export async function estimateVehicleValue(
     minimum: toRoundedCurrency(minimum),
     maximum: toRoundedCurrency(maximum),
     galleryValue: toRoundedCurrency(galleryValue),
+    recommendedOffer: toRoundedCurrency(estimate * 0.90),
     quickValue: toRoundedCurrency(quickValue),
     privateBand: toRoundedCurrency(privateBand),
     demand,
