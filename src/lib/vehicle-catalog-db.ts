@@ -12,12 +12,13 @@ import { cupraCatalog } from '../data/cupraCatalog.js';
 import { daciaCatalog } from '../data/daciaCatalog.js';
 import { fiatCatalog } from '../data/fiatCatalog.js';
 import { fordCatalog } from '../data/fordCatalog.js';
+import { hondaCatalog } from '../data/hondaCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v41';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v42';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -114,6 +115,37 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
     }
   }
   brandPackages.Ford = Array.from(new Set(Object.values(fordCatalog).flatMap((details) => details.packages)));
+  for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Honda|')) delete fuelTypesByKey[key];
+  for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Honda|')) delete transmissionsByKey[key];
+  for (const key of Object.keys(enginesByKey)) if (key.includes('|Honda|')) delete enginesByKey[key];
+  for (const yearText of years) {
+    modelsByYearMake[`${yearText}|Honda`] = [];
+    makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Honda');
+  }
+  for (const [model, details] of Object.entries(hondaCatalog)) {
+    modelPackages[`Honda|${model}`] = [...details.packages];
+    for (const yearText of years) {
+      const year = Number(yearText);
+      if (year < details.from || year > details.to) continue;
+      const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+      if (!activeDrives.length) continue;
+      makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Honda']));
+      modelsByYearMake[`${yearText}|Honda`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Honda`] || []), model]));
+      const fuelKey = `${yearText}|Honda|${model}|${details.bodyType}`;
+      fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+      for (const drive of activeDrives) {
+        const driveKey = `${fuelKey}|${drive.fuel}`;
+        transmissionsByKey[driveKey] = Array.from(new Set([...(transmissionsByKey[driveKey] || []), ...drive.transmissions]));
+        for (const transmission of drive.transmissions) {
+          enginesByKey[`${driveKey}|${transmission}`] = Array.from(new Set([
+            ...(enginesByKey[`${driveKey}|${transmission}`] || []),
+            ...drive.engines,
+          ]));
+        }
+      }
+    }
+  }
+  brandPackages.Honda = Array.from(new Set(Object.values(hondaCatalog).flatMap((details) => details.packages)));
   return {
     ...snapshot,
     modelsByYearMake,
@@ -131,6 +163,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
         Dacia: Array.from(new Set(Object.values(daciaCatalog).flatMap((details) => details.packages))),
         Fiat: Array.from(new Set(Object.values(fiatCatalog).flatMap((details) => details.packages))),
         Ford: Array.from(new Set(Object.values(fordCatalog).flatMap((details) => details.packages))),
+        Honda: Array.from(new Set(Object.values(hondaCatalog).flatMap((details) => details.packages))),
       },
     },
   };
@@ -494,34 +527,6 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         const modelKey = `Hyundai|${model}`;
         modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...packages]));
         brandPackages.Hyundai = Array.from(new Set([...(brandPackages.Hyundai || []), ...packages]));
-      }
-
-      // Honda Türkiye trim families. Keep them attached to each model so a
-      // Civic package cannot leak into HR-V/CR-V or motorcycle records.
-      const hondaPackages: Record<string, string[]> = {
-        City: ['Elegance', 'Executive'],
-        Civic: ['Premium', 'Elegance', 'Elegance+', 'Executive+', 'Eco Elegance', 'Eco Executive+'],
-        Jazz: ['Elegance', 'Advance', 'Crosstar'],
-        'Jazz e:HEV': ['Elegance', 'Advance', 'Crosstar'],
-        'HR-V': ['Elegance', 'Advance', 'Style+'],
-        'HR-V e:HEV': ['Elegance', 'Advance', 'Style+'],
-        'CR-V': ['Elegance', 'Advance', 'Executive+'],
-        'CR-V e:HEV': ['Elegance', 'Advance', 'Executive+'],
-        Accord: ['Elegance', 'Executive'],
-      };
-      for (const [model, packages] of Object.entries(hondaPackages)) {
-        const modelKey = `Honda|${model}`;
-        modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...packages]));
-        brandPackages.Honda = Array.from(new Set([...(brandPackages.Honda || []), ...packages]));
-      }
-      // Historical Civic 1.6 i-DTEC diesel sold in Türkiye. Add it as a
-      // model/year-specific DB path without replacing Civic's petrol/LPG rows.
-      for (const year of years) {
-        const fuelKey = `${year}|Honda|Civic|Sedan`;
-        const driveKey = `${fuelKey}|Dizel`;
-        fuelTypesByKey[fuelKey] = Array.from(new Set([...(fuelTypesByKey[fuelKey] || []), 'Dizel']));
-        transmissionsByKey[driveKey] = Array.from(new Set([...(transmissionsByKey[driveKey] || []), 'Manuel']));
-        enginesByKey[`${driveKey}|Manuel`] = Array.from(new Set([...(enginesByKey[`${driveKey}|Manuel`] || []), '1.6 i-DTEC']));
       }
 
       // Audi Turkey catalog, normalized by nameplate and model year. The
@@ -918,6 +923,77 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         }
       }
 
+      // Rebuild Honda model-by-model for 2010-2026. The generic/global feed
+      // stretched discontinued Accord/Insight/CR-Z rows into current years,
+      // exposed the Civic diesel in every year and mixed legacy combustion
+      // models with current e:HEV/EV nameplates and their trim families.
+      for (const key of Object.keys(enginesByKey)) if (key.includes('|Honda|')) delete enginesByKey[key];
+      for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Honda|')) delete fuelTypesByKey[key];
+      for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Honda|')) delete transmissionsByKey[key];
+      for (const key of Object.keys(modelPackages)) if (key.startsWith('Honda|')) delete modelPackages[key];
+      delete brandPackages.Honda;
+      for (const yearText of years) {
+        modelsByYearMake[`${yearText}|Honda`] = [];
+        makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Honda');
+      }
+      brandPackages.Honda = Array.from(new Set(Object.values(hondaCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(hondaCatalog)) {
+        modelPackages[`Honda|${model}`] = [...details.packages];
+        for (const yearText of years) {
+          const year = Number(yearText);
+          if (year < details.from || year > details.to) continue;
+          const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+          if (!activeDrives.length) continue;
+          makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Honda']));
+          const yearMakeKey = `${yearText}|Honda`;
+          modelsByYearMake[yearMakeKey] = Array.from(new Set([...(modelsByYearMake[yearMakeKey] || []), model]));
+          const fuelKey = `${yearText}|Honda|${model}|${details.bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+          for (const drive of activeDrives) {
+            const driveKey = `${fuelKey}|${drive.fuel}`;
+            transmissionsByKey[driveKey] = Array.from(new Set([...(transmissionsByKey[driveKey] || []), ...drive.transmissions]));
+            for (const transmission of drive.transmissions) {
+              enginesByKey[`${driveKey}|${transmission}`] = Array.from(new Set([
+                ...(enginesByKey[`${driveKey}|${transmission}`] || []),
+                ...drive.engines,
+              ]));
+            }
+          }
+        }
+      }
+      // Package selection is engine-first in the valuation UI. Keep the main
+      // Honda Türkiye engine/trim relationships in the DB snapshot so legacy
+      // Civic/CR-V trims cannot leak into current e:HEV or EV nameplates.
+      const hondaReferenceModels = vehicleReferenceIndex.models as Record<string, Record<string, string[]>>;
+      hondaReferenceModels['Otomobil|Honda|Civic Sedan'] = {
+        '1.6 i-VTEC 125': ['Dream', 'Premium', 'Elegance', 'Executive'],
+        '1.6 i-VTEC AT5 125': ['Premium', 'Elegance', 'Executive'],
+        '1.6 i-VTEC ECO 125': ['Eco Elegance', 'Eco Executive'],
+        '1.6 i-VTEC ECO AT5 125': ['Eco Elegance', 'Eco Executive'],
+        '1.6 i-VTEC CVT 125': ['Elegance', 'Executive', 'Executive+'],
+        '1.6 i-VTEC ECO CVT 125': ['Eco Elegance', 'Eco Executive+'],
+        '1.6 i-DTEC 120': ['Elegance', 'Executive'],
+        '1.6 i-DTEC AT9 120': ['Elegance', 'Executive'],
+        '1.5 VTEC Turbo CVT 182': ['Elegance+', 'Executive+'],
+        '1.5 VTEC Turbo ECO CVT 182': ['Elegance+', 'Executive+'],
+      };
+      hondaReferenceModels['Otomobil|Honda|Jazz e:HEV'] = {
+        '1.5 e:HEV e-CVT 109': ['Elegance', 'Crosstar'],
+        '1.5 e:HEV e-CVT 122': ['Elegance', 'Advance', 'Crosstar'],
+      };
+      hondaReferenceModels['Arazi, SUV, Pick-up|Honda|HR-V e:HEV'] = {
+        '1.5 e:HEV e-CVT 131': ['Elegance', 'Advance', 'Style+'],
+      };
+      hondaReferenceModels['Arazi, SUV, Pick-up|Honda|CR-V e:HEV'] = {
+        '2.0 e:HEV e-CVT 184': ['Advance'],
+      };
+      hondaReferenceModels['Arazi, SUV, Pick-up|Honda|ZR-V e:HEV'] = {
+        '2.0 e:HEV e-CVT 184': ['Advance'],
+      };
+      hondaReferenceModels['Arazi, SUV, Pick-up|Honda|e:Ny1'] = {
+        '150 kW 68.8 kWh': ['Elegance', 'Advance'],
+      };
+
       // Rebuild Chery from the official Türkiye range. The earlier generic
       // patch exposed Chery/OMODA/Jaecoo names in every year and mixed EVs
       // into Chery. Türkiye-market Chery models are petrol, 7-DCT SUVs from
@@ -1070,6 +1146,10 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         modelPackages[`Ford|${model}`] = [...details.packages];
       }
       brandPackages.Ford = Array.from(new Set(Object.values(fordCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(hondaCatalog)) {
+        modelPackages[`Honda|${model}`] = [...details.packages];
+      }
+      brandPackages.Honda = Array.from(new Set(Object.values(hondaCatalog).flatMap((details) => details.packages)));
 
       const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
         ? valuationMetadata.commonColors

@@ -110,8 +110,8 @@ export const vehicleCatalog = {
       key: 'Honda',
       label: 'Honda',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'motosiklet', 'hasarli-araclar', 'klasik-araclar', 'atv'],
-      models: ['Civic', 'City', 'Jazz', 'HR-V', 'CR-V', 'Accord', 'PCX', 'CBR 650R', 'Africa Twin', 'Pioneer 520'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'hasarli-araclar', 'klasik-araclar'],
+      models: ['Accord', 'City', 'Civic Sedan', 'Civic Hatchback', 'Civic Type R', 'Jazz', 'Jazz e:HEV', 'Insight', 'CR-Z', 'HR-V', 'HR-V e:HEV', 'CR-V', 'CR-V e:HEV', 'ZR-V e:HEV', 'e:Ny1', 'NSX', 'Prelude e:HEV'],
     },
     {
       key: 'Hyundai',

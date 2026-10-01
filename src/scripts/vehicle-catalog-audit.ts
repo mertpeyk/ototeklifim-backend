@@ -318,6 +318,47 @@ if ((engines[`${fordFocus2023Diesel}|Otomatik`] || []).some((value) => !/AT8|Pow
   issues.push({ type: 'ford_engine_transmission_leak', key: `${fordFocus2023Diesel}|Otomatik` });
 }
 
+const hondaElectrifiedModels = ['Jazz e:HEV', 'HR-V e:HEV', 'CR-V e:HEV', 'ZR-V e:HEV', 'e:Ny1', 'Prelude e:HEV'];
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Honda' || !hondaElectrifiedModels.includes(model)) continue;
+  const expectedFuel = model === 'e:Ny1' ? 'Elektrik' : 'Hibrit';
+  if (values.length !== 1 || values[0] !== expectedFuel) {
+    issues.push({ type: 'honda_electrified_invalid_fuel', key: fuelKey });
+  }
+  const gearValues = transmissions[`${fuelKey}|${expectedFuel}`] || [];
+  if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+    issues.push({ type: 'honda_electrified_non_automatic', key: `${fuelKey}|${expectedFuel}` });
+  }
+}
+for (const model of ['Accord', 'Insight', 'CR-Z']) {
+  if ((modelsByYearMake['2026|Honda'] || []).includes(model)) {
+    issues.push({ type: 'honda_invalid_model_year', key: `2026|Honda|${model}` });
+  }
+}
+for (const year of ['2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020']) {
+  if ((modelsByYearMake[`${year}|Honda`] || []).includes('City')) {
+    issues.push({ type: 'honda_city_generation_gap', key: `${year}|Honda|City` });
+  }
+}
+if ((modelsByYearMake['2022|Honda'] || []).includes('Civic Type R')) {
+  issues.push({ type: 'honda_type_r_generation_gap', key: '2022|Honda|Civic Type R' });
+}
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [year, brand, model] = fuelKey.split('|');
+  if (brand !== 'Honda' || model !== 'Civic Sedan') continue;
+  if (values.includes('Dizel') && (Number(year) < 2018 || Number(year) > 2020)) {
+    issues.push({ type: 'honda_civic_diesel_invalid_year', key: fuelKey });
+  }
+}
+const hondaCivic2019Diesel = '2019|Honda|Civic Sedan|Sedan|Dizel';
+if ((engines[`${hondaCivic2019Diesel}|Manuel`] || []).some((value) => /AT9|CVT/.test(value))) {
+  issues.push({ type: 'honda_engine_transmission_leak', key: `${hondaCivic2019Diesel}|Manuel` });
+}
+if ((engines[`${hondaCivic2019Diesel}|Otomatik`] || []).some((value) => !/AT9|CVT/.test(value))) {
+  issues.push({ type: 'honda_engine_transmission_leak', key: `${hondaCivic2019Diesel}|Otomatik` });
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;
