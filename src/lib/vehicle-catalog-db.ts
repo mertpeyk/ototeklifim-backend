@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { prisma } from '../db.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
-const SETTING_KEY = 'vehicle_catalog_snapshot_v2';
+// Bump the snapshot whenever catalog metadata changes. This forces existing
+// deployments to refresh the DB copy instead of serving the old incomplete
+// colour/package map forever.
+const SETTING_KEY = 'vehicle_catalog_snapshot_v3';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -46,12 +49,43 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
         }
       }
 
+      const valuationMetadata = JSON.parse(metadata) as Record<string, any>;
+      const modelPackages = { ...(valuationMetadata.modelPackages || {}) } as Record<string, string[]>;
+      const brandPackages = { ...(valuationMetadata.brandPackages || {}) } as Record<string, string[]>;
+      const defaultPackages = Array.isArray(valuationMetadata.defaultPackages) && valuationMetadata.defaultPackages.length
+        ? valuationMetadata.defaultPackages
+        : ['Standart', 'Comfort', 'Prestige', 'Premium'];
+
+      // Every DB vehicle node must have a usable package list. The external
+      // metadata only contains popular models, so fill missing model entries
+      // from the brand list (or the global defaults) during the DB seed.
+      for (const brand of (vehicleCatalog.brands || []) as Array<{ label: string; models: string[] }>) {
+        const brandOptions = Array.isArray(brandPackages[brand.label]) && brandPackages[brand.label].length
+          ? brandPackages[brand.label]
+          : defaultPackages;
+        for (const model of brand.models || []) {
+          const key = `${brand.label}|${model}`;
+          if (!Array.isArray(modelPackages[key]) || !modelPackages[key].length) {
+            modelPackages[key] = [...brandOptions];
+          }
+        }
+      }
+
+      const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
+        ? valuationMetadata.commonColors
+        : vehicleCatalog.colorOptions;
+
       return {
         ...vehicleCatalog,
         ...valuation,
         makesByYear,
         modelsByYearMake,
-        valuationMetadata: JSON.parse(metadata) as Record<string, unknown>,
+        valuationMetadata: {
+          ...valuationMetadata,
+          defaultPackages,
+          modelPackages,
+          commonColors,
+        },
       };
     } catch {
       // Try the next deployment layout.
