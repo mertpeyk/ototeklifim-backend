@@ -20,12 +20,13 @@ import { mercedesCatalog } from '../data/mercedesCatalog.js';
 import { mgCatalog } from '../data/mgCatalog.js';
 import { mitsubishiCatalog } from '../data/mitsubishiCatalog.js';
 import { nissanCatalog } from '../data/nissanCatalog.js';
+import { peugeotCatalog } from '../data/peugeotCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v50';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v51';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,6 +43,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
     ? snapshot.brands.map((brand: any) => {
       if (brand?.key === 'Mitsubishi') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'], models: Object.keys(mitsubishiCatalog) };
       if (brand?.key === 'Nissan') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'], models: Object.keys(nissanCatalog) };
+      if (brand?.key === 'Peugeot') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'], models: Object.keys(peugeotCatalog) };
       return brand;
     })
     : snapshot.brands;
@@ -364,6 +366,34 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
     }
   }
   brandPackages.Nissan = Array.from(new Set(Object.values(nissanCatalog).flatMap((details) => details.packages)));
+  for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Peugeot|')) delete fuelTypesByKey[key];
+  for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Peugeot|')) delete transmissionsByKey[key];
+  for (const key of Object.keys(enginesByKey)) if (key.includes('|Peugeot|')) delete enginesByKey[key];
+  for (const key of Object.keys(modelPackages)) if (key.startsWith('Peugeot|')) delete modelPackages[key];
+  delete brandPackages.Peugeot;
+  for (const yearText of years) {
+    modelsByYearMake[`${yearText}|Peugeot`] = [];
+    makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Peugeot');
+  }
+  for (const [model, details] of Object.entries(peugeotCatalog)) {
+    modelPackages[`Peugeot|${model}`] = [...details.packages];
+    for (const yearText of years) {
+      const year = Number(yearText);
+      if (year < details.from || year > details.to) continue;
+      const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+      if (!activeDrives.length) continue;
+      makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Peugeot']));
+      modelsByYearMake[`${yearText}|Peugeot`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Peugeot`] || []), model]));
+      const fuelKey = `${yearText}|Peugeot|${model}|${details.bodyType}`;
+      fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+      for (const drive of activeDrives) {
+        const driveKey = `${fuelKey}|${drive.fuel}`;
+        transmissionsByKey[driveKey] = Array.from(new Set(drive.transmissions));
+        for (const transmission of drive.transmissions) enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
+      }
+    }
+  }
+  brandPackages.Peugeot = Array.from(new Set(Object.values(peugeotCatalog).flatMap((details) => details.packages)));
   return {
     ...snapshot,
     brands,
@@ -390,6 +420,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
         MG: Array.from(new Set(Object.values(mgCatalog).flatMap((details) => details.packages))),
         Mitsubishi: Array.from(new Set(Object.values(mitsubishiCatalog).flatMap((details) => details.packages))),
         Nissan: Array.from(new Set(Object.values(nissanCatalog).flatMap((details) => details.packages))),
+        Peugeot: Array.from(new Set(Object.values(peugeotCatalog).flatMap((details) => details.packages))),
       },
     },
   };
@@ -1614,6 +1645,37 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         }
       }
 
+      // Rebuild Peugeot after generic/reference/web enrichment so legacy HDi,
+      // VTi and ETG combinations cannot leak into current Hybrid/EV models.
+      for (const key of Object.keys(enginesByKey)) if (key.includes('|Peugeot|')) delete enginesByKey[key];
+      for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Peugeot|')) delete fuelTypesByKey[key];
+      for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Peugeot|')) delete transmissionsByKey[key];
+      for (const key of Object.keys(modelPackages)) if (key.startsWith('Peugeot|')) delete modelPackages[key];
+      delete brandPackages.Peugeot;
+      for (const yearText of years) {
+        modelsByYearMake[`${yearText}|Peugeot`] = [];
+        makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Peugeot');
+      }
+      brandPackages.Peugeot = Array.from(new Set(Object.values(peugeotCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(peugeotCatalog)) {
+        modelPackages[`Peugeot|${model}`] = [...details.packages];
+        for (const yearText of years) {
+          const year = Number(yearText);
+          if (year < details.from || year > details.to) continue;
+          const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+          if (!activeDrives.length) continue;
+          makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Peugeot']));
+          modelsByYearMake[`${yearText}|Peugeot`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Peugeot`] || []), model]));
+          const fuelKey = `${yearText}|Peugeot|${model}|${details.bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+          for (const drive of activeDrives) {
+            const driveKey = `${fuelKey}|${drive.fuel}`;
+            transmissionsByKey[driveKey] = Array.from(new Set(drive.transmissions));
+            for (const transmission of drive.transmissions) enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
+          }
+        }
+      }
+
       const kiaReferenceModels = vehicleReferenceIndex.models as Record<string, Record<string, string[]>>;
       for (const [model, details] of Object.entries(kiaCatalog)) {
         const category = details.bodyType === 'SUV' ? 'Arazi, SUV, Pick-up'
@@ -1658,6 +1720,16 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
           : details.bodyType === 'MPV' || details.bodyType === 'Panelvan' ? 'Minivan & Panelvan'
             : 'Otomobil';
         nissanReferenceModels[`${category}|Nissan|${model}`] = Object.fromEntries(
+          details.drives.flatMap((drive) => drive.engines.map((engine) => [engine, details.packages])),
+        );
+      }
+
+      const peugeotReferenceModels = vehicleReferenceIndex.models as Record<string, Record<string, string[]>>;
+      for (const [model, details] of Object.entries(peugeotCatalog)) {
+        const category = details.bodyType === 'SUV' ? 'Arazi, SUV, Pick-up'
+          : details.bodyType === 'MPV' || details.bodyType === 'Panelvan' ? 'Minivan & Panelvan'
+            : 'Otomobil';
+        peugeotReferenceModels[`${category}|Peugeot|${model}`] = Object.fromEntries(
           details.drives.flatMap((drive) => drive.engines.map((engine) => [engine, details.packages])),
         );
       }
@@ -1734,6 +1806,10 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         modelPackages[`Nissan|${model}`] = [...details.packages];
       }
       brandPackages.Nissan = Array.from(new Set(Object.values(nissanCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(peugeotCatalog)) {
+        modelPackages[`Peugeot|${model}`] = [...details.packages];
+      }
+      brandPackages.Peugeot = Array.from(new Set(Object.values(peugeotCatalog).flatMap((details) => details.packages)));
 
       const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
         ? valuationMetadata.commonColors

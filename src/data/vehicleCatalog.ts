@@ -2,6 +2,7 @@ import { mercedesCatalog } from './mercedesCatalog.js';
 import { mgCatalog } from './mgCatalog.js';
 import { mitsubishiCatalog } from './mitsubishiCatalog.js';
 import { nissanCatalog } from './nissanCatalog.js';
+import { peugeotCatalog } from './peugeotCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -85,8 +86,8 @@ export const vehicleCatalog = {
       key: 'Peugeot',
       label: 'Peugeot',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan', 'kiralik-araclar', 'hasarli-araclar'],
-      models: ['208', '2008', '301', '308', '3008', '5008', '508', 'Rifter', 'Partner', 'Boxer'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'],
+      models: Object.keys(peugeotCatalog),
     },
     {
       key: 'Citroen',
