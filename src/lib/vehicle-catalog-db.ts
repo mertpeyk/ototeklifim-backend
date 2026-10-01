@@ -24,7 +24,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v48';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v49';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,6 +37,11 @@ type CatalogSnapshot = Record<string, unknown> & {
 let memorySnapshot: CatalogSnapshot | null = null;
 
 function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapshot {
+  const brands = Array.isArray(snapshot.brands)
+    ? snapshot.brands.map((brand: any) => brand?.key === 'Mitsubishi'
+      ? { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'], models: Object.keys(mitsubishiCatalog) }
+      : brand)
+    : snapshot.brands;
   const modelsByYearMake = { ...((snapshot.modelsByYearMake || {}) as Record<string, string[]>) };
   const makesByYear = { ...((snapshot.makesByYear || {}) as Record<string, string[]>) };
   const fuelTypesByKey = { ...((snapshot.fuelTypesByKey || {}) as Record<string, string[]>) };
@@ -330,6 +335,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
   brandPackages.Mitsubishi = Array.from(new Set(Object.values(mitsubishiCatalog).flatMap((details) => details.packages)));
   return {
     ...snapshot,
+    brands,
     modelsByYearMake,
     makesByYear,
     fuelTypesByKey,
