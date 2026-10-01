@@ -13,6 +13,7 @@
     "calibrate:valuation": "tsx src/scripts/valuation-auto-calibrate.ts",
     "test:valuation": "tsx src/scripts/valuation-smoke.ts",
     "test:valuation:regression": "tsx src/scripts/valuation-regression.ts",
+    "test:catalog": "tsx src/scripts/vehicle-catalog-audit.ts",
     "test": "npm run build"
   },
   "keywords": [],

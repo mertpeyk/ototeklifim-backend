@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v25';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v26';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,7 +20,7 @@ type CatalogSnapshot = Record<string, unknown> & {
 
 let memorySnapshot: CatalogSnapshot | null = null;
 
-async function readStaticSnapshot(): Promise<CatalogSnapshot> {
+export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
   const candidates = [
     path.resolve(__dirname, '../assets'),
     path.resolve(__dirname, '../../src/assets'),
@@ -63,16 +63,6 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
           Array.from(new Set((Array.isArray(transmissions) ? transmissions : []).map(String))),
         ]),
       );
-
-      // Keep the admin/static catalogue additions (for example Mercedes E250)
-      // in the same API tree even when the external valuation source has no row.
-      for (const brand of (vehicleCatalog.brands || []) as Array<{ label: string; models: string[] }>) {
-        for (const year of years) {
-          makesByYear[year] = Array.from(new Set([...(makesByYear[year] || []), brand.label]));
-          const key = `${year}|${brand.label}`;
-          modelsByYearMake[key] = Array.from(new Set([...(modelsByYearMake[key] || []), ...(brand.models || [])]));
-        }
-      }
 
       const valuationMetadata = JSON.parse(metadata) as Record<string, any>;
       // Preserve the legacy UI seed in the DB snapshot as a catalog seed. It
@@ -412,6 +402,37 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
         enginesByKey[`${driveKey}|Manuel`] = Array.from(new Set([...(enginesByKey[`${driveKey}|Manuel`] || []), '1.6 i-DTEC']));
       }
 
+      // Reconcile the public year -> make -> model tree from actual DB
+      // powertrain rows. Never expose a model in a year where it has no fuel
+      // path (the previous blanket merge produced entries such as e-tron 2006).
+      for (const [fuelKey, fuelValues] of Object.entries(fuelTypesByKey)) {
+        const [year, brand, model] = fuelKey.split('|');
+        if (!year || !brand || !model || !fuelValues.length) continue;
+        makesByYear[year] = Array.from(new Set([...(makesByYear[year] || []), brand]));
+        const yearMakeKey = `${year}|${brand}`;
+        modelsByYearMake[yearMakeKey] = Array.from(new Set([...(modelsByYearMake[yearMakeKey] || []), model]));
+      }
+
+      // Apply the EV invariant after every import/curated patch. Earlier
+      // normalization ran before later model patches and allowed legacy
+      // manual gears to leak back into electric rows.
+      for (const [fuelKey, fuelValues] of Object.entries(fuelTypesByKey)) {
+        if (!fuelValues.includes('Elektrik')) continue;
+        const electricDriveKey = `${fuelKey}|Elektrik`;
+        const electricEngineRows = Object.entries(enginesByKey)
+          .filter(([key]) => key.startsWith(`${electricDriveKey}|`))
+          .flatMap(([, values]) => values);
+        transmissionsByKey[electricDriveKey] = ['Otomatik'];
+        if (electricEngineRows.length) {
+          enginesByKey[`${electricDriveKey}|Otomatik`] = Array.from(new Set(electricEngineRows));
+        }
+        for (const key of Object.keys(enginesByKey)) {
+          if (key.startsWith(`${electricDriveKey}|`) && key !== `${electricDriveKey}|Otomatik`) {
+            delete enginesByKey[key];
+          }
+        }
+      }
+
       // The reference index is the broadest trim source. Its values are
       // engine -> package arrays; fold them into the API's brand/model maps
       // so every referenced make/model gets its real package list in DB.
@@ -510,6 +531,7 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
           ...valuationMetadata,
           defaultPackages,
           modelPackages,
+          brandPackages,
           commonColors,
         },
       };
@@ -535,7 +557,7 @@ export async function getVehicleCatalogSnapshot() {
       }
     }
 
-    const snapshot = await readStaticSnapshot();
+    const snapshot = await buildVehicleCatalogSnapshot();
     await prisma.appSetting.upsert({
       where: { key: SETTING_KEY },
       create: { key: SETTING_KEY, value: JSON.stringify(snapshot) },
@@ -546,7 +568,7 @@ export async function getVehicleCatalogSnapshot() {
   } catch {
     // Catalog loading must never prevent the API from passing healthcheck.
     // The static catalog is still a valid source until the DB is available.
-    memorySnapshot = await readStaticSnapshot();
+    memorySnapshot = await buildVehicleCatalogSnapshot();
     return memorySnapshot;
   }
 }
