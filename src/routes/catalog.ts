@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 
 import { prisma } from '../db.js';
-import { vehicleCatalog } from '../data/vehicleCatalog.js';
+import { getVehicleCatalogSnapshot } from '../lib/vehicle-catalog-db.js';
 
 export async function catalogRoutes(app: FastifyInstance) {
   app.get('/catalog/vehicles', async () => {
+    const catalog = await getVehicleCatalogSnapshot();
     const grouped = await prisma.listing.groupBy({
       by: ['category'],
       where: {
@@ -20,8 +21,8 @@ export async function catalogRoutes(app: FastifyInstance) {
     );
 
     return {
-      ...vehicleCatalog,
-      categories: vehicleCatalog.categories.map((category) => ({
+      ...catalog,
+      categories: ((catalog.categories as Array<{ label: string; key: string }>) || []).map((category) => ({
         ...category,
         listingCount:
             countMap.get(category.label.toLowerCase()) ??

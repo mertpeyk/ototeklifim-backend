@@ -1,6 +1,7 @@
 import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getVehicleCatalogSnapshot } from './vehicle-catalog-db.js';
 
 type ValuationCatalog = {
   years: string[];
@@ -135,6 +136,19 @@ async function loadCatalogSnapshot() {
   }
 
   try {
+    const databaseSnapshot = await getVehicleCatalogSnapshot();
+    if (databaseSnapshot.modelsByYearMake) {
+      const metadata = (databaseSnapshot.valuationMetadata || {}) as ValuationMetadata;
+      const { valuationMetadata: _valuationMetadata, ...catalog } = databaseSnapshot;
+      const snapshot = {
+        expiresAt: Date.now() + CACHE_TTL_MS,
+        catalog: catalog as unknown as ValuationCatalog,
+        metadata,
+      };
+      cachedCatalog = snapshot;
+      return snapshot;
+    }
+
     const assetsRoot = await resolveValuationAssetsRoot();
     const catalogPath = path.join(assetsRoot, 'valuation-catalog.json');
     const metadataPath = path.join(assetsRoot, 'valuation-metadata.json');
