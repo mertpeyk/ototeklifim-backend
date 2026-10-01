@@ -5,6 +5,7 @@ import { nissanCatalog } from './nissanCatalog.js';
 import { peugeotCatalog } from './peugeotCatalog.js';
 import { porscheCatalog } from './porscheCatalog.js';
 import { suzukiCatalog } from './suzukiCatalog.js';
+import { teslaCatalog } from './teslaCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -187,7 +188,7 @@ export const vehicleCatalog = {
       label: 'Tesla',
       logoUrl: '',
       categoryKeys: ['elektrikli-araclar', 'otomobil', 'arazi-suv-pickup'],
-      models: ['Model 3', 'Model Y', 'Model S', 'Model X'],
+      models: Object.keys(teslaCatalog),
     },
     {
       key: 'TOGG',
