@@ -22,12 +22,13 @@ import { mitsubishiCatalog } from '../data/mitsubishiCatalog.js';
 import { nissanCatalog } from '../data/nissanCatalog.js';
 import { peugeotCatalog } from '../data/peugeotCatalog.js';
 import { porscheCatalog } from '../data/porscheCatalog.js';
+import { suzukiCatalog } from '../data/suzukiCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v52';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v53';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,6 +47,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
       if (brand?.key === 'Nissan') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'], models: Object.keys(nissanCatalog) };
       if (brand?.key === 'Peugeot') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'], models: Object.keys(peugeotCatalog) };
       if (brand?.key === 'Porsche') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup'], models: Object.keys(porscheCatalog) };
+      if (brand?.key === 'Suzuki') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup'], models: Object.keys(suzukiCatalog) };
       return brand;
     })
     : snapshot.brands;
@@ -424,6 +426,34 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
     }
   }
   brandPackages.Porsche = Array.from(new Set(Object.values(porscheCatalog).flatMap((details) => details.packages)));
+  for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Suzuki|')) delete fuelTypesByKey[key];
+  for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Suzuki|')) delete transmissionsByKey[key];
+  for (const key of Object.keys(enginesByKey)) if (key.includes('|Suzuki|')) delete enginesByKey[key];
+  for (const key of Object.keys(modelPackages)) if (key.startsWith('Suzuki|')) delete modelPackages[key];
+  delete brandPackages.Suzuki;
+  for (const yearText of years) {
+    modelsByYearMake[`${yearText}|Suzuki`] = [];
+    makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Suzuki');
+  }
+  for (const [model, details] of Object.entries(suzukiCatalog)) {
+    modelPackages[`Suzuki|${model}`] = [...details.packages];
+    for (const yearText of years) {
+      const year = Number(yearText);
+      if (year < details.from || year > details.to) continue;
+      const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+      if (!activeDrives.length) continue;
+      makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Suzuki']));
+      modelsByYearMake[`${yearText}|Suzuki`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Suzuki`] || []), model]));
+      const fuelKey = `${yearText}|Suzuki|${model}|${details.bodyType}`;
+      fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+      for (const drive of activeDrives) {
+        const driveKey = `${fuelKey}|${drive.fuel}`;
+        transmissionsByKey[driveKey] = Array.from(new Set(drive.transmissions));
+        for (const transmission of drive.transmissions) enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
+      }
+    }
+  }
+  brandPackages.Suzuki = Array.from(new Set(Object.values(suzukiCatalog).flatMap((details) => details.packages)));
   return {
     ...snapshot,
     brands,

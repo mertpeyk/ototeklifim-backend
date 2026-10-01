@@ -4,6 +4,7 @@ import { mitsubishiCatalog } from './mitsubishiCatalog.js';
 import { nissanCatalog } from './nissanCatalog.js';
 import { peugeotCatalog } from './peugeotCatalog.js';
 import { porscheCatalog } from './porscheCatalog.js';
+import { suzukiCatalog } from './suzukiCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -248,8 +249,8 @@ export const vehicleCatalog = {
       key: 'Suzuki',
       label: 'Suzuki',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'motosiklet', 'atv', 'hasarli-araclar'],
-      models: ['Swift', 'Vitara', 'S-Cross', 'Jimny', 'GSX-S1000', 'V-Strom 650', 'KingQuad 750'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup'],
+      models: Object.keys(suzukiCatalog),
     },
     {
       key: 'Isuzu',
