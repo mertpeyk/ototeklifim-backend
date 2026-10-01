@@ -9,6 +9,7 @@ const transmissions = (snapshot.transmissionsByKey || {}) as StringMap;
 const engines = (snapshot.enginesByKey || {}) as StringMap;
 const metadata = (snapshot.valuationMetadata || {}) as Record<string, any>;
 const packages = (metadata.modelPackages || {}) as StringMap;
+const referenceModels = ((snapshot.vehicleReferenceIndex || {}).models || {}) as Record<string, Record<string, string[]>>;
 
 const issues: Array<{ type: string; key: string }> = [];
 const modelKeys = new Set<string>();
@@ -70,6 +71,10 @@ for (const [fuelKey, values] of Object.entries(fuels)) {
 }
 if ((modelsByYearMake['2025|Audi'] || []).includes('A4')) issues.push({ type: 'audi_invalid_model_year', key: '2025|Audi|A4' });
 if ((modelsByYearMake['2026|Audi'] || []).includes('Q8 e-tron')) issues.push({ type: 'audi_invalid_model_year', key: '2026|Audi|Q8 e-tron' });
+const audiA4ReferencePackages = referenceModels['Otomobil|Audi|A4']?.['45 TFSI quattro'] || [];
+if (!audiA4ReferencePackages.includes('Advanced') || !audiA4ReferencePackages.includes('S line')) {
+  issues.push({ type: 'audi_missing_engine_packages', key: 'Otomobil|Audi|A4|45 TFSI quattro' });
+}
 
 const bmwEvModels = ['i3', 'i4', 'i5', 'i7', 'iX', 'iX1', 'iX2', 'iX3'];
 for (const [fuelKey, values] of Object.entries(fuels)) {
