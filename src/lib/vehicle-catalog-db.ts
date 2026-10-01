@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v24';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v25';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -382,6 +382,34 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
         const modelKey = `Hyundai|${model}`;
         modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...packages]));
         brandPackages.Hyundai = Array.from(new Set([...(brandPackages.Hyundai || []), ...packages]));
+      }
+
+      // Honda Türkiye trim families. Keep them attached to each model so a
+      // Civic package cannot leak into HR-V/CR-V or motorcycle records.
+      const hondaPackages: Record<string, string[]> = {
+        City: ['Elegance', 'Executive'],
+        Civic: ['Premium', 'Elegance', 'Elegance+', 'Executive+', 'Eco Elegance', 'Eco Executive+'],
+        Jazz: ['Elegance', 'Advance', 'Crosstar'],
+        'Jazz e:HEV': ['Elegance', 'Advance', 'Crosstar'],
+        'HR-V': ['Elegance', 'Advance', 'Style+'],
+        'HR-V e:HEV': ['Elegance', 'Advance', 'Style+'],
+        'CR-V': ['Elegance', 'Advance', 'Executive+'],
+        'CR-V e:HEV': ['Elegance', 'Advance', 'Executive+'],
+        Accord: ['Elegance', 'Executive'],
+      };
+      for (const [model, packages] of Object.entries(hondaPackages)) {
+        const modelKey = `Honda|${model}`;
+        modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...packages]));
+        brandPackages.Honda = Array.from(new Set([...(brandPackages.Honda || []), ...packages]));
+      }
+      // Historical Civic 1.6 i-DTEC diesel sold in Türkiye. Add it as a
+      // model/year-specific DB path without replacing Civic's petrol/LPG rows.
+      for (const year of years) {
+        const fuelKey = `${year}|Honda|Civic|Sedan`;
+        const driveKey = `${fuelKey}|Dizel`;
+        fuelTypesByKey[fuelKey] = Array.from(new Set([...(fuelTypesByKey[fuelKey] || []), 'Dizel']));
+        transmissionsByKey[driveKey] = Array.from(new Set([...(transmissionsByKey[driveKey] || []), 'Manuel']));
+        enginesByKey[`${driveKey}|Manuel`] = Array.from(new Set([...(enginesByKey[`${driveKey}|Manuel`] || []), '1.6 i-DTEC']));
       }
 
       // The reference index is the broadest trim source. Its values are
