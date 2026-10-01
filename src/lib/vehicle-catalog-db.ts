@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v15';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v16';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -121,6 +121,23 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
           fuelTypesByKey[fuelKey] = ['Elektrik'];
           transmissionsByKey[`${fuelKey}|Elektrik`] = ['Otomatik'];
         }
+      }
+
+      // Store the EV rule in the DB snapshot itself. Clients should not infer
+      // this from a brand name or fall back to the generic fuel list.
+      for (const [fuelKey, fuels] of Object.entries(fuelTypesByKey)) {
+        if (!fuels.length || !fuels.every((fuel) => fuel === 'Elektrik')) continue;
+        fuelTypesByKey[fuelKey] = ['Elektrik'];
+        const prefix = `${fuelKey}|Elektrik`;
+        const engineValues = Object.entries(enginesByKey)
+          .filter(([key]) => key.startsWith(`${prefix}|`))
+          .flatMap(([, engines]) => engines);
+        const electricEngineKey = `${prefix}|Otomatik`;
+        if (engineValues.length) enginesByKey[electricEngineKey] = Array.from(new Set(engineValues));
+        for (const key of Object.keys(transmissionsByKey)) {
+          if (key.startsWith(prefix)) delete transmissionsByKey[key];
+        }
+        transmissionsByKey[prefix] = ['Otomatik'];
       }
 
       const modelPackages = { ...(valuationMetadata.modelPackages || {}) } as Record<string, string[]>;
