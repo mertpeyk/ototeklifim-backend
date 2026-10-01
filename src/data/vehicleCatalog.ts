@@ -1,3 +1,5 @@
+import { mercedesCatalog } from './mercedesCatalog.js';
+
 const currentYear = new Date().getFullYear();
 
 export const vehicleCatalog = {
@@ -34,20 +36,11 @@ export const vehicleCatalog = {
       models: ['1 Serisi', '2 Serisi', '3 Serisi', '4 Serisi', '5 Serisi', '7 Serisi', 'X1', 'X3', 'X5', 'X6', 'i4', 'i5', 'iX'],
     },
     {
-      key: 'Mercedes_Benz',
+      key: 'Mercedes-Benz',
       label: 'Mercedes-Benz',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar', 'minivan-panelvan', 'ticari-araclar', 'hasarli-araclar', 'klasik-araclar'],
-      models: [
-        'A Serisi', 'A160', 'A180', 'A200', 'A250',
-        'C Serisi', 'C180', 'C200', 'C220d', 'C300',
-        'E Serisi', 'E200', 'E220d', 'E250', 'E300', 'E350',
-        'S Serisi', 'S350d', 'S400d', 'S500',
-        'CLA', 'CLA 180', 'CLA 200', 'CLA 220d', 'CLA 250',
-        'GLA', 'GLA 180', 'GLA 200', 'GLA 220d',
-        'GLB', 'GLB 200', 'GLB 220d', 'GLC', 'GLC 200', 'GLC 220d', 'GLC 300',
-        'GLE', 'GLE 300d', 'GLE 350d', 'GLE 400d', 'Sprinter', 'Vito', 'Actros', 'EQE', 'EQS',
-      ],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'],
+      models: Object.keys(mercedesCatalog),
     },
     {
       key: 'Volkswagen',
