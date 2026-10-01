@@ -61,7 +61,8 @@ export const suzukiCatalog: Record<string, SuzukiModel> = {
     { to: 2016, fuel: 'Dizel', transmissions: ['Manuel'], engines: ['1.6 DDiS 120', '1.6 DDiS AllGrip 120'] },
     { from: 2017, fuel: 'Benzin', transmissions: ['Manuel'], engines: ['1.0 Boosterjet 112', '1.4 Boosterjet 140', '1.4 Boosterjet AllGrip 140'] },
     { from: 2017, fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['1.0 Boosterjet AT6 112', '1.4 Boosterjet AT6 140', '1.4 Boosterjet AT6 AllGrip 140'] },
-    { from: 2017, fuel: 'Dizel', transmissions: ['Manuel', 'Otomatik'], engines: ['1.6 DDiS 120', '1.6 DDiS TCSS 120'] },
+    { from: 2017, fuel: 'Dizel', transmissions: ['Manuel'], engines: ['1.6 DDiS 120'] },
+    { from: 2017, fuel: 'Dizel', transmissions: ['Otomatik'], engines: ['1.6 DDiS TCSS 120'] },
   ], packages: ['GL', 'GL+', 'GLX'] },
   Celerio: { from: 2015, to: 2018, bodyType: 'Hatchback', drives: [
     { fuel: 'Benzin', transmissions: ['Manuel'], engines: ['1.0 Dualjet 68'] },
@@ -70,7 +71,8 @@ export const suzukiCatalog: Record<string, SuzukiModel> = {
   Vitara: { from: 2015, to: 2026, bodyType: 'SUV', drives: [
     { to: 2018, fuel: 'Benzin', transmissions: ['Manuel'], engines: ['1.6 VVT 120', '1.6 VVT AllGrip 120'] },
     { to: 2018, fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['1.6 VVT AT6 120', '1.6 VVT AT6 AllGrip 120'] },
-    { to: 2018, fuel: 'Dizel', transmissions: ['Manuel', 'Otomatik'], engines: ['1.6 DDiS 120', '1.6 DDiS TCSS 120'] },
+    { to: 2018, fuel: 'Dizel', transmissions: ['Manuel'], engines: ['1.6 DDiS 120'] },
+    { to: 2018, fuel: 'Dizel', transmissions: ['Otomatik'], engines: ['1.6 DDiS TCSS 120'] },
     { from: 2019, to: 2020, fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['1.0 Boosterjet AT6 112', '1.4 Boosterjet AT6 140', '1.4 Boosterjet AT6 AllGrip 140'] },
     { from: 2021, to: 2023, fuel: 'Hibrit', transmissions: ['Otomatik'], engines: ['1.4 Boosterjet 48V SHVS AT6 129', '1.4 Boosterjet 48V SHVS AT6 AllGrip 129', '1.5 Dualjet Strong Hybrid AGS 116'] },
     { from: 2024, fuel: 'Hibrit', transmissions: ['Otomatik'], engines: ['1.4 Boosterjet 48V SHVS AT6 109', '1.4 Boosterjet 48V SHVS AT6 AllGrip 109'] },
@@ -80,8 +82,10 @@ export const suzukiCatalog: Record<string, SuzukiModel> = {
     { fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['1.2 Dualjet CVT 90', '1.0 Boosterjet AT6 111'] },
   ], packages: ['GL', 'GLX'] },
   Ignis: { from: 2017, to: 2022, bodyType: 'Hatchback', drives: [
-    { to: 2019, fuel: 'Benzin', transmissions: ['Manuel', 'Otomatik'], engines: ['1.2 Dualjet 90', '1.2 Dualjet AGS 90'] },
-    { from: 2020, fuel: 'Hibrit', transmissions: ['Manuel', 'Otomatik'], engines: ['1.2 Dualjet SHVS 83', '1.2 Dualjet SHVS CVT 83'] },
+    { to: 2019, fuel: 'Benzin', transmissions: ['Manuel'], engines: ['1.2 Dualjet 90'] },
+    { to: 2019, fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['1.2 Dualjet AGS 90'] },
+    { from: 2020, fuel: 'Hibrit', transmissions: ['Manuel'], engines: ['1.2 Dualjet SHVS 83'] },
+    { from: 2020, fuel: 'Hibrit', transmissions: ['Otomatik'], engines: ['1.2 Dualjet SHVS CVT 83'] },
   ], packages: ['GL', 'GLX', 'GLX AllGrip'] },
   'S-Cross': { from: 2022, to: 2026, bodyType: 'SUV', drives: [
     { to: 2023, fuel: 'Hibrit', transmissions: ['Otomatik'], engines: ['1.4 Boosterjet 48V SHVS AT6 129', '1.4 Boosterjet 48V SHVS AT6 AllGrip 129'] },
