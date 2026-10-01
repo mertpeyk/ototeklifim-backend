@@ -13,7 +13,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v33';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v34';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -775,6 +775,15 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         modelPackages[`TOGG|${model}`] = [...packages];
       }
       brandPackages.TOGG = Array.from(new Set(Object.values(toggPackages).flat()));
+
+      // Citroën packages are authoritative after reference/web enrichment.
+      // Otherwise a combined current listing such as "e-C4 115 kW Max" is
+      // appended to the combustion C4 model and unrelated legacy trims leak
+      // into dedicated electric nameplates.
+      for (const [model, details] of Object.entries(citroenCatalog)) {
+        modelPackages[`Citroën|${model}`] = [...details.packages];
+      }
+      brandPackages['Citroën'] = Array.from(new Set(Object.values(citroenCatalog).flatMap((details) => details.packages)));
 
       const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
         ? valuationMetadata.commonColors

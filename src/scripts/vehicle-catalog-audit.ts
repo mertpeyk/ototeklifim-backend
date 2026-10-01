@@ -171,6 +171,12 @@ if ((modelsByYearMake['2026|Citroën'] || []).includes('C-Elysée')) {
 if ((modelsByYearMake['2020|Citroën'] || []).includes('e-C3')) {
   issues.push({ type: 'citroen_invalid_model_year', key: '2020|Citroën|e-C3' });
 }
+if ((packages['Citroën|C4'] || []).some((value) => value.toLowerCase().includes('e-c4'))) {
+  issues.push({ type: 'citroen_package_model_leak', key: 'Citroën|C4' });
+}
+if ((packages['Citroën|e-C4'] || []).some((value) => ['attraction', 'confort', 'exclusive'].includes(value.toLowerCase()))) {
+  issues.push({ type: 'citroen_package_model_leak', key: 'Citroën|e-C4' });
+}
 if (Object.keys(modelsByYearMake).some((key) => key.endsWith('|Citroen') && (modelsByYearMake[key] || []).length)) {
   issues.push({ type: 'citroen_duplicate_unaccented_brand', key: 'Citroen' });
 }
