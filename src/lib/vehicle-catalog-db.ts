@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v17';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v18';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -185,6 +185,23 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
           const fuelKey = `${year}|TOGG|${model}|${details.bodyType}`;
           const driveKey = `${fuelKey}|Elektrik`;
           enginesByKey[driveKey] = [...details.engines];
+          fuelTypesByKey[fuelKey] = ['Elektrik'];
+          transmissionsByKey[driveKey] = ['Otomatik'];
+        }
+      }
+
+      // Re-assert the TOGG motor rows after all catalog merges. This prevents
+      // a later reference/import pass from hiding them behind an old key.
+      const toggMotorRows: Record<string, string[]> = {
+        T10X: ['V1 RWD', 'V2 RWD', 'V2 4More AWD'],
+        T10F: ['V1 RWD', 'V2 RWD', 'V2 4More AWD'],
+      };
+      for (const [model, motors] of Object.entries(toggMotorRows)) {
+        const bodyType = model === 'T10X' ? 'SUV' : 'Sedan';
+        for (const year of years) {
+          const fuelKey = `${year}|TOGG|${model}|${bodyType}`;
+          const driveKey = `${fuelKey}|Elektrik`;
+          enginesByKey[`${driveKey}|Otomatik`] = [...motors];
           fuelTypesByKey[fuelKey] = ['Elektrik'];
           transmissionsByKey[driveKey] = ['Otomatik'];
         }
