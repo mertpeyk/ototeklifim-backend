@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v9';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v10';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -122,11 +122,35 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
           transmissionsByKey[`${fuelKey}|Elektrik`] = ['Otomatik'];
         }
       }
+
       const modelPackages = { ...(valuationMetadata.modelPackages || {}) } as Record<string, string[]>;
       const brandPackages = { ...(valuationMetadata.brandPackages || {}) } as Record<string, string[]>;
       const defaultPackages = Array.isArray(valuationMetadata.defaultPackages) && valuationMetadata.defaultPackages.length
         ? valuationMetadata.defaultPackages
         : ['Standart', 'Comfort', 'Prestige', 'Premium'];
+
+      // BYD Turkey's current nameplates and powertrains. Keep these in the
+      // DB maps so EV/DM-i combinations do not depend on a loose model alias.
+      const bydCatalog: Record<string, { fuel: string; engines: string[]; packages: string[] }> = {
+        'Atto 3': { fuel: 'Elektrik', engines: ['150 kW Elektrik'], packages: ['Comfort', 'Design'] },
+        Dolphin: { fuel: 'Elektrik', engines: ['150 kW Elektrik'], packages: ['Comfort', 'Design', 'Premium'] },
+        Seal: { fuel: 'Elektrik', engines: ['160 kW Design', '390 kW AWD Excellence'], packages: ['Design', 'Excellence AWD'] },
+        Han: { fuel: 'Elektrik', engines: ['380 kW AWD'], packages: ['Executive AWD'] },
+        'Seal U': { fuel: 'Hibrit', engines: ['1.5L DM-i 160 kW'], packages: ['Design', 'DM-i Design'] },
+      };
+      for (const [model, details] of Object.entries(bydCatalog)) {
+        const modelKey = `BYD|${model}`;
+        modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...details.packages]));
+        brandPackages.BYD = Array.from(new Set([...(brandPackages.BYD || []), ...details.packages]));
+        for (const year of years) {
+          const bodyType = model === 'Seal' || model === 'Han' ? 'Sedan' : 'SUV';
+          const mapKey = `${year}|BYD|${model}|${bodyType}|${details.fuel}|Otomatik`;
+          enginesByKey[mapKey] = Array.from(new Set([...(enginesByKey[mapKey] || []), ...details.engines]));
+          const fuelKey = `${year}|BYD|${model}|${bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set([...(fuelTypesByKey[fuelKey] || []), details.fuel]));
+          transmissionsByKey[`${fuelKey}|${details.fuel}`] = ['Otomatik'];
+        }
+      }
 
       // The reference index is the broadest trim source. Its values are
       // engine -> package arrays; fold them into the API's brand/model maps
