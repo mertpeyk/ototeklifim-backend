@@ -6,12 +6,13 @@ import { prisma } from '../db.js';
 import { bmwCatalog } from '../data/bmwCatalog.js';
 import { bydCatalog } from '../data/bydCatalog.js';
 import { cheryCatalog } from '../data/cheryCatalog.js';
+import { chevroletCatalog } from '../data/chevroletCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v31';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v32';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -562,6 +563,41 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
           if (!activeDrives.length) continue;
           modelsByYearMake[yearMakeKey] = Array.from(new Set([...(modelsByYearMake[yearMakeKey] || []), model]));
           const fuelKey = `${yearText}|BMW|${model}|${details.bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+          for (const drive of activeDrives) {
+            const driveKey = `${fuelKey}|${drive.fuel}`;
+            transmissionsByKey[driveKey] = [...drive.transmissions];
+            for (const transmission of drive.transmissions) {
+              enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
+            }
+          }
+        }
+      }
+
+      // Rebuild Chevrolet model-by-model for 2010-2026. Türkiye/Europe
+      // nameplates end in their actual market years; later global/import EV,
+      // performance, SUV and pickup models keep separate canonical rows.
+      // This prevents legacy Aveo/Cruze gasoline options or brand-wide trims
+      // from leaking into Bolt/Equinox EV and current imported models.
+      for (const key of Object.keys(enginesByKey)) if (key.includes('|Chevrolet|')) delete enginesByKey[key];
+      for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Chevrolet|')) delete fuelTypesByKey[key];
+      for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Chevrolet|')) delete transmissionsByKey[key];
+      for (const yearText of years) {
+        modelsByYearMake[`${yearText}|Chevrolet`] = [];
+        makesByYear[yearText] = (makesByYear[yearText] || []).filter((brand) => brand !== 'Chevrolet');
+      }
+      brandPackages.Chevrolet = Array.from(new Set(Object.values(chevroletCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(chevroletCatalog)) {
+        modelPackages[`Chevrolet|${model}`] = [...details.packages];
+        for (const yearText of years) {
+          const year = Number(yearText);
+          if (year < details.from || year > details.to) continue;
+          const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+          if (!activeDrives.length) continue;
+          makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Chevrolet']));
+          const yearMakeKey = `${yearText}|Chevrolet`;
+          modelsByYearMake[yearMakeKey] = Array.from(new Set([...(modelsByYearMake[yearMakeKey] || []), model]));
+          const fuelKey = `${yearText}|Chevrolet|${model}|${details.bodyType}`;
           fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
           for (const drive of activeDrives) {
             const driveKey = `${fuelKey}|${drive.fuel}`;

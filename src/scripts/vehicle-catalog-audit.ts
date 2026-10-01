@@ -124,6 +124,28 @@ for (const year of ['2010', '2011', '2012', '2013', '2014', '2015', '2016', '201
   if ((modelsByYearMake[`${year}|Chery`] || []).length) issues.push({ type: 'chery_invalid_model_year', key: `${year}|Chery` });
 }
 
+const chevroletEvModels = ['Bolt EV', 'Bolt EUV', 'Equinox EV', 'Blazer EV'];
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Chevrolet' || !chevroletEvModels.includes(model)) continue;
+  if (values.length !== 1 || values[0] !== 'Elektrik') {
+    issues.push({ type: 'chevrolet_ev_non_electric', key: fuelKey });
+  }
+  const gearValues = transmissions[`${fuelKey}|Elektrik`] || [];
+  if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+    issues.push({ type: 'chevrolet_ev_non_automatic', key: `${fuelKey}|Elektrik` });
+  }
+}
+for (const model of ['Spark', 'Aveo', 'Cruze', 'Orlando', 'Captiva']) {
+  if ((modelsByYearMake['2016|Chevrolet'] || []).includes(model)) {
+    issues.push({ type: 'chevrolet_invalid_model_year', key: `2016|Chevrolet|${model}` });
+  }
+}
+if ((modelsByYearMake['2024|Chevrolet'] || []).includes('Camaro')) {
+  const yearModels = modelsByYearMake['2025|Chevrolet'] || [];
+  if (yearModels.includes('Camaro')) issues.push({ type: 'chevrolet_invalid_model_year', key: '2025|Chevrolet|Camaro' });
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;
