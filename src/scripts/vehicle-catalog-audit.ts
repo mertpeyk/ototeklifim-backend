@@ -23,6 +23,36 @@ for (const [fuelKey, values] of Object.entries(fuels)) {
   fuelRowsByModelYear.set(indexKey, rows);
 }
 
+// Jaguar stopped the outgoing product range during 2024. Keep I-PACE purely
+// electric and prevent manual/automatic engine contamination in representative
+// XF/F-TYPE rows.
+if ((modelsByYearMake['2025|Jaguar'] || []).length || (modelsByYearMake['2026|Jaguar'] || []).length) {
+  issues.push({ type: 'jaguar_post_2024_legacy_model', key: '2025-2026|Jaguar' });
+}
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Jaguar' || model !== 'I-PACE') continue;
+  if (values.length !== 1 || values[0] !== 'Elektrik') {
+    issues.push({ type: 'jaguar_ipace_non_electric', key: fuelKey });
+  }
+  const gearValues = transmissions[`${fuelKey}|Elektrik`] || [];
+  if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+    issues.push({ type: 'jaguar_ipace_non_automatic', key: `${fuelKey}|Elektrik` });
+  }
+}
+for (const model of ['XJ', 'XK']) {
+  if ((modelsByYearMake['2024|Jaguar'] || []).includes(model)) {
+    issues.push({ type: 'jaguar_discontinued_model_leak', key: `2024|Jaguar|${model}` });
+  }
+}
+const jaguarXf2019Diesel = '2019|Jaguar|XF|Sedan|Dizel';
+if ((engines[`${jaguarXf2019Diesel}|Manuel`] || []).some((value) => /AT8/.test(value))) {
+  issues.push({ type: 'jaguar_engine_transmission_leak', key: `${jaguarXf2019Diesel}|Manuel` });
+}
+if ((engines[`${jaguarXf2019Diesel}|Otomatik`] || []).some((value) => !/AT8/.test(value))) {
+  issues.push({ type: 'jaguar_engine_transmission_leak', key: `${jaguarXf2019Diesel}|Otomatik` });
+}
+
 for (const [yearMake, models] of Object.entries(modelsByYearMake)) {
   const [year, brand] = yearMake.split('|');
   for (const model of models) {

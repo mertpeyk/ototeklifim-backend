@@ -202,7 +202,7 @@ export const vehicleCatalog = {
       label: 'Jaguar',
       logoUrl: '',
       categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'],
-      models: ['E-Pace', 'F-Pace', 'I-Pace', 'XE', 'XF', 'XJ', 'F-Type'],
+      models: ['XF', 'XF Sportbrake', 'XJ', 'XK', 'F-TYPE', 'XE', 'F-PACE', 'E-PACE', 'I-PACE'],
     },
     {
       key: 'Volvo',

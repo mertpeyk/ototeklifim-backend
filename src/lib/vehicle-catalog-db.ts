@@ -14,12 +14,13 @@ import { fiatCatalog } from '../data/fiatCatalog.js';
 import { fordCatalog } from '../data/fordCatalog.js';
 import { hondaCatalog } from '../data/hondaCatalog.js';
 import { hyundaiCatalog } from '../data/hyundaiCatalog.js';
+import { jaguarCatalog } from '../data/jaguarCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v43';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v44';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -178,6 +179,34 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
     }
   }
   brandPackages.Hyundai = Array.from(new Set(Object.values(hyundaiCatalog).flatMap((details) => details.packages)));
+  for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Jaguar|')) delete fuelTypesByKey[key];
+  for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Jaguar|')) delete transmissionsByKey[key];
+  for (const key of Object.keys(enginesByKey)) if (key.includes('|Jaguar|')) delete enginesByKey[key];
+  for (const yearText of years) {
+    modelsByYearMake[`${yearText}|Jaguar`] = [];
+    makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Jaguar');
+  }
+  for (const [model, details] of Object.entries(jaguarCatalog)) {
+    modelPackages[`Jaguar|${model}`] = [...details.packages];
+    for (const yearText of years) {
+      const year = Number(yearText);
+      if (year < details.from || year > details.to) continue;
+      const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+      if (!activeDrives.length) continue;
+      makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Jaguar']));
+      modelsByYearMake[`${yearText}|Jaguar`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Jaguar`] || []), model]));
+      const fuelKey = `${yearText}|Jaguar|${model}|${details.bodyType}`;
+      fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+      for (const drive of activeDrives) {
+        const driveKey = `${fuelKey}|${drive.fuel}`;
+        transmissionsByKey[driveKey] = Array.from(new Set([...(transmissionsByKey[driveKey] || []), ...drive.transmissions]));
+        for (const transmission of drive.transmissions) {
+          enginesByKey[`${driveKey}|${transmission}`] = Array.from(new Set([...(enginesByKey[`${driveKey}|${transmission}`] || []), ...drive.engines]));
+        }
+      }
+    }
+  }
+  brandPackages.Jaguar = Array.from(new Set(Object.values(jaguarCatalog).flatMap((details) => details.packages)));
   return {
     ...snapshot,
     modelsByYearMake,
@@ -197,6 +226,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
         Ford: Array.from(new Set(Object.values(fordCatalog).flatMap((details) => details.packages))),
         Honda: Array.from(new Set(Object.values(hondaCatalog).flatMap((details) => details.packages))),
         Hyundai: Array.from(new Set(Object.values(hyundaiCatalog).flatMap((details) => details.packages))),
+        Jaguar: Array.from(new Set(Object.values(jaguarCatalog).flatMap((details) => details.packages))),
       },
     },
   };
@@ -1222,6 +1252,57 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
       }
       brandPackages.TOGG = Array.from(new Set(Object.values(toggPackages).flat()));
 
+      // Rebuild Jaguar after every generic/reference/web merge. The former
+      // broad patch exposed the same petrol engines in every year, omitted
+      // legacy diesel/manual combinations and leaked combustion rows into
+      // I-PACE. Jaguar's outgoing range also must not be extended past 2024.
+      for (const key of Object.keys(enginesByKey)) if (key.includes('|Jaguar|')) delete enginesByKey[key];
+      for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Jaguar|')) delete fuelTypesByKey[key];
+      for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Jaguar|')) delete transmissionsByKey[key];
+      for (const key of Object.keys(modelPackages)) if (key.startsWith('Jaguar|')) delete modelPackages[key];
+      delete brandPackages.Jaguar;
+      for (const yearText of years) {
+        modelsByYearMake[`${yearText}|Jaguar`] = [];
+        makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Jaguar');
+      }
+      brandPackages.Jaguar = Array.from(new Set(Object.values(jaguarCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(jaguarCatalog)) {
+        modelPackages[`Jaguar|${model}`] = [...details.packages];
+        for (const yearText of years) {
+          const year = Number(yearText);
+          if (year < details.from || year > details.to) continue;
+          const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+          if (!activeDrives.length) continue;
+          makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Jaguar']));
+          modelsByYearMake[`${yearText}|Jaguar`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Jaguar`] || []), model]));
+          const fuelKey = `${yearText}|Jaguar|${model}|${details.bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+          for (const drive of activeDrives) {
+            const driveKey = `${fuelKey}|${drive.fuel}`;
+            transmissionsByKey[driveKey] = Array.from(new Set([...(transmissionsByKey[driveKey] || []), ...drive.transmissions]));
+            for (const transmission of drive.transmissions) {
+              enginesByKey[`${driveKey}|${transmission}`] = Array.from(new Set([...(enginesByKey[`${driveKey}|${transmission}`] || []), ...drive.engines]));
+            }
+          }
+        }
+      }
+
+      const jaguarReferenceModels = vehicleReferenceIndex.models as Record<string, Record<string, string[]>>;
+      jaguarReferenceModels['Otomobil|Jaguar|XF'] = Object.fromEntries(
+        jaguarCatalog.XF.drives.flatMap((drive) => drive.engines.map((engine) => [engine, jaguarCatalog.XF.packages])),
+      );
+      jaguarReferenceModels['Otomobil|Jaguar|XE'] = Object.fromEntries(
+        jaguarCatalog.XE.drives.flatMap((drive) => drive.engines.map((engine) => [engine, jaguarCatalog.XE.packages])),
+      );
+      jaguarReferenceModels['Otomobil|Jaguar|F-TYPE'] = Object.fromEntries(
+        jaguarCatalog['F-TYPE'].drives.flatMap((drive) => drive.engines.map((engine) => [engine, jaguarCatalog['F-TYPE'].packages])),
+      );
+      for (const model of ['F-PACE', 'E-PACE', 'I-PACE'] as const) {
+        jaguarReferenceModels[`Arazi, SUV, Pick-up|Jaguar|${model}`] = Object.fromEntries(
+          jaguarCatalog[model].drives.flatMap((drive) => drive.engines.map((engine) => [engine, jaguarCatalog[model].packages])),
+        );
+      }
+
       // Citroën packages are authoritative after reference/web enrichment.
       // Otherwise a combined current listing such as "e-C4 115 kW Max" is
       // appended to the combustion C4 model and unrelated legacy trims leak
@@ -1254,6 +1335,10 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         modelPackages[`Hyundai|${model}`] = [...details.packages];
       }
       brandPackages.Hyundai = Array.from(new Set(Object.values(hyundaiCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(jaguarCatalog)) {
+        modelPackages[`Jaguar|${model}`] = [...details.packages];
+      }
+      brandPackages.Jaguar = Array.from(new Set(Object.values(jaguarCatalog).flatMap((details) => details.packages)));
 
       const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
         ? valuationMetadata.commonColors
