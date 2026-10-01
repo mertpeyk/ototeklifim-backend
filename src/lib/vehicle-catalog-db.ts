@@ -18,12 +18,13 @@ import { jaguarCatalog } from '../data/jaguarCatalog.js';
 import { kiaCatalog } from '../data/kiaCatalog.js';
 import { mercedesCatalog } from '../data/mercedesCatalog.js';
 import { mgCatalog } from '../data/mgCatalog.js';
+import { mitsubishiCatalog } from '../data/mitsubishiCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v47';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v48';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -299,6 +300,34 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
     }
   }
   brandPackages.MG = Array.from(new Set(Object.values(mgCatalog).flatMap((details) => details.packages)));
+  for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Mitsubishi|')) delete fuelTypesByKey[key];
+  for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Mitsubishi|')) delete transmissionsByKey[key];
+  for (const key of Object.keys(enginesByKey)) if (key.includes('|Mitsubishi|')) delete enginesByKey[key];
+  for (const key of Object.keys(modelPackages)) if (key.startsWith('Mitsubishi|')) delete modelPackages[key];
+  delete brandPackages.Mitsubishi;
+  for (const yearText of years) {
+    modelsByYearMake[`${yearText}|Mitsubishi`] = [];
+    makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Mitsubishi');
+  }
+  for (const [model, details] of Object.entries(mitsubishiCatalog)) {
+    modelPackages[`Mitsubishi|${model}`] = [...details.packages];
+    for (const yearText of years) {
+      const year = Number(yearText);
+      if (year < details.from || year > details.to) continue;
+      const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+      if (!activeDrives.length) continue;
+      makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Mitsubishi']));
+      modelsByYearMake[`${yearText}|Mitsubishi`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Mitsubishi`] || []), model]));
+      const fuelKey = `${yearText}|Mitsubishi|${model}|${details.bodyType}`;
+      fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+      for (const drive of activeDrives) {
+        const driveKey = `${fuelKey}|${drive.fuel}`;
+        transmissionsByKey[driveKey] = Array.from(new Set(drive.transmissions));
+        for (const transmission of drive.transmissions) enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
+      }
+    }
+  }
+  brandPackages.Mitsubishi = Array.from(new Set(Object.values(mitsubishiCatalog).flatMap((details) => details.packages)));
   return {
     ...snapshot,
     modelsByYearMake,
@@ -322,6 +351,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
         Kia: Array.from(new Set(Object.values(kiaCatalog).flatMap((details) => details.packages))),
         'Mercedes-Benz': Array.from(new Set(Object.values(mercedesCatalog).flatMap((details) => details.packages))),
         MG: Array.from(new Set(Object.values(mgCatalog).flatMap((details) => details.packages))),
+        Mitsubishi: Array.from(new Set(Object.values(mitsubishiCatalog).flatMap((details) => details.packages))),
       },
     },
   };
@@ -1484,6 +1514,37 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         }
       }
 
+      // Rebuild Mitsubishi after generic/reference/web enrichment so old
+      // Lancer/Pajero engines and current ASX/Outlander drivetrains never mix.
+      for (const key of Object.keys(enginesByKey)) if (key.includes('|Mitsubishi|')) delete enginesByKey[key];
+      for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Mitsubishi|')) delete fuelTypesByKey[key];
+      for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Mitsubishi|')) delete transmissionsByKey[key];
+      for (const key of Object.keys(modelPackages)) if (key.startsWith('Mitsubishi|')) delete modelPackages[key];
+      delete brandPackages.Mitsubishi;
+      for (const yearText of years) {
+        modelsByYearMake[`${yearText}|Mitsubishi`] = [];
+        makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Mitsubishi');
+      }
+      brandPackages.Mitsubishi = Array.from(new Set(Object.values(mitsubishiCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(mitsubishiCatalog)) {
+        modelPackages[`Mitsubishi|${model}`] = [...details.packages];
+        for (const yearText of years) {
+          const year = Number(yearText);
+          if (year < details.from || year > details.to) continue;
+          const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+          if (!activeDrives.length) continue;
+          makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Mitsubishi']));
+          modelsByYearMake[`${yearText}|Mitsubishi`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Mitsubishi`] || []), model]));
+          const fuelKey = `${yearText}|Mitsubishi|${model}|${details.bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+          for (const drive of activeDrives) {
+            const driveKey = `${fuelKey}|${drive.fuel}`;
+            transmissionsByKey[driveKey] = Array.from(new Set(drive.transmissions));
+            for (const transmission of drive.transmissions) enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
+          }
+        }
+      }
+
       const kiaReferenceModels = vehicleReferenceIndex.models as Record<string, Record<string, string[]>>;
       for (const [model, details] of Object.entries(kiaCatalog)) {
         const category = details.bodyType === 'SUV' ? 'Arazi, SUV, Pick-up'
@@ -1508,6 +1569,16 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
       for (const [model, details] of Object.entries(mgCatalog)) {
         const category = details.bodyType === 'SUV' ? 'Arazi, SUV, Pick-up' : 'Otomobil';
         mgReferenceModels[`${category}|MG|${model}`] = Object.fromEntries(
+          details.drives.flatMap((drive) => drive.engines.map((engine) => [engine, details.packages])),
+        );
+      }
+
+      const mitsubishiReferenceModels = vehicleReferenceIndex.models as Record<string, Record<string, string[]>>;
+      for (const [model, details] of Object.entries(mitsubishiCatalog)) {
+        const category = details.bodyType === 'SUV' || details.bodyType === 'Pickup' ? 'Arazi, SUV, Pick-up'
+          : details.bodyType === 'MPV' || details.bodyType === 'Panelvan' ? 'Minivan & Panelvan'
+            : 'Otomobil';
+        mitsubishiReferenceModels[`${category}|Mitsubishi|${model}`] = Object.fromEntries(
           details.drives.flatMap((drive) => drive.engines.map((engine) => [engine, details.packages])),
         );
       }
@@ -1576,6 +1647,10 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         modelPackages[`MG|${model}`] = [...details.packages];
       }
       brandPackages.MG = Array.from(new Set(Object.values(mgCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(mitsubishiCatalog)) {
+        modelPackages[`Mitsubishi|${model}`] = [...details.packages];
+      }
+      brandPackages.Mitsubishi = Array.from(new Set(Object.values(mitsubishiCatalog).flatMap((details) => details.packages)));
 
       const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
         ? valuationMetadata.commonColors

@@ -1,5 +1,6 @@
 import { mercedesCatalog } from './mercedesCatalog.js';
 import { mgCatalog } from './mgCatalog.js';
+import { mitsubishiCatalog } from './mitsubishiCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -237,8 +238,8 @@ export const vehicleCatalog = {
       key: 'Mitsubishi',
       label: 'Mitsubishi',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'hasarli-araclar', 'klasik-araclar'],
-      models: ['Space Star', 'ASX', 'Eclipse Cross', 'Outlander', 'L200'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'],
+      models: Object.keys(mitsubishiCatalog),
     },
     {
       key: 'Suzuki',
