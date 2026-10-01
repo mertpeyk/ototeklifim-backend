@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v7';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v8';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,10 +32,11 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
 
   for (const root of candidates) {
     try {
-      const [catalog, metadata, referenceIndex] = await Promise.all([
+      const [catalog, metadata, referenceIndex, webPackageIndex] = await Promise.all([
         readFile(path.join(root, 'valuation-catalog.json'), 'utf8'),
         readFile(path.join(root, 'valuation-metadata.json'), 'utf8'),
         readFile(path.join(root, 'vehicle-reference-index.json'), 'utf8').catch(() => '{"version":2,"models":{}}'),
+        readFile(path.join(root, 'web-package-index.json'), 'utf8').catch(() => '{"models":{}}'),
       ]);
       const valuation = JSON.parse(catalog) as Record<string, any>;
       const years = (valuation.years || []).map(String);
@@ -75,6 +76,7 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
 
       const valuationMetadata = JSON.parse(metadata) as Record<string, any>;
       const vehicleReferenceIndex = JSON.parse(referenceIndex) as Record<string, unknown>;
+      const webPackages = JSON.parse(webPackageIndex) as { models?: Record<string, unknown> };
       const modelPackages = { ...(valuationMetadata.modelPackages || {}) } as Record<string, string[]>;
       const brandPackages = { ...(valuationMetadata.brandPackages || {}) } as Record<string, string[]>;
       const defaultPackages = Array.isArray(valuationMetadata.defaultPackages) && valuationMetadata.defaultPackages.length
@@ -95,6 +97,17 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
         const modelKey = `${brand}|${model}`;
         modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...packages]));
         brandPackages[brand] = Array.from(new Set([...(brandPackages[brand] || []), ...packages]));
+      }
+
+      // Merge externally researched Turkey-market trim names as a second,
+      // clearly separated source. Existing curated/reference packages win by
+      // retaining their values; web entries only add missing verified names.
+      for (const [modelKey, packageList] of Object.entries(webPackages.models || {})) {
+        const packages = Array.isArray(packageList) ? packageList.map(String).map((value) => value.trim()).filter(Boolean) : [];
+        if (!packages.length) continue;
+        const [, brand] = modelKey.split('|');
+        modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...packages]));
+        if (brand) brandPackages[brand] = Array.from(new Set([...(brandPackages[brand] || []), ...packages]));
       }
 
       // Every DB vehicle node must have a usable package list. The external
