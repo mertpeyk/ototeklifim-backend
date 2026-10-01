@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v20';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v21';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -334,6 +334,22 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
         const [, brand] = modelKey.split('|');
         modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...packages]));
         if (brand) brandPackages[brand] = Array.from(new Set([...(brandPackages[brand] || []), ...packages]));
+      }
+
+      // Cover every model exposed by the DB vehicle catalog, not only the
+      // curated brand list. This closes the gap for older/less popular models
+      // while keeping package names sourced from the corresponding brand.
+      for (const [yearMakeKey, models] of Object.entries(modelsByYearMake)) {
+        const [, brand] = yearMakeKey.split('|');
+        const brandOptions = Array.isArray(brandPackages[brand]) && brandPackages[brand].length
+          ? brandPackages[brand]
+          : defaultPackages;
+        for (const model of models || []) {
+          const modelKey = `${brand}|${model}`;
+          if (!Array.isArray(modelPackages[modelKey]) || !modelPackages[modelKey].length) {
+            modelPackages[modelKey] = [...brandOptions];
+          }
+        }
       }
 
       // Every DB vehicle node must have a usable package list. The external
