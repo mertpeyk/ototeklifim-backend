@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v16';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v17';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,6 +75,18 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
       }
 
       const valuationMetadata = JSON.parse(metadata) as Record<string, any>;
+      // Preserve the legacy UI seed in the DB snapshot as a catalog seed. It
+      // is only used when a model has no engine row at all; model-specific
+      // engines continue to come from enginesByKey/referenceIndex.
+      valuationMetadata.genericEngineOptions = Array.from(new Set([
+        ...(valuationMetadata.genericEngineOptions || []),
+        '0.9 TwinAir', '1.0 TSI', '1.0 EcoBoost', '1.2 PureTech',
+        '1.3 TCe', '1.4 TSI', '1.5 BlueHDi', '1.5 dCi', '1.5 EcoBoost',
+        '1.6', '1.6 CRDi', '1.6 dCi', '1.6 HDi', '1.6 Multijet', '1.6 TDI',
+        '1.6 T-GDI', '1.8 Hybrid', '2.0 TDI', '2.0 BlueHDi', '2.0 dCi',
+        '2.0 TFSI', '2.2 CRDi', '2.5 Hybrid', '3.0 TDI', '3.0 TFSI',
+        'Elektrik', 'Çift Motor Elektrik',
+      ]));
       const vehicleReferenceIndex = JSON.parse(referenceIndex) as Record<string, unknown>;
       const webPackages = JSON.parse(webPackageIndex) as { models?: Record<string, unknown> };
 
