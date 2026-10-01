@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v4';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v5';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,6 +39,27 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
       const years = (valuation.years || []).map(String);
       const makesByYear = { ...(valuation.makesByYear || {}) } as Record<string, string[]>;
       const modelsByYearMake = { ...(valuation.modelsByYearMake || {}) } as Record<string, string[]>;
+      // These maps are the complete engine source. Copy and normalize them
+      // into the DB snapshot explicitly so an older/incomplete snapshot can
+      // never silently drop model engine combinations.
+      const enginesByKey = Object.fromEntries(
+        Object.entries(valuation.enginesByKey || {}).map(([key, engines]) => [
+          key,
+          Array.from(new Set((Array.isArray(engines) ? engines : []).map(String))),
+        ]),
+      );
+      const fuelTypesByKey = Object.fromEntries(
+        Object.entries(valuation.fuelTypesByKey || {}).map(([key, fuels]) => [
+          key,
+          Array.from(new Set((Array.isArray(fuels) ? fuels : []).map(String))),
+        ]),
+      );
+      const transmissionsByKey = Object.fromEntries(
+        Object.entries(valuation.transmissionsByKey || {}).map(([key, transmissions]) => [
+          key,
+          Array.from(new Set((Array.isArray(transmissions) ? transmissions : []).map(String))),
+        ]),
+      );
 
       // Keep the admin/static catalogue additions (for example Mercedes E250)
       // in the same API tree even when the external valuation source has no row.
@@ -93,6 +114,9 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
         ...valuation,
         makesByYear,
         modelsByYearMake,
+        enginesByKey,
+        fuelTypesByKey,
+        transmissionsByKey,
         valuationMetadata: {
           ...valuationMetadata,
           defaultPackages,
