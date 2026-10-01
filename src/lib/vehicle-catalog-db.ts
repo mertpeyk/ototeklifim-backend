@@ -69,7 +69,10 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
       fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
       for (const drive of activeDrives) {
         const driveKey = `${fuelKey}|${drive.fuel}`;
-        transmissionsByKey[driveKey] = [...drive.transmissions];
+        transmissionsByKey[driveKey] = Array.from(new Set([
+          ...(transmissionsByKey[driveKey] || []),
+          ...drive.transmissions,
+        ]));
         for (const transmission of drive.transmissions) {
           enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
         }
