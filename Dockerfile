@@ -23,4 +23,4 @@ ENV PORT=8080
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "npm run db:push && npm start"]
+CMD ["sh", "-c", "npm run db:push && npm run catalog:refresh && npm start"]
