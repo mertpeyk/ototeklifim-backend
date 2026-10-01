@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { prisma } from '../db.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
-const SETTING_KEY = 'vehicle_catalog_snapshot_v1';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v2';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -31,9 +31,26 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
         readFile(path.join(root, 'valuation-catalog.json'), 'utf8'),
         readFile(path.join(root, 'valuation-metadata.json'), 'utf8'),
       ]);
+      const valuation = JSON.parse(catalog) as Record<string, any>;
+      const years = (valuation.years || []).map(String);
+      const makesByYear = { ...(valuation.makesByYear || {}) } as Record<string, string[]>;
+      const modelsByYearMake = { ...(valuation.modelsByYearMake || {}) } as Record<string, string[]>;
+
+      // Keep the admin/static catalogue additions (for example Mercedes E250)
+      // in the same API tree even when the external valuation source has no row.
+      for (const brand of (vehicleCatalog.brands || []) as Array<{ label: string; models: string[] }>) {
+        for (const year of years) {
+          makesByYear[year] = Array.from(new Set([...(makesByYear[year] || []), brand.label]));
+          const key = `${year}|${brand.label}`;
+          modelsByYearMake[key] = Array.from(new Set([...(modelsByYearMake[key] || []), ...(brand.models || [])]));
+        }
+      }
+
       return {
         ...vehicleCatalog,
-        ...(JSON.parse(catalog) as Record<string, unknown>),
+        ...valuation,
+        makesByYear,
+        modelsByYearMake,
         valuationMetadata: JSON.parse(metadata) as Record<string, unknown>,
       };
     } catch {
