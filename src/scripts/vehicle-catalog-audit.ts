@@ -233,6 +233,20 @@ for (const year of ['2021', '2022', '2023', '2024', '2025']) {
     issues.push({ type: 'dacia_logan_generation_gap', key: `${year}|Dacia|Logan` });
   }
 }
+const daciaDuster2023Base = '2023|Dacia|Duster|SUV';
+if ((engines[`${daciaDuster2023Base}|Benzin|Manuel`] || []).some((value) => value.includes('EDC'))) {
+  issues.push({ type: 'dacia_engine_transmission_leak', key: `${daciaDuster2023Base}|Benzin|Manuel` });
+}
+if ((engines[`${daciaDuster2023Base}|Benzin|Otomatik`] || []).some((value) => value.includes('4x4'))) {
+  issues.push({ type: 'dacia_engine_transmission_leak', key: `${daciaDuster2023Base}|Benzin|Otomatik` });
+}
+const daciaJogger2026Base = '2026|Dacia|Jogger|MPV|LPG';
+if ((engines[`${daciaJogger2026Base}|Manuel`] || []).some((value) => value.includes('EDC'))) {
+  issues.push({ type: 'dacia_engine_transmission_leak', key: `${daciaJogger2026Base}|Manuel` });
+}
+if ((engines[`${daciaJogger2026Base}|Otomatik`] || []).some((value) => !value.includes('EDC'))) {
+  issues.push({ type: 'dacia_engine_transmission_leak', key: `${daciaJogger2026Base}|Otomatik` });
+}
 
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
