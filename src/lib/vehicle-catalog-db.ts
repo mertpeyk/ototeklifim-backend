@@ -161,6 +161,58 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
         }
       }
 
+      // Complete the Chery, Jaguar and Volvo branches in the same DB maps.
+      // These entries deliberately use the model names exposed by the public
+      // catalog so fuel/transmission/engine/package selections stay aligned.
+      const brandPowertrains: Record<string, Record<string, { bodyType: string; fuel: string; engines: string[]; packages: string[] }>> = {
+        Chery: {
+          'Tiggo 4 Pro': { bodyType: 'SUV', fuel: 'Benzin', engines: ['1.5 Turbo'], packages: ['Comfort', 'Luxury'] },
+          'Tiggo 7 Pro': { bodyType: 'SUV', fuel: 'Benzin', engines: ['1.6 TGDI'], packages: ['Luxury', 'Excellent'] },
+          'Tiggo 7 Pro Max': { bodyType: 'SUV', fuel: 'Benzin', engines: ['1.6 TGDI'], packages: ['Intelligent', 'Exceptional'] },
+          'Tiggo 8 Pro': { bodyType: 'SUV', fuel: 'Benzin', engines: ['1.6 TGDI'], packages: ['Luxury', 'Excellent'] },
+          'Tiggo 8 Pro Max': { bodyType: 'SUV', fuel: 'Benzin', engines: ['1.6 TGDI'], packages: ['Intelligent', 'Exceptional'] },
+          'Omoda 5': { bodyType: 'SUV', fuel: 'Benzin', engines: ['1.6 TGDI'], packages: ['Comfort', 'Luxury'] },
+          'Omoda E5': { bodyType: 'SUV', fuel: 'Elektrik', engines: ['61 kWh Elektrik'], packages: ['Comfort', 'Luxury'] },
+          'Jaecoo 7': { bodyType: 'SUV', fuel: 'Benzin', engines: ['1.6 TGDI'], packages: ['Luxury', 'Excellence'] },
+          'Jaecoo 8': { bodyType: 'SUV', fuel: 'Benzin', engines: ['1.6 TGDI'], packages: ['Luxury', 'Excellence'] },
+        },
+        Jaguar: {
+          'E-Pace': { bodyType: 'SUV', fuel: 'Benzin', engines: ['1.5 PHEV', '2.0 Turbo'], packages: ['S', 'SE', 'R-Dynamic'] },
+          'F-Pace': { bodyType: 'SUV', fuel: 'Benzin', engines: ['2.0 Turbo', '3.0 P400'], packages: ['R-Dynamic S', 'R-Dynamic SE', 'R-Dynamic HSE'] },
+          'I-Pace': { bodyType: 'SUV', fuel: 'Elektrik', engines: ['400 PS Elektrik'], packages: ['S', 'SE', 'HSE'] },
+          XE: { bodyType: 'Sedan', fuel: 'Benzin', engines: ['2.0 Turbo'], packages: ['S', 'SE', 'R-Dynamic'] },
+          XF: { bodyType: 'Sedan', fuel: 'Benzin', engines: ['2.0 Turbo', '2.0 D'], packages: ['R-Dynamic S', 'R-Dynamic SE', 'R-Dynamic HSE'] },
+          XJ: { bodyType: 'Sedan', fuel: 'Benzin', engines: ['3.0 V6'], packages: ['Luxury', 'Premium Luxury', 'Portfolio'] },
+          'F-Type': { bodyType: 'Coupe', fuel: 'Benzin', engines: ['2.0 Turbo', '5.0 V8'], packages: ['R-Dynamic', 'R', 'First Edition'] },
+        },
+        Volvo: {
+          EX30: { bodyType: 'SUV', fuel: 'Elektrik', engines: ['Single Motor', 'Twin Motor Performance'], packages: ['Core', 'Plus', 'Ultra'] },
+          EX40: { bodyType: 'SUV', fuel: 'Elektrik', engines: ['Single Motor Extended Range', 'Twin Motor Performance'], packages: ['Plus', 'Ultra', 'Black Edition'] },
+          EC40: { bodyType: 'SUV', fuel: 'Elektrik', engines: ['Single Motor Extended Range', 'Twin Motor Performance'], packages: ['Plus', 'Ultimate'] },
+          XC40: { bodyType: 'SUV', fuel: 'Hibrit', engines: ['B3 Mild Hybrid', 'B4 Mild Hybrid'], packages: ['Core', 'Plus', 'Ultimate'] },
+          XC60: { bodyType: 'SUV', fuel: 'Hibrit', engines: ['B5 Mild Hybrid', 'T6 Recharge', 'T8 Recharge'], packages: ['Core', 'Plus', 'Ultimate'] },
+          XC90: { bodyType: 'SUV', fuel: 'Hibrit', engines: ['B5 Mild Hybrid', 'T8 Recharge'], packages: ['Core', 'Plus', 'Ultimate'] },
+          S60: { bodyType: 'Sedan', fuel: 'Hibrit', engines: ['B3 Mild Hybrid', 'T8 Recharge'], packages: ['Core', 'Plus', 'Ultimate'] },
+          S90: { bodyType: 'Sedan', fuel: 'Hibrit', engines: ['B5 Mild Hybrid', 'T8 Recharge'], packages: ['Plus', 'Ultimate'] },
+          V60: { bodyType: 'Station Wagon', fuel: 'Hibrit', engines: ['B4 Mild Hybrid', 'T6 Recharge'], packages: ['Core', 'Plus', 'Ultimate'] },
+          'V90 Cross Country': { bodyType: 'Station Wagon', fuel: 'Hibrit', engines: ['B5 Mild Hybrid'], packages: ['Plus', 'Ultimate'] },
+        },
+      };
+      for (const [brand, models] of Object.entries(brandPowertrains)) {
+        brandPackages[brand] = Array.from(new Set([...(brandPackages[brand] || []), ...Object.values(models).flatMap((details) => details.packages)]));
+        for (const [model, details] of Object.entries(models)) {
+          const modelKey = `${brand}|${model}`;
+          modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...details.packages]));
+          for (const year of years) {
+            const fuelKey = `${year}|${brand}|${model}|${details.bodyType}`;
+            const driveKey = `${fuelKey}|${details.fuel}`;
+            enginesByKey[`${driveKey}|Otomatik`] = Array.from(new Set([...(enginesByKey[`${driveKey}|Otomatik`] || []), ...details.engines]));
+            fuelTypesByKey[fuelKey] = Array.from(new Set([...(fuelTypesByKey[fuelKey] || []), details.fuel]));
+            transmissionsByKey[driveKey] = ['Otomatik'];
+          }
+        }
+      }
+
       const defaultPackages = Array.isArray(valuationMetadata.defaultPackages) && valuationMetadata.defaultPackages.length
         ? valuationMetadata.defaultPackages
         : ['Standart', 'Comfort', 'Prestige', 'Premium'];

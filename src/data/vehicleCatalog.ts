@@ -183,6 +183,27 @@ export const vehicleCatalog = {
       models: ['T10X', 'T10F'],
     },
     {
+      key: 'Chery',
+      label: 'Chery',
+      logoUrl: '',
+      categoryKeys: ['otomobil', 'arazi-suv-pickup'],
+      models: ['Tiggo 4 Pro', 'Tiggo 7 Pro', 'Tiggo 7 Pro Max', 'Tiggo 8 Pro', 'Tiggo 8 Pro Max', 'Omoda 5', 'Omoda E5', 'Jaecoo 7', 'Jaecoo 8'],
+    },
+    {
+      key: 'Jaguar',
+      label: 'Jaguar',
+      logoUrl: '',
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'],
+      models: ['E-Pace', 'F-Pace', 'I-Pace', 'XE', 'XF', 'XJ', 'F-Type'],
+    },
+    {
+      key: 'Volvo',
+      label: 'Volvo',
+      logoUrl: '',
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'],
+      models: ['EX30', 'EX40', 'EC40', 'XC40', 'XC60', 'XC90', 'S60', 'S90', 'V60', 'V90 Cross Country'],
+    },
+    {
       key: 'MG',
       label: 'MG',
       logoUrl: '',
