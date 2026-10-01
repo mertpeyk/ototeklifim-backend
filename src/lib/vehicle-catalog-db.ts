@@ -8,7 +8,8 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v3';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v4';
+const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -75,8 +76,20 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
         ? valuationMetadata.commonColors
         : vehicleCatalog.colorOptions;
 
+      const allowedCategories = (vehicleCatalog.categories || []).filter((category: any) =>
+        ALLOWED_CATEGORY_KEYS.has(category.key),
+      );
+      const allowedBrands = (vehicleCatalog.brands || [])
+        .map((brand: any) => ({
+          ...brand,
+          categoryKeys: (brand.categoryKeys || []).filter((key: string) => ALLOWED_CATEGORY_KEYS.has(key)),
+        }))
+        .filter((brand: any) => brand.categoryKeys.length);
+
       return {
         ...vehicleCatalog,
+        categories: allowedCategories,
+        brands: allowedBrands,
         ...valuation,
         makesByYear,
         modelsByYearMake,
