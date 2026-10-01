@@ -462,7 +462,7 @@ model AdminUserNote {
 
 model AppSetting {
   key       String   @id
-  value     String   @db.Text
+  value     String   @db.LongText
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

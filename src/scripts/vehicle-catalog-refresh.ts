@@ -1,9 +1,8 @@
 import { prisma } from '../db.js';
-import { clearVehicleCatalogCache, getVehicleCatalogSnapshot } from '../lib/vehicle-catalog-db.js';
+import { refreshVehicleCatalogSnapshot } from '../lib/vehicle-catalog-db.js';
 
 async function main() {
-  clearVehicleCatalogCache();
-  const snapshot = await getVehicleCatalogSnapshot();
+  const snapshot = await refreshVehicleCatalogSnapshot();
   const modelCount = Object.values(snapshot.modelsByYearMake || {})
     .reduce((total, models) => total + (Array.isArray(models) ? models.length : 0), 0);
 

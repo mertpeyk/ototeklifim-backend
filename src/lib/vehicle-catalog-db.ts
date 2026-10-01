@@ -736,20 +736,38 @@ export async function getVehicleCatalogSnapshot() {
       }
     }
 
-    const snapshot = await buildVehicleCatalogSnapshot();
-    await prisma.appSetting.upsert({
-      where: { key: SETTING_KEY },
-      create: { key: SETTING_KEY, value: JSON.stringify(snapshot) },
-      update: { value: JSON.stringify(snapshot) },
+    // Never build the large catalog on the API event loop. Until the current
+    // snapshot is ready, serve the most recent stored version (if any) or the
+    // lightweight built-in catalog. A separate refresh process writes the new
+    // snapshot and the API cache is cleared when it exits.
+    const previous = await prisma.appSetting.findFirst({
+      where: { key: { startsWith: 'vehicle_catalog_snapshot_v' } },
+      orderBy: { updatedAt: 'desc' },
     });
-    memorySnapshot = snapshot;
-    return snapshot;
+    if (previous) {
+      try {
+        memorySnapshot = JSON.parse(previous.value) as CatalogSnapshot;
+        return memorySnapshot;
+      } catch {
+        // Fall through to the built-in catalog.
+      }
+    }
   } catch {
-    // Catalog loading must never prevent the API from passing healthcheck.
-    // The static catalog is still a valid source until the DB is available.
-    memorySnapshot = await buildVehicleCatalogSnapshot();
-    return memorySnapshot;
+    // The built-in catalog keeps the API available while DB access recovers.
   }
+
+  memorySnapshot = { ...vehicleCatalog };
+  return memorySnapshot;
+}
+
+export async function refreshVehicleCatalogSnapshot() {
+  const snapshot = await buildVehicleCatalogSnapshot();
+  await prisma.appSetting.upsert({
+    where: { key: SETTING_KEY },
+    create: { key: SETTING_KEY, value: JSON.stringify(snapshot) },
+    update: { value: JSON.stringify(snapshot) },
+  });
+  return snapshot;
 }
 
 export function clearVehicleCatalogCache() {
