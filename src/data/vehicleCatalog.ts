@@ -117,8 +117,8 @@ export const vehicleCatalog = {
       key: 'Hyundai',
       label: 'Hyundai',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar', 'kiralik-araclar', 'hasarli-araclar'],
-      models: ['i10', 'i20', 'i30', 'Elantra', 'Bayon', 'Kona', 'Kona EV', 'Tucson', 'Santa Fe', 'IONIQ 5', 'IONIQ 6', 'IONIQ 9', 'INSTER', 'STARIA HEV'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'],
+      models: ['Getz', 'Matrix', 'Accent Era', 'Accent Blue', 'i10', 'i20', 'i20 Active', 'i20 N', 'i30', 'Elantra', 'Sonata', 'i40', 'ix20', 'Veloster', 'Genesis Coupe', 'ix35', 'Tucson', 'Santa Fe', 'Kona', 'Kona EV', 'Bayon', 'IONIQ Hybrid', 'IONIQ Electric', 'IONIQ 5', 'IONIQ 5 N', 'IONIQ 6', 'IONIQ 9', 'INSTER', 'H-1', 'STARIA', 'STARIA HEV', 'H100'],
     },
     {
       key: 'Kia',

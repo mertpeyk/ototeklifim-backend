@@ -359,6 +359,35 @@ if ((engines[`${hondaCivic2019Diesel}|Otomatik`] || []).some((value) => !/AT9|CV
   issues.push({ type: 'honda_engine_transmission_leak', key: `${hondaCivic2019Diesel}|Otomatik` });
 }
 
+const hyundaiEvModels = ['Kona EV', 'IONIQ Electric', 'IONIQ 5', 'IONIQ 5 N', 'IONIQ 6', 'IONIQ 9', 'INSTER'];
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Hyundai' || !hyundaiEvModels.includes(model)) continue;
+  if (values.length !== 1 || values[0] !== 'Elektrik') {
+    issues.push({ type: 'hyundai_ev_non_electric', key: fuelKey });
+  }
+  const gearValues = transmissions[`${fuelKey}|Elektrik`] || [];
+  if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+    issues.push({ type: 'hyundai_ev_non_automatic', key: `${fuelKey}|Elektrik` });
+  }
+}
+for (const model of ['Getz', 'Matrix', 'Accent Era', 'Sonata', 'Veloster', 'Genesis Coupe', 'ix35']) {
+  if ((modelsByYearMake['2026|Hyundai'] || []).includes(model)) {
+    issues.push({ type: 'hyundai_invalid_model_year', key: `2026|Hyundai|${model}` });
+  }
+}
+for (const year of ['2021', '2022', '2023']) {
+  if ((modelsByYearMake[`${year}|Hyundai`] || []).includes('i30')) {
+    issues.push({ type: 'hyundai_i30_sales_gap', key: `${year}|Hyundai|i30` });
+  }
+}
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand === 'Hyundai' && model === 'STARIA HEV' && (values.length !== 1 || values[0] !== 'Hibrit')) {
+    issues.push({ type: 'hyundai_staria_hev_invalid_fuel', key: fuelKey });
+  }
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;

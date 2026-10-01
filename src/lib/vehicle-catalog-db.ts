@@ -13,12 +13,13 @@ import { daciaCatalog } from '../data/daciaCatalog.js';
 import { fiatCatalog } from '../data/fiatCatalog.js';
 import { fordCatalog } from '../data/fordCatalog.js';
 import { hondaCatalog } from '../data/hondaCatalog.js';
+import { hyundaiCatalog } from '../data/hyundaiCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v42';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v43';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -146,6 +147,37 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
     }
   }
   brandPackages.Honda = Array.from(new Set(Object.values(hondaCatalog).flatMap((details) => details.packages)));
+  for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Hyundai|')) delete fuelTypesByKey[key];
+  for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Hyundai|')) delete transmissionsByKey[key];
+  for (const key of Object.keys(enginesByKey)) if (key.includes('|Hyundai|')) delete enginesByKey[key];
+  for (const yearText of years) {
+    modelsByYearMake[`${yearText}|Hyundai`] = [];
+    makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Hyundai');
+  }
+  for (const [model, details] of Object.entries(hyundaiCatalog)) {
+    modelPackages[`Hyundai|${model}`] = [...details.packages];
+    for (const yearText of years) {
+      const year = Number(yearText);
+      if (year < details.from || year > details.to) continue;
+      const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+      if (!activeDrives.length) continue;
+      makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Hyundai']));
+      modelsByYearMake[`${yearText}|Hyundai`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Hyundai`] || []), model]));
+      const fuelKey = `${yearText}|Hyundai|${model}|${details.bodyType}`;
+      fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+      for (const drive of activeDrives) {
+        const driveKey = `${fuelKey}|${drive.fuel}`;
+        transmissionsByKey[driveKey] = Array.from(new Set([...(transmissionsByKey[driveKey] || []), ...drive.transmissions]));
+        for (const transmission of drive.transmissions) {
+          enginesByKey[`${driveKey}|${transmission}`] = Array.from(new Set([
+            ...(enginesByKey[`${driveKey}|${transmission}`] || []),
+            ...drive.engines,
+          ]));
+        }
+      }
+    }
+  }
+  brandPackages.Hyundai = Array.from(new Set(Object.values(hyundaiCatalog).flatMap((details) => details.packages)));
   return {
     ...snapshot,
     modelsByYearMake,
@@ -164,6 +196,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
         Fiat: Array.from(new Set(Object.values(fiatCatalog).flatMap((details) => details.packages))),
         Ford: Array.from(new Set(Object.values(fordCatalog).flatMap((details) => details.packages))),
         Honda: Array.from(new Set(Object.values(hondaCatalog).flatMap((details) => details.packages))),
+        Hyundai: Array.from(new Set(Object.values(hyundaiCatalog).flatMap((details) => details.packages))),
       },
     },
   };
@@ -994,6 +1027,73 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         '150 kW 68.8 kWh': ['Elegance', 'Advance'],
       };
 
+      // Rebuild Hyundai model-by-model for 2010-2026. The old package-only
+      // patch left discontinued models in current years and mixed combustion,
+      // HEV and EV powertrains across similarly named IONIQ/KONA/STARIA rows.
+      for (const key of Object.keys(enginesByKey)) if (key.includes('|Hyundai|')) delete enginesByKey[key];
+      for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Hyundai|')) delete fuelTypesByKey[key];
+      for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Hyundai|')) delete transmissionsByKey[key];
+      for (const key of Object.keys(modelPackages)) if (key.startsWith('Hyundai|')) delete modelPackages[key];
+      delete brandPackages.Hyundai;
+      for (const yearText of years) {
+        modelsByYearMake[`${yearText}|Hyundai`] = [];
+        makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Hyundai');
+      }
+      brandPackages.Hyundai = Array.from(new Set(Object.values(hyundaiCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(hyundaiCatalog)) {
+        modelPackages[`Hyundai|${model}`] = [...details.packages];
+        for (const yearText of years) {
+          const year = Number(yearText);
+          if (year < details.from || year > details.to) continue;
+          const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+          if (!activeDrives.length) continue;
+          makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Hyundai']));
+          const yearMakeKey = `${yearText}|Hyundai`;
+          modelsByYearMake[yearMakeKey] = Array.from(new Set([...(modelsByYearMake[yearMakeKey] || []), model]));
+          const fuelKey = `${yearText}|Hyundai|${model}|${details.bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+          for (const drive of activeDrives) {
+            const driveKey = `${fuelKey}|${drive.fuel}`;
+            transmissionsByKey[driveKey] = Array.from(new Set([...(transmissionsByKey[driveKey] || []), ...drive.transmissions]));
+            for (const transmission of drive.transmissions) {
+              enginesByKey[`${driveKey}|${transmission}`] = Array.from(new Set([
+                ...(enginesByKey[`${driveKey}|${transmission}`] || []),
+                ...drive.engines,
+              ]));
+            }
+          }
+        }
+      }
+
+      const hyundaiReferenceModels = vehicleReferenceIndex.models as Record<string, Record<string, string[]>>;
+      hyundaiReferenceModels['Otomobil|Hyundai|i20'] = {
+        '1.4 MPI AT6 100': ['Jump', 'Style', 'Style Plus', 'Elite'],
+        '1.0 T-GDI DCT 100': ['Style', 'Elite', 'N Line'],
+        '1.0 T-GDI 48V DCT 100': ['Style', 'Elite', 'N Line'],
+      };
+      hyundaiReferenceModels['Otomobil|Hyundai|i30'] = {
+        '1.5 T-GDI DCT 160': ['Comfort', 'Prime'],
+        '1.6 T-GDI DCT 150': ['Comfort', 'Prime'],
+      };
+      hyundaiReferenceModels['Arazi, SUV, Pick-up|Hyundai|Tucson'] = {
+        '1.6 T-GDI DCT 160': ['Comfort', 'Prime', 'Elite', 'N Line'],
+        '1.6 CRDi DCT 136': ['Comfort', 'Prime', 'Elite', 'Elite Plus'],
+        '1.6 CRDi DCT 136 4x4': ['Elite Plus'],
+        '1.6 T-GDI HEV AT 215': ['Elite'],
+        '1.6 T-GDI HEV AT 230': ['Elite', 'N Line'],
+      };
+      hyundaiReferenceModels['Arazi, SUV, Pick-up|Hyundai|Kona EV'] = {
+        '115 kW 48.4 kWh': ['Advance'],
+        '160 kW 65.4 kWh': ['Advance'],
+      };
+      hyundaiReferenceModels['Arazi, SUV, Pick-up|Hyundai|INSTER'] = {
+        '71.1 kW 42 kWh': ['Dynamic'],
+        '84.5 kW 49 kWh': ['Advance', 'Cross Advance'],
+      };
+      hyundaiReferenceModels['Minivan & Panelvan|Hyundai|STARIA HEV'] = {
+        '1.6 T-GDI HEV AT 225 4x2': ['Elite'],
+      };
+
       // Rebuild Chery from the official Türkiye range. The earlier generic
       // patch exposed Chery/OMODA/Jaecoo names in every year and mixed EVs
       // into Chery. Türkiye-market Chery models are petrol, 7-DCT SUVs from
@@ -1150,6 +1250,10 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         modelPackages[`Honda|${model}`] = [...details.packages];
       }
       brandPackages.Honda = Array.from(new Set(Object.values(hondaCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(hyundaiCatalog)) {
+        modelPackages[`Hyundai|${model}`] = [...details.packages];
+      }
+      brandPackages.Hyundai = Array.from(new Set(Object.values(hyundaiCatalog).flatMap((details) => details.packages)));
 
       const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
         ? valuationMetadata.commonColors
