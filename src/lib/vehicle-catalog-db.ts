@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v19';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v20';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -350,6 +350,17 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
           }
         }
       }
+
+      // Final authoritative TOGG package rows. Keep these after every merge so
+      // imports cannot replace the exact model keys used by the forms.
+      const toggPackages = {
+        T10X: ['V1 RWD Standart Menzil', 'V1 RWD Uzun Menzil', 'V2 RWD Uzun Menzil', 'V2 4More Obsidiyen'],
+        T10F: ['V1 RWD Standart Menzil', 'V2 RWD Uzun Menzil', 'V2 4More Obsidiyen'],
+      };
+      for (const [model, packages] of Object.entries(toggPackages)) {
+        modelPackages[`TOGG|${model}`] = [...packages];
+      }
+      brandPackages.TOGG = Array.from(new Set(Object.values(toggPackages).flat()));
 
       const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
         ? valuationMetadata.commonColors
