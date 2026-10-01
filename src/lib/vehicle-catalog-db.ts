@@ -243,8 +243,8 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
   for (const key of Object.keys(enginesByKey)) if (mercedesAliases.some((brand) => key.includes(`|${brand}|`))) delete enginesByKey[key];
   for (const key of Object.keys(modelPackages)) if (mercedesAliases.some((brand) => key.startsWith(`${brand}|`))) delete modelPackages[key];
   for (const alias of mercedesAliases) delete brandPackages[alias];
+  for (const key of Object.keys(modelsByYearMake)) if (mercedesAliases.some((brand) => key.endsWith(`|${brand}`))) delete modelsByYearMake[key];
   for (const yearText of years) {
-    for (const alias of mercedesAliases) delete modelsByYearMake[`${yearText}|${alias}`];
     makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => !mercedesAliases.includes(value));
   }
   for (const [model, details] of Object.entries(mercedesCatalog)) {
@@ -1392,8 +1392,8 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
       for (const key of Object.keys(transmissionsByKey)) if (mercedesAliases.some((brand) => key.includes(`|${brand}|`))) delete transmissionsByKey[key];
       for (const key of Object.keys(modelPackages)) if (mercedesAliases.some((brand) => key.startsWith(`${brand}|`))) delete modelPackages[key];
       for (const alias of mercedesAliases) delete brandPackages[alias];
+      for (const key of Object.keys(modelsByYearMake)) if (mercedesAliases.some((brand) => key.endsWith(`|${brand}`))) delete modelsByYearMake[key];
       for (const yearText of years) {
-        for (const alias of mercedesAliases) delete modelsByYearMake[`${yearText}|${alias}`];
         makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => !mercedesAliases.includes(value));
       }
       brandPackages['Mercedes-Benz'] = Array.from(new Set(Object.values(mercedesCatalog).flatMap((details) => details.packages)));
