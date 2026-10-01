@@ -244,7 +244,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
   for (const key of Object.keys(modelPackages)) if (mercedesAliases.some((brand) => key.startsWith(`${brand}|`))) delete modelPackages[key];
   for (const alias of mercedesAliases) delete brandPackages[alias];
   for (const yearText of years) {
-    for (const alias of mercedesAliases) modelsByYearMake[`${yearText}|${alias}`] = [];
+    for (const alias of mercedesAliases) delete modelsByYearMake[`${yearText}|${alias}`];
     makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => !mercedesAliases.includes(value));
   }
   for (const [model, details] of Object.entries(mercedesCatalog)) {
@@ -1393,7 +1393,7 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
       for (const key of Object.keys(modelPackages)) if (mercedesAliases.some((brand) => key.startsWith(`${brand}|`))) delete modelPackages[key];
       for (const alias of mercedesAliases) delete brandPackages[alias];
       for (const yearText of years) {
-        for (const alias of mercedesAliases) modelsByYearMake[`${yearText}|${alias}`] = [];
+        for (const alias of mercedesAliases) delete modelsByYearMake[`${yearText}|${alias}`];
         makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => !mercedesAliases.includes(value));
       }
       brandPackages['Mercedes-Benz'] = Array.from(new Set(Object.values(mercedesCatalog).flatMap((details) => details.packages)));
