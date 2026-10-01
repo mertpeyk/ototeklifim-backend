@@ -85,6 +85,27 @@ if ((modelsByYearMake['2012|BMW'] || []).includes('i3')) issues.push({ type: 'bm
 if ((modelsByYearMake['2023|BMW'] || []).includes('iX2')) issues.push({ type: 'bmw_invalid_model_year', key: '2023|BMW|iX2' });
 if ((modelsByYearMake['2023|BMW'] || []).includes('i3')) issues.push({ type: 'bmw_invalid_model_year', key: '2023|BMW|i3' });
 
+const bydEvModels = ['ATTO 2', 'DOLPHIN', 'ATTO 3', 'SEAL U EV', 'SEAL', 'SEALION 7', 'HAN', 'TANG'];
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'BYD') continue;
+  if (bydEvModels.includes(model) && (values.length !== 1 || values[0] !== 'Elektrik')) {
+    issues.push({ type: 'byd_ev_non_electric', key: fuelKey });
+  }
+  if (model === 'SEAL U DM-i' && (values.length !== 1 || values[0] !== 'Hibrit')) {
+    issues.push({ type: 'byd_dmi_non_hybrid', key: fuelKey });
+  }
+  for (const fuel of values) {
+    const gearValues = transmissions[`${fuelKey}|${fuel}`] || [];
+    if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+      issues.push({ type: 'byd_non_automatic', key: `${fuelKey}|${fuel}` });
+    }
+  }
+}
+for (const year of ['2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023']) {
+  if ((modelsByYearMake[`${year}|BYD`] || []).length) issues.push({ type: 'byd_invalid_model_year', key: `${year}|BYD` });
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;
