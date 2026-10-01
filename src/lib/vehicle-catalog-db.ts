@@ -16,7 +16,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v39';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v40';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,8 +29,14 @@ type CatalogSnapshot = Record<string, unknown> & {
 let memorySnapshot: CatalogSnapshot | null = null;
 
 function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapshot {
+  const modelsByYearMake = { ...((snapshot.modelsByYearMake || {}) as Record<string, string[]>) };
+  const makesByYear = { ...((snapshot.makesByYear || {}) as Record<string, string[]>) };
+  const fuelTypesByKey = { ...((snapshot.fuelTypesByKey || {}) as Record<string, string[]>) };
+  const transmissionsByKey = { ...((snapshot.transmissionsByKey || {}) as Record<string, string[]>) };
+  const enginesByKey = { ...((snapshot.enginesByKey || {}) as Record<string, string[]>) };
   const valuationMetadata = (snapshot.valuationMetadata || {}) as Record<string, any>;
   const modelPackages = { ...((valuationMetadata.modelPackages || {}) as Record<string, string[]>) };
+  const brandPackages = { ...((valuationMetadata.brandPackages || {}) as Record<string, string[]>) };
   for (const [model, details] of Object.entries(citroenCatalog)) {
     modelPackages[`Citroën|${model}`] = [...details.packages];
   }
@@ -43,13 +49,46 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
   for (const [model, details] of Object.entries(fiatCatalog)) {
     modelPackages[`Fiat|${model}`] = [...details.packages];
   }
+  for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Fiat|')) delete fuelTypesByKey[key];
+  for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Fiat|')) delete transmissionsByKey[key];
+  for (const key of Object.keys(enginesByKey)) if (key.includes('|Fiat|')) delete enginesByKey[key];
+  const years = Array.from({ length: 17 }, (_, index) => String(2010 + index));
+  for (const yearText of years) {
+    modelsByYearMake[`${yearText}|Fiat`] = [];
+    makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Fiat');
+  }
+  for (const [model, details] of Object.entries(fiatCatalog)) {
+    for (const yearText of years) {
+      const year = Number(yearText);
+      if (year < details.from || year > details.to) continue;
+      const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+      if (!activeDrives.length) continue;
+      makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Fiat']));
+      modelsByYearMake[`${yearText}|Fiat`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Fiat`] || []), model]));
+      const fuelKey = `${yearText}|Fiat|${model}|${details.bodyType}`;
+      fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+      for (const drive of activeDrives) {
+        const driveKey = `${fuelKey}|${drive.fuel}`;
+        transmissionsByKey[driveKey] = [...drive.transmissions];
+        for (const transmission of drive.transmissions) {
+          enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
+        }
+      }
+    }
+  }
+  brandPackages.Fiat = Array.from(new Set(Object.values(fiatCatalog).flatMap((details) => details.packages)));
   return {
     ...snapshot,
+    modelsByYearMake,
+    makesByYear,
+    fuelTypesByKey,
+    transmissionsByKey,
+    enginesByKey,
     valuationMetadata: {
       ...valuationMetadata,
       modelPackages,
       brandPackages: {
-        ...((valuationMetadata.brandPackages || {}) as Record<string, string[]>),
+        ...brandPackages,
         Citroën: Array.from(new Set(Object.values(citroenCatalog).flatMap((details) => details.packages))),
         Cupra: Array.from(new Set(Object.values(cupraCatalog).flatMap((details) => details.packages))),
         Dacia: Array.from(new Set(Object.values(daciaCatalog).flatMap((details) => details.packages))),
