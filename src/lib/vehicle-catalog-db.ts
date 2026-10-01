@@ -15,7 +15,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v37';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v38';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -569,7 +569,7 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         '40 TFSI': ['Advanced', 'S line', 'Black Edition'],
         '45 TFSI quattro': ['Advanced', 'S line', 'Black Edition', 'Quattro Advanced'],
         '1.6 TDI': ['Attraction', 'Ambition', 'Design'],
-        '2.0 TDI': ['Design', 'Sport', 'Advanced', 'S line'],
+        '2.0 TDI': ['Attraction', 'Ambition', 'Ambiente', 'S line'],
         '35 TDI': ['Advanced', 'S line'],
         '40 TDI quattro': ['Advanced', 'S line', 'Black Edition', 'Quattro Advanced'],
         '3.0 TDI quattro': ['Sport', 'S line', 'Quattro Advanced'],

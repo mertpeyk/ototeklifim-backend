@@ -75,6 +75,10 @@ const audiA4ReferencePackages = referenceModels['Otomobil|Audi|A4']?.['45 TFSI q
 if (!audiA4ReferencePackages.includes('Advanced') || !audiA4ReferencePackages.includes('S line')) {
   issues.push({ type: 'audi_missing_engine_packages', key: 'Otomobil|Audi|A4|45 TFSI quattro' });
 }
+const audiA4LegacyDieselPackages = referenceModels['Otomobil|Audi|A4']?.['2.0 TDI'] || [];
+if (!['Attraction', 'Ambition', 'Ambiente'].every((trim) => audiA4LegacyDieselPackages.includes(trim))) {
+  issues.push({ type: 'audi_missing_2013_a4_2_0_tdi_packages', key: 'Otomobil|Audi|A4|2.0 TDI' });
+}
 
 const bmwEvModels = ['i3', 'i4', 'i5', 'i7', 'iX', 'iX1', 'iX2', 'iX3'];
 for (const [fuelKey, values] of Object.entries(fuels)) {
