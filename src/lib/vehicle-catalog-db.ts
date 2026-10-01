@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v22';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v23';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -300,6 +300,40 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
         fuelTypesByKey[fuelKey] = ['Elektrik'];
         transmissionsByKey[`${fuelKey}|Elektrik`] = ['Otomatik'];
         enginesByKey[`${fuelKey}|Elektrik|Otomatik`] = mg4Engines;
+      }
+
+      // MG Turkey has mixed powertrains across the brand. Keep every
+      // nameplate/submodel isolated so petrol, hybrid and EV options never
+      // leak into one another through the brand-level maps.
+      const mgPowertrains: Record<string, { bodyType: string; fuel: string; engines: string[]; packages: string[] }> = {
+        ZS: { bodyType: 'SUV', fuel: 'Benzin', engines: ['1.0 T-GDI', '1.5 VTi-tech'], packages: ['Comfort', 'Luxury'] },
+        'ZS EV': { bodyType: 'SUV', fuel: 'Elektrik', engines: ['44.5 kWh Elektrik', '72 kWh Elektrik'], packages: ['Comfort', 'Luxury'] },
+        'ZS Hybrid+': { bodyType: 'SUV', fuel: 'Hibrit', engines: ['1.5 Hybrid+'], packages: ['Comfort', 'Luxury'] },
+        HS: { bodyType: 'SUV', fuel: 'Benzin', engines: ['1.5 T-GDI'], packages: ['Comfort', 'Luxury'] },
+        'HS Hybrid+': { bodyType: 'SUV', fuel: 'Hibrit', engines: ['1.5 Turbo Hybrid+'], packages: ['Comfort', 'Luxury'] },
+        'HS PHEV': { bodyType: 'SUV', fuel: 'Hibrit', engines: ['1.5 T-GDI eHS PHEV'], packages: ['Comfort', 'Luxury'] },
+        EHS: { bodyType: 'SUV', fuel: 'Hibrit', engines: ['1.5 T-GDI eHS PHEV'], packages: ['Comfort', 'Luxury'] },
+        MG5: { bodyType: 'Sedan', fuel: 'Elektrik', engines: ['50.3 kWh Elektrik', '61.1 kWh Elektrik'], packages: ['Comfort', 'Luxury'] },
+        'Marvel R': { bodyType: 'SUV', fuel: 'Elektrik', engines: ['70 kWh Elektrik', '70 kWh Çift Motor Elektrik'], packages: ['Comfort', 'Luxury', 'Performance'] },
+        MG7: { bodyType: 'Sedan', fuel: 'Benzin', engines: ['1.5 T-GDI'], packages: ['Luxury', 'Trophy'] },
+      };
+      for (const [model, details] of Object.entries(mgPowertrains)) {
+        for (const key of Object.keys(enginesByKey)) if (key.includes(`|MG|${model}|`)) delete enginesByKey[key];
+        for (const key of Object.keys(fuelTypesByKey)) if (key.includes(`|MG|${model}|`)) delete fuelTypesByKey[key];
+        for (const key of Object.keys(transmissionsByKey)) if (key.includes(`|MG|${model}|`)) delete transmissionsByKey[key];
+        const modelKey = `MG|${model}`;
+        modelPackages[modelKey] = details.packages;
+        brandPackages.MG = Array.from(new Set([...(brandPackages.MG || []), ...details.packages]));
+        for (const year of years) {
+          const fuelKey = `${year}|MG|${model}|${details.bodyType}`;
+          const driveKey = `${fuelKey}|${details.fuel}`;
+          fuelTypesByKey[fuelKey] = [details.fuel];
+          const transmissions = model === 'ZS' ? ['Manuel', 'Otomatik'] : ['Otomatik'];
+          transmissionsByKey[driveKey] = transmissions;
+          for (const transmission of transmissions) {
+            enginesByKey[`${driveKey}|${transmission}`] = details.engines;
+          }
+        }
       }
 
       // Opel Turkey trim names. Some historical engine keys use a different

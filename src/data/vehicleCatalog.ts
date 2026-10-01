@@ -208,7 +208,7 @@ export const vehicleCatalog = {
       label: 'MG',
       logoUrl: '',
       categoryKeys: ['otomobil', 'elektrikli-araclar'],
-      models: ['ZS', 'HS', 'MG4', 'MG5'],
+      models: ['ZS', 'ZS EV', 'ZS Hybrid+', 'HS', 'HS Hybrid+', 'HS PHEV', 'EHS', 'MG4', 'MG5', 'Marvel R', 'MG7'],
     },
     {
       key: 'Porsche',
