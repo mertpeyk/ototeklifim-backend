@@ -3,6 +3,7 @@ import { mgCatalog } from './mgCatalog.js';
 import { mitsubishiCatalog } from './mitsubishiCatalog.js';
 import { nissanCatalog } from './nissanCatalog.js';
 import { peugeotCatalog } from './peugeotCatalog.js';
+import { porscheCatalog } from './porscheCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -88,6 +89,13 @@ export const vehicleCatalog = {
       logoUrl: '',
       categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'],
       models: Object.keys(peugeotCatalog),
+    },
+    {
+      key: 'Porsche',
+      label: 'Porsche',
+      logoUrl: '',
+      categoryKeys: ['otomobil', 'arazi-suv-pickup'],
+      models: Object.keys(porscheCatalog),
     },
     {
       key: 'Citroen',
@@ -214,13 +222,6 @@ export const vehicleCatalog = {
       logoUrl: '',
       categoryKeys: ['otomobil', 'arazi-suv-pickup'],
       models: Object.keys(mgCatalog),
-    },
-    {
-      key: 'Porsche',
-      label: 'Porsche',
-      logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar', 'klasik-araclar'],
-      models: ['911', 'Panamera', 'Macan', 'Cayenne', 'Taycan'],
     },
     {
       key: 'Land_Rover',
