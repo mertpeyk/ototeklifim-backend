@@ -1,4 +1,5 @@
 import { mercedesCatalog } from './mercedesCatalog.js';
+import { mgCatalog } from './mgCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -208,8 +209,8 @@ export const vehicleCatalog = {
       key: 'MG',
       label: 'MG',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'elektrikli-araclar'],
-      models: ['ZS', 'ZS EV', 'ZS Hybrid+', 'HS', 'HS Hybrid+', 'HS PHEV', 'EHS', 'MG4', 'MG5', 'Marvel R', 'MG7'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup'],
+      models: Object.keys(mgCatalog),
     },
     {
       key: 'Porsche',
