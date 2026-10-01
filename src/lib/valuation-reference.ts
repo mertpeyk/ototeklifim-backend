@@ -149,23 +149,7 @@ async function loadCatalogSnapshot() {
       return snapshot;
     }
 
-    const assetsRoot = await resolveValuationAssetsRoot();
-    const catalogPath = path.join(assetsRoot, 'valuation-catalog.json');
-    const metadataPath = path.join(assetsRoot, 'valuation-metadata.json');
-
-    const [catalogRaw, metadataRaw] = await Promise.all([
-      readFile(catalogPath, 'utf8'),
-      readFile(metadataPath, 'utf8'),
-    ]);
-
-    const snapshot = {
-      expiresAt: Date.now() + CACHE_TTL_MS,
-      catalog: JSON.parse(catalogRaw) as ValuationCatalog,
-      metadata: JSON.parse(metadataRaw) as ValuationMetadata,
-    };
-
-    cachedCatalog = snapshot;
-    return snapshot;
+    return null;
   } catch {
     catalogUnavailableUntil = Date.now() + CACHE_TTL_MS;
     return null;
