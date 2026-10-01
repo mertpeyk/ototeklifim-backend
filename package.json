@@ -10,6 +10,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx src/scripts/seed.ts",
+    "catalog:refresh": "node dist/scripts/vehicle-catalog-refresh.js",
     "calibrate:valuation": "tsx src/scripts/valuation-auto-calibrate.ts",
     "test:valuation": "tsx src/scripts/valuation-smoke.ts",
     "test:valuation:regression": "tsx src/scripts/valuation-regression.ts",
