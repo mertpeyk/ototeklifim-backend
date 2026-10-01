@@ -6,6 +6,7 @@ import { peugeotCatalog } from './peugeotCatalog.js';
 import { porscheCatalog } from './porscheCatalog.js';
 import { suzukiCatalog } from './suzukiCatalog.js';
 import { teslaCatalog } from './teslaCatalog.js';
+import { volvoCatalog } from './volvoCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -216,7 +217,7 @@ export const vehicleCatalog = {
       label: 'Volvo',
       logoUrl: '',
       categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'],
-      models: ['EX30', 'EX40', 'EC40', 'XC40', 'XC60', 'XC90', 'S60', 'S90', 'V60', 'V90 Cross Country'],
+      models: Object.keys(volvoCatalog),
     },
     {
       key: 'MG',

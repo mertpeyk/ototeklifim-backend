@@ -24,12 +24,13 @@ import { peugeotCatalog } from '../data/peugeotCatalog.js';
 import { porscheCatalog } from '../data/porscheCatalog.js';
 import { suzukiCatalog } from '../data/suzukiCatalog.js';
 import { teslaCatalog } from '../data/teslaCatalog.js';
+import { volvoCatalog } from '../data/volvoCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v54';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v55';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,6 +51,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
       if (brand?.key === 'Porsche') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup'], models: Object.keys(porscheCatalog) };
       if (brand?.key === 'Suzuki') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup'], models: Object.keys(suzukiCatalog) };
       if (brand?.key === 'Tesla') return { ...brand, categoryKeys: ['elektrikli-araclar', 'otomobil', 'arazi-suv-pickup'], models: Object.keys(teslaCatalog) };
+      if (brand?.key === 'Volvo') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'], models: Object.keys(volvoCatalog) };
       return brand;
     })
     : snapshot.brands;
@@ -488,6 +490,40 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
     }
   }
   brandPackages.Tesla = Array.from(new Set(Object.values(teslaCatalog).flatMap((details) => details.packages)));
+  for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Volvo|')) delete fuelTypesByKey[key];
+  for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Volvo|')) delete transmissionsByKey[key];
+  for (const key of Object.keys(enginesByKey)) if (key.includes('|Volvo|')) delete enginesByKey[key];
+  for (const key of Object.keys(modelPackages)) if (key.startsWith('Volvo|')) delete modelPackages[key];
+  delete brandPackages.Volvo;
+  for (const yearText of years) {
+    modelsByYearMake[`${yearText}|Volvo`] = [];
+    makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Volvo');
+  }
+  for (const [model, details] of Object.entries(volvoCatalog)) {
+    modelPackages[`Volvo|${model}`] = [...details.packages];
+    for (const yearText of years) {
+      const year = Number(yearText);
+      if (year < details.from || year > details.to) continue;
+      const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+      if (!activeDrives.length) continue;
+      makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Volvo']));
+      modelsByYearMake[`${yearText}|Volvo`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Volvo`] || []), model]));
+      const fuelKey = `${yearText}|Volvo|${model}|${details.bodyType}`;
+      fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+      for (const drive of activeDrives) {
+        const driveKey = `${fuelKey}|${drive.fuel}`;
+        transmissionsByKey[driveKey] = Array.from(new Set([
+          ...(transmissionsByKey[driveKey] || []),
+          ...drive.transmissions,
+        ]));
+        for (const transmission of drive.transmissions) {
+          const engineKey = `${driveKey}|${transmission}`;
+          enginesByKey[engineKey] = Array.from(new Set([...(enginesByKey[engineKey] || []), ...drive.engines]));
+        }
+      }
+    }
+  }
+  brandPackages.Volvo = Array.from(new Set(Object.values(volvoCatalog).flatMap((details) => details.packages)));
   return {
     ...snapshot,
     brands,
