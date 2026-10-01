@@ -7,6 +7,7 @@ import { porscheCatalog } from './porscheCatalog.js';
 import { suzukiCatalog } from './suzukiCatalog.js';
 import { teslaCatalog } from './teslaCatalog.js';
 import { volvoCatalog } from './volvoCatalog.js';
+import { opelCatalog } from './opelCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -146,8 +147,8 @@ export const vehicleCatalog = {
       key: 'Opel',
       label: 'Opel',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan', 'kiralik-araclar', 'hasarli-araclar'],
-      models: ['Corsa', 'Astra', 'Insignia', 'Mokka', 'Crossland', 'Grandland', 'Combo', 'Vivaro'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan', 'elektrikli-araclar'],
+      models: Object.keys(opelCatalog),
     },
     {
       key: 'Skoda',
