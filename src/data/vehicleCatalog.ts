@@ -179,7 +179,7 @@ export const vehicleCatalog = {
       key: 'TOGG',
       label: 'TOGG',
       logoUrl: '',
-      categoryKeys: ['elektrikli-araclar', 'otomobil'],
+      categoryKeys: ['elektrikli-araclar', 'otomobil', 'arazi-suv-pickup'],
       models: ['T10X', 'T10F'],
     },
     {
