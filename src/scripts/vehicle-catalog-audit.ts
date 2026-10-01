@@ -55,6 +55,22 @@ for (const [yearMake, models] of Object.entries(modelsByYearMake)) {
   }
 }
 
+// Brand-by-brand regression checks. Audi is the first fully reconciled
+// nameplate catalog: current EVs must not inherit combustion fuels/gears and
+// discontinued canonical models must not appear outside their valid years.
+const audiEvModels = ['e-tron', 'Q4 e-tron', 'Q6 e-tron', 'Q8 e-tron', 'A6 e-tron', 'e-tron GT'];
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Audi' || !audiEvModels.includes(model)) continue;
+  if (values.some((fuel) => fuel !== 'Elektrik')) issues.push({ type: 'audi_ev_non_electric', key: fuelKey });
+  const gearValues = transmissions[`${fuelKey}|Elektrik`] || [];
+  if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+    issues.push({ type: 'audi_ev_non_automatic', key: `${fuelKey}|Elektrik` });
+  }
+}
+if ((modelsByYearMake['2025|Audi'] || []).includes('A4')) issues.push({ type: 'audi_invalid_model_year', key: '2025|Audi|A4' });
+if ((modelsByYearMake['2026|Audi'] || []).includes('Q8 e-tron')) issues.push({ type: 'audi_invalid_model_year', key: '2026|Audi|Q8 e-tron' });
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;
