@@ -1,6 +1,7 @@
 import { mercedesCatalog } from './mercedesCatalog.js';
 import { mgCatalog } from './mgCatalog.js';
 import { mitsubishiCatalog } from './mitsubishiCatalog.js';
+import { nissanCatalog } from './nissanCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -126,8 +127,8 @@ export const vehicleCatalog = {
       key: 'Nissan',
       label: 'Nissan',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan', 'kiralik-araclar', 'hasarli-araclar'],
-      models: ['Micra', 'Juke', 'Qashqai', 'X-Trail', 'Navara', 'Townstar'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'],
+      models: Object.keys(nissanCatalog),
     },
     {
       key: 'Opel',
