@@ -8,12 +8,13 @@ import { bydCatalog } from '../data/bydCatalog.js';
 import { cheryCatalog } from '../data/cheryCatalog.js';
 import { chevroletCatalog } from '../data/chevroletCatalog.js';
 import { citroenCatalog } from '../data/citroenCatalog.js';
+import { cupraCatalog } from '../data/cupraCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v34';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v35';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +32,9 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
   for (const [model, details] of Object.entries(citroenCatalog)) {
     modelPackages[`Citroën|${model}`] = [...details.packages];
   }
+  for (const [model, details] of Object.entries(cupraCatalog)) {
+    modelPackages[`Cupra|${model}`] = [...details.packages];
+  }
   return {
     ...snapshot,
     valuationMetadata: {
@@ -39,6 +43,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
       brandPackages: {
         ...((valuationMetadata.brandPackages || {}) as Record<string, string[]>),
         Citroën: Array.from(new Set(Object.values(citroenCatalog).flatMap((details) => details.packages))),
+        Cupra: Array.from(new Set(Object.values(cupraCatalog).flatMap((details) => details.packages))),
       },
     },
   };
@@ -667,6 +672,41 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         }
       }
 
+      // CUPRA is an independent marque from 2018 onward. Rebuild the model
+      // years and powertrains atomically so SEAT-era rows or brand-wide
+      // petrol/manual defaults cannot leak into Born and Tavascan.
+      for (const key of Object.keys(enginesByKey)) if (key.includes('|Cupra|')) delete enginesByKey[key];
+      for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Cupra|')) delete fuelTypesByKey[key];
+      for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Cupra|')) delete transmissionsByKey[key];
+      for (const key of Object.keys(modelPackages)) if (key.startsWith('Cupra|')) delete modelPackages[key];
+      delete brandPackages.Cupra;
+      for (const yearText of years) {
+        modelsByYearMake[`${yearText}|Cupra`] = [];
+        makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Cupra');
+      }
+      brandPackages.Cupra = Array.from(new Set(Object.values(cupraCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(cupraCatalog)) {
+        modelPackages[`Cupra|${model}`] = [...details.packages];
+        for (const yearText of years) {
+          const year = Number(yearText);
+          if (year < details.from || year > details.to) continue;
+          const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+          if (!activeDrives.length) continue;
+          makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Cupra']));
+          const yearMakeKey = `${yearText}|Cupra`;
+          modelsByYearMake[yearMakeKey] = Array.from(new Set([...(modelsByYearMake[yearMakeKey] || []), model]));
+          const fuelKey = `${yearText}|Cupra|${model}|${details.bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+          for (const drive of activeDrives) {
+            const driveKey = `${fuelKey}|${drive.fuel}`;
+            transmissionsByKey[driveKey] = [...drive.transmissions];
+            for (const transmission of drive.transmissions) {
+              enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
+            }
+          }
+        }
+      }
+
       // Rebuild Chery from the official Türkiye range. The earlier generic
       // patch exposed Chery/OMODA/Jaecoo names in every year and mixed EVs
       // into Chery. Türkiye-market Chery models are petrol, 7-DCT SUVs from
@@ -803,6 +843,10 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         modelPackages[`Citroën|${model}`] = [...details.packages];
       }
       brandPackages['Citroën'] = Array.from(new Set(Object.values(citroenCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(cupraCatalog)) {
+        modelPackages[`Cupra|${model}`] = [...details.packages];
+      }
+      brandPackages.Cupra = Array.from(new Set(Object.values(cupraCatalog).flatMap((details) => details.packages)));
 
       const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
         ? valuationMetadata.commonColors

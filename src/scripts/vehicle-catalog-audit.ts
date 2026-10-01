@@ -181,6 +181,29 @@ if (Object.keys(modelsByYearMake).some((key) => key.endsWith('|Citroen') && (mod
   issues.push({ type: 'citroen_duplicate_unaccented_brand', key: 'Citroen' });
 }
 
+const cupraEvModels = ['Born', 'Tavascan'];
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Cupra') continue;
+  if (cupraEvModels.includes(model) && (values.length !== 1 || values[0] !== 'Elektrik')) {
+    issues.push({ type: 'cupra_ev_non_electric', key: fuelKey });
+  }
+  for (const fuel of values) {
+    const gearValues = transmissions[`${fuelKey}|${fuel}`] || [];
+    if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+      issues.push({ type: 'cupra_non_automatic', key: `${fuelKey}|${fuel}` });
+    }
+  }
+}
+for (const year of ['2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017']) {
+  if ((modelsByYearMake[`${year}|Cupra`] || []).length) {
+    issues.push({ type: 'cupra_invalid_model_year', key: `${year}|Cupra` });
+  }
+}
+if ((modelsByYearMake['2024|Cupra'] || []).includes('Tavascan') || (modelsByYearMake['2024|Cupra'] || []).includes('Terramar')) {
+  issues.push({ type: 'cupra_invalid_model_year', key: '2024|Cupra|Tavascan/Terramar' });
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;
