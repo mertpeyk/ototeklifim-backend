@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v23';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v24';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -357,6 +357,31 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
         const modelKey = `Opel|${model}`;
         modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...packages]));
         brandPackages.Opel = Array.from(new Set([...(brandPackages.Opel || []), ...packages]));
+      }
+
+      // Hyundai Türkiye trim names. Keep these model-specific because the
+      // same brand contains petrol, hybrid and EV nameplates with different
+      // equipment families.
+      const hyundaiPackages: Record<string, string[]> = {
+        i10: ['Jump', 'Style', 'Style Plus', 'Elite'],
+        i20: ['Jump', 'Style', 'Style Plus', 'Elite', 'Elite Plus', 'Prime', 'N Line'],
+        i30: ['Comfort', 'Prime'],
+        Elantra: ['Style', 'Elite'],
+        Bayon: ['Jump', 'Style', 'Elite', 'Prime', 'N Line'],
+        Kona: ['Prime'],
+        'Kona EV': ['Advance'],
+        Tucson: ['Comfort', 'Prime', 'Elite', 'Elite Plus', 'N Line'],
+        'Santa Fe': ['Progressive', 'Elite', 'Prestige', 'Prime Plus'],
+        'IONIQ 5': ['Dynamic Vision Roof', 'Advance'],
+        'IONIQ 6': ['Advance'],
+        'IONIQ 9': ['Progressive', 'Calligraphy'],
+        INSTER: ['Dynamic', 'Advance', 'Cross Advance'],
+        'STARIA HEV': ['Elite'],
+      };
+      for (const [model, packages] of Object.entries(hyundaiPackages)) {
+        const modelKey = `Hyundai|${model}`;
+        modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...packages]));
+        brandPackages.Hyundai = Array.from(new Set([...(brandPackages.Hyundai || []), ...packages]));
       }
 
       // The reference index is the broadest trim source. Its values are

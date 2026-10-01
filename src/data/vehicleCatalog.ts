@@ -110,7 +110,7 @@ export const vehicleCatalog = {
       label: 'Hyundai',
       logoUrl: '',
       categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar', 'kiralik-araclar', 'hasarli-araclar'],
-      models: ['i10', 'i20', 'i30', 'Elantra', 'Bayon', 'Kona', 'Tucson', 'Santa Fe', 'IONIQ 5'],
+      models: ['i10', 'i20', 'i30', 'Elantra', 'Bayon', 'Kona', 'Kona EV', 'Tucson', 'Santa Fe', 'IONIQ 5', 'IONIQ 6', 'IONIQ 9', 'INSTER', 'STARIA HEV'],
     },
     {
       key: 'Kia',
