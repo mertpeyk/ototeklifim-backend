@@ -252,6 +252,41 @@ if ((engines[`${daciaJogger2026Base}|Otomatik`] || []).some((value) => !value.in
   issues.push({ type: 'dacia_engine_transmission_leak', key: `${daciaJogger2026Base}|Otomatik` });
 }
 
+const fiatEvModels = ['500e', '600e', 'E-Ulysse'];
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Fiat') continue;
+  if (fiatEvModels.includes(model) && (values.length !== 1 || values[0] !== 'Elektrik')) {
+    issues.push({ type: 'fiat_ev_non_electric', key: fuelKey });
+  }
+  if (fiatEvModels.includes(model)) {
+    const gearValues = transmissions[`${fuelKey}|Elektrik`] || [];
+    if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+      issues.push({ type: 'fiat_ev_non_automatic', key: `${fuelKey}|Elektrik` });
+    }
+  }
+}
+for (const model of ['Albea', 'Palio', 'Grande Punto']) {
+  if ((modelsByYearMake['2013|Fiat'] || []).includes(model)) {
+    issues.push({ type: 'fiat_invalid_model_year', key: `2013|Fiat|${model}` });
+  }
+}
+for (const model of ['Punto', 'Linea', 'Bravo', '500L', '500X']) {
+  if ((modelsByYearMake['2026|Fiat'] || []).includes(model)) {
+    issues.push({ type: 'fiat_invalid_model_year', key: `2026|Fiat|${model}` });
+  }
+}
+if ((modelsByYearMake['2020|Fiat'] || []).includes('500e')) {
+  issues.push({ type: 'fiat_invalid_model_year', key: '2020|Fiat|500e' });
+}
+const fiatEgea2023Base = '2023|Fiat|Egea Sedan|Sedan|Dizel';
+if ((engines[`${fiatEgea2023Base}|Manuel`] || []).some((value) => value.includes('DCT'))) {
+  issues.push({ type: 'fiat_engine_transmission_leak', key: `${fiatEgea2023Base}|Manuel` });
+}
+if ((engines[`${fiatEgea2023Base}|Otomatik`] || []).some((value) => !value.includes('DCT'))) {
+  issues.push({ type: 'fiat_engine_transmission_leak', key: `${fiatEgea2023Base}|Otomatik` });
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;
