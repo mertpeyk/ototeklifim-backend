@@ -124,8 +124,8 @@ export const vehicleCatalog = {
       key: 'Kia',
       label: 'Kia',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar', 'kiralik-araclar', 'hasarli-araclar'],
-      models: ['Picanto', 'Rio', 'Ceed', 'Stonic', 'Sportage', 'Sorento', 'Niro EV', 'EV6'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'],
+      models: ['Picanto', 'Rio Hatchback', 'Rio Sedan', 'Ceed Hatchback', 'Ceed SW', 'ProCeed', 'XCeed', 'Cerato', 'Venga', 'Carens', 'Soul', 'Soul EV', 'Optima', 'Stinger', 'Stonic', 'Sportage', 'Sorento', 'Niro Hybrid', 'Niro PHEV', 'Niro EV', 'EV3', 'EV6', 'EV9', 'Carnival', 'Bongo'],
     },
     {
       key: 'Nissan',
