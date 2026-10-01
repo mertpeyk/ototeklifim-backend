@@ -106,6 +106,19 @@ for (const year of ['2010', '2011', '2012', '2013', '2014', '2015', '2016', '201
   if ((modelsByYearMake[`${year}|BYD`] || []).length) issues.push({ type: 'byd_invalid_model_year', key: `${year}|BYD` });
 }
 
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand] = fuelKey.split('|');
+  if (brand !== 'Chery') continue;
+  if (values.length !== 1 || values[0] !== 'Benzin') issues.push({ type: 'chery_invalid_fuel', key: fuelKey });
+  const gearValues = transmissions[`${fuelKey}|Benzin`] || [];
+  if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+    issues.push({ type: 'chery_invalid_transmission', key: `${fuelKey}|Benzin` });
+  }
+}
+for (const year of ['2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020', '2021', '2022']) {
+  if ((modelsByYearMake[`${year}|Chery`] || []).length) issues.push({ type: 'chery_invalid_model_year', key: `${year}|Chery` });
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;

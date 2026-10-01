@@ -5,12 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { prisma } from '../db.js';
 import { bmwCatalog } from '../data/bmwCatalog.js';
 import { bydCatalog } from '../data/bydCatalog.js';
+import { cheryCatalog } from '../data/cheryCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v29';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v30';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -549,6 +550,34 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
               enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
             }
           }
+        }
+      }
+
+      // Rebuild Chery from the official Türkiye range. The earlier generic
+      // patch exposed Chery/OMODA/Jaecoo names in every year and mixed EVs
+      // into Chery. Türkiye-market Chery models are petrol, 7-DCT SUVs from
+      // 2023 onward and must use their period-correct trim families.
+      for (const key of Object.keys(enginesByKey)) if (key.includes('|Chery|')) delete enginesByKey[key];
+      for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Chery|')) delete fuelTypesByKey[key];
+      for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Chery|')) delete transmissionsByKey[key];
+      for (const yearText of years) {
+        const yearMakeKey = `${yearText}|Chery`;
+        modelsByYearMake[yearMakeKey] = [];
+        makesByYear[yearText] = (makesByYear[yearText] || []).filter((brand) => brand !== 'Chery');
+      }
+      brandPackages.Chery = Array.from(new Set(Object.values(cheryCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(cheryCatalog)) {
+        modelPackages[`Chery|${model}`] = [...details.packages];
+        for (const yearText of years) {
+          const year = Number(yearText);
+          if (year < details.from || year > details.to) continue;
+          makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Chery']));
+          const yearMakeKey = `${yearText}|Chery`;
+          modelsByYearMake[yearMakeKey] = Array.from(new Set([...(modelsByYearMake[yearMakeKey] || []), model]));
+          const fuelKey = `${yearText}|Chery|${model}|SUV`;
+          fuelTypesByKey[fuelKey] = ['Benzin'];
+          transmissionsByKey[`${fuelKey}|Benzin`] = ['Otomatik'];
+          enginesByKey[`${fuelKey}|Benzin|Otomatik`] = [details.engine];
         }
       }
 
