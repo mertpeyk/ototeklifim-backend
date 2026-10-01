@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v6';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v7';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -80,6 +80,22 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
       const defaultPackages = Array.isArray(valuationMetadata.defaultPackages) && valuationMetadata.defaultPackages.length
         ? valuationMetadata.defaultPackages
         : ['Standart', 'Comfort', 'Prestige', 'Premium'];
+
+      // The reference index is the broadest trim source. Its values are
+      // engine -> package arrays; fold them into the API's brand/model maps
+      // so every referenced make/model gets its real package list in DB.
+      for (const [referenceKey, enginePackages] of Object.entries(vehicleReferenceIndex.models || {})) {
+        const [, brand, model] = referenceKey.split('|');
+        if (!brand || !model || !enginePackages || typeof enginePackages !== 'object') continue;
+        const packages = Object.values(enginePackages as Record<string, unknown>)
+          .flatMap((value) => Array.isArray(value) ? value.map(String) : [])
+          .map((value) => value.trim())
+          .filter(Boolean);
+        if (!packages.length) continue;
+        const modelKey = `${brand}|${model}`;
+        modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...packages]));
+        brandPackages[brand] = Array.from(new Set([...(brandPackages[brand] || []), ...packages]));
+      }
 
       // Every DB vehicle node must have a usable package list. The external
       // metadata only contains popular models, so fill missing model entries
