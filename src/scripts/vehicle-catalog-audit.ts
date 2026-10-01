@@ -204,6 +204,36 @@ if ((modelsByYearMake['2024|Cupra'] || []).includes('Tavascan') || (modelsByYear
   issues.push({ type: 'cupra_invalid_model_year', key: '2024|Cupra|Tavascan/Terramar' });
 }
 
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Dacia') continue;
+  if (model === 'Spring' && (values.length !== 1 || values[0] !== 'Elektrik')) {
+    issues.push({ type: 'dacia_spring_non_electric', key: fuelKey });
+  }
+  if (model === 'Spring') {
+    const gearValues = transmissions[`${fuelKey}|Elektrik`] || [];
+    if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+      issues.push({ type: 'dacia_spring_non_automatic', key: `${fuelKey}|Elektrik` });
+    }
+  }
+}
+for (const model of ['Duster', 'Lodgy', 'Dokker', 'Dokker Van']) {
+  if ((modelsByYearMake['2026|Dacia'] || []).includes(model)) {
+    issues.push({ type: 'dacia_invalid_model_year', key: `2026|Dacia|${model}` });
+  }
+}
+if ((modelsByYearMake['2021|Dacia'] || []).includes('Jogger')) {
+  issues.push({ type: 'dacia_invalid_model_year', key: '2021|Dacia|Jogger' });
+}
+if ((modelsByYearMake['2025|Dacia'] || []).includes('Spring')) {
+  issues.push({ type: 'dacia_invalid_model_year', key: '2025|Dacia|Spring' });
+}
+for (const year of ['2021', '2022', '2023', '2024', '2025']) {
+  if ((modelsByYearMake[`${year}|Dacia`] || []).includes('Logan')) {
+    issues.push({ type: 'dacia_logan_generation_gap', key: `${year}|Dacia|Logan` });
+  }
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;

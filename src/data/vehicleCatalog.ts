@@ -158,8 +158,8 @@ export const vehicleCatalog = {
       key: 'Dacia',
       label: 'Dacia',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'kiralik-araclar', 'hasarli-araclar'],
-      models: ['Sandero', 'Logan', 'Jogger', 'Duster'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan', 'kiralik-araclar', 'hasarli-araclar'],
+      models: ['Logan', 'Logan MCV', 'Sandero', 'Sandero Stepway', 'Duster', 'Lodgy', 'Dokker', 'Dokker Van', 'Jogger', 'Spring', 'Bigster'],
     },
     {
       key: 'BYD',
