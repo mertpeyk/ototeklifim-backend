@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v21';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v22';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -284,6 +284,22 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
           fuelTypesByKey[fuelKey] = Array.from(new Set([...(fuelTypesByKey[fuelKey] || []), details.fuel]));
           transmissionsByKey[`${fuelKey}|${details.fuel}`] = ['Otomatik'];
         }
+      }
+
+      // MG4 is an EV-only nameplate. Keep it separate from MG's petrol and
+      // hybrid models so the brand-level fuel list cannot leak into MG4.
+      for (const key of Object.keys(enginesByKey)) if (key.includes('|MG|MG4|')) delete enginesByKey[key];
+      for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|MG|MG4|')) delete fuelTypesByKey[key];
+      for (const key of Object.keys(transmissionsByKey)) if (key.includes('|MG|MG4|')) delete transmissionsByKey[key];
+      const mg4Packages = ['Comfort', 'Luxury', 'XPower'];
+      const mg4Engines = ['51 kWh Elektrik', '64 kWh Elektrik', '77 kWh Elektrik', 'XPower Çift Motor Elektrik'];
+      modelPackages['MG|MG4'] = mg4Packages;
+      brandPackages.MG = Array.from(new Set([...(brandPackages.MG || []), ...mg4Packages]));
+      for (const year of years) {
+        const fuelKey = `${year}|MG|MG4|Hatchback`;
+        fuelTypesByKey[fuelKey] = ['Elektrik'];
+        transmissionsByKey[`${fuelKey}|Elektrik`] = ['Otomatik'];
+        enginesByKey[`${fuelKey}|Elektrik|Otomatik`] = mg4Engines;
       }
 
       // Opel Turkey trim names. Some historical engine keys use a different
