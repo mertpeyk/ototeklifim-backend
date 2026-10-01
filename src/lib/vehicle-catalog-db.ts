@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v12';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v13';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -125,6 +125,42 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
 
       const modelPackages = { ...(valuationMetadata.modelPackages || {}) } as Record<string, string[]>;
       const brandPackages = { ...(valuationMetadata.brandPackages || {}) } as Record<string, string[]>;
+
+      // TOGG Turkey powertrain/package data. Remove the legacy gasoline rows
+      // first; TOGG's T10X and T10F are fully electric and use automatic drive.
+      const toggCatalog: Record<string, { bodyType: string; engines: string[]; packages: string[] }> = {
+        T10X: {
+          bodyType: 'SUV',
+          engines: ['V1 RWD', 'V2 RWD', 'V2 4More AWD'],
+          packages: ['V1 RWD Standart Menzil', 'V1 RWD Uzun Menzil', 'V2 RWD Uzun Menzil', 'V2 4More Obsidiyen'],
+        },
+        T10F: {
+          bodyType: 'Sedan',
+          engines: ['V1 RWD', 'V2 RWD', 'V2 4More AWD'],
+          packages: ['V1 RWD Standart Menzil', 'V2 RWD Uzun Menzil', 'V2 4More Obsidiyen'],
+        },
+      };
+      for (const key of Object.keys(enginesByKey)) {
+        if (key.includes('|TOGG|')) delete enginesByKey[key];
+      }
+      for (const key of Object.keys(fuelTypesByKey)) {
+        if (key.includes('|TOGG|')) delete fuelTypesByKey[key];
+      }
+      for (const key of Object.keys(transmissionsByKey)) {
+        if (key.includes('|TOGG|')) delete transmissionsByKey[key];
+      }
+      brandPackages.TOGG = Array.from(new Set(Object.values(toggCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(toggCatalog)) {
+        modelPackages[`TOGG|${model}`] = [...details.packages];
+        for (const year of years) {
+          const fuelKey = `${year}|TOGG|${model}|${details.bodyType}`;
+          const driveKey = `${fuelKey}|Elektrik`;
+          enginesByKey[driveKey] = [...details.engines];
+          fuelTypesByKey[fuelKey] = ['Elektrik'];
+          transmissionsByKey[driveKey] = ['Otomatik'];
+        }
+      }
+
       const defaultPackages = Array.isArray(valuationMetadata.defaultPackages) && valuationMetadata.defaultPackages.length
         ? valuationMetadata.defaultPackages
         : ['Standart', 'Comfort', 'Prestige', 'Premium'];
