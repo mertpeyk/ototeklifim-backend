@@ -172,7 +172,7 @@ export const vehicleCatalog = {
       key: 'Tesla',
       label: 'Tesla',
       logoUrl: '',
-      categoryKeys: ['elektrikli-araclar', 'otomobil'],
+      categoryKeys: ['elektrikli-araclar', 'otomobil', 'arazi-suv-pickup'],
       models: ['Model 3', 'Model Y', 'Model S', 'Model X'],
     },
     {
