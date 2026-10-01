@@ -8,7 +8,9 @@ startValuationCalibrationScheduler(app.log);
 
 const start = async () => {
   try {
-    await getVehicleCatalogSnapshot();
+    void getVehicleCatalogSnapshot().catch((error) => {
+      app.log.warn({ error }, 'Vehicle catalog DB unavailable; using static catalog fallback');
+    });
     await app.listen({
       host: '0.0.0.0',
       port: env.PORT,

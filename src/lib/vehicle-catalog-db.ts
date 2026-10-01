@@ -47,27 +47,33 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
 export async function getVehicleCatalogSnapshot() {
   if (memorySnapshot) return memorySnapshot;
 
-  const setting = await prisma.appSetting.findUnique({ where: { key: SETTING_KEY } });
-  if (setting) {
-    try {
-      memorySnapshot = JSON.parse(setting.value) as CatalogSnapshot;
-      return memorySnapshot;
-    } catch {
-      // Rebuild a corrupt/old snapshot below.
+  try {
+    const setting = await prisma.appSetting.findUnique({ where: { key: SETTING_KEY } });
+    if (setting) {
+      try {
+        memorySnapshot = JSON.parse(setting.value) as CatalogSnapshot;
+        return memorySnapshot;
+      } catch {
+        // Rebuild a corrupt/old snapshot below.
+      }
     }
-  }
 
-  const snapshot = await readStaticSnapshot();
-  await prisma.appSetting.upsert({
-    where: { key: SETTING_KEY },
-    create: { key: SETTING_KEY, value: JSON.stringify(snapshot) },
-    update: { value: JSON.stringify(snapshot) },
-  });
-  memorySnapshot = snapshot;
-  return snapshot;
+    const snapshot = await readStaticSnapshot();
+    await prisma.appSetting.upsert({
+      where: { key: SETTING_KEY },
+      create: { key: SETTING_KEY, value: JSON.stringify(snapshot) },
+      update: { value: JSON.stringify(snapshot) },
+    });
+    memorySnapshot = snapshot;
+    return snapshot;
+  } catch {
+    // Catalog loading must never prevent the API from passing healthcheck.
+    // The static catalog is still a valid source until the DB is available.
+    memorySnapshot = await readStaticSnapshot();
+    return memorySnapshot;
+  }
 }
 
 export function clearVehicleCatalogCache() {
   memorySnapshot = null;
 }
-
