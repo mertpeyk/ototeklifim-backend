@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v11';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v12';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -150,6 +150,29 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
           fuelTypesByKey[fuelKey] = Array.from(new Set([...(fuelTypesByKey[fuelKey] || []), details.fuel]));
           transmissionsByKey[`${fuelKey}|${details.fuel}`] = ['Otomatik'];
         }
+      }
+
+      // Opel Turkey trim names. Some historical engine keys use a different
+      // spelling than the current catalog model key, so keep a normalized
+      // model-level fallback in the DB snapshot as well.
+      const opelPackages: Record<string, string[]> = {
+        Corsa: ['Edition', 'GS', 'Ultimate'],
+        'Corsa-e': ['GS', 'Ultimate'],
+        Astra: ['Edition', 'Elegance', 'GS Line', 'Ultimate'],
+        'Astra-e': ['GS', 'Ultimate'],
+        Mokka: ['Edition', 'GS', 'Ultimate'],
+        'Mokka-e': ['Edition', 'GS', 'Ultimate'],
+        Grandland: ['Edition', 'GS', 'Ultimate'],
+        Crossland: ['Edition', 'Elegance', 'Ultimate'],
+        Combo: ['Edition', 'Elegance'],
+        'Combo Life': ['Edition', 'Elegance'],
+        Frontera: ['Edition', 'GS'],
+        Zafira: ['Edition', 'Elegance', 'Ultimate'],
+      };
+      for (const [model, packages] of Object.entries(opelPackages)) {
+        const modelKey = `Opel|${model}`;
+        modelPackages[modelKey] = Array.from(new Set([...(modelPackages[modelKey] || []), ...packages]));
+        brandPackages.Opel = Array.from(new Set([...(brandPackages.Opel || []), ...packages]));
       }
 
       // The reference index is the broadest trim source. Its values are
