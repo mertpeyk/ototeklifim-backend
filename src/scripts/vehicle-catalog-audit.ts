@@ -71,6 +71,20 @@ for (const [fuelKey, values] of Object.entries(fuels)) {
 if ((modelsByYearMake['2025|Audi'] || []).includes('A4')) issues.push({ type: 'audi_invalid_model_year', key: '2025|Audi|A4' });
 if ((modelsByYearMake['2026|Audi'] || []).includes('Q8 e-tron')) issues.push({ type: 'audi_invalid_model_year', key: '2026|Audi|Q8 e-tron' });
 
+const bmwEvModels = ['i3', 'i4', 'i5', 'i7', 'iX', 'iX1', 'iX2', 'iX3'];
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'BMW' || !bmwEvModels.includes(model)) continue;
+  if (values.length !== 1 || values[0] !== 'Elektrik') issues.push({ type: 'bmw_ev_non_electric', key: fuelKey });
+  const gearValues = transmissions[`${fuelKey}|Elektrik`] || [];
+  if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+    issues.push({ type: 'bmw_ev_non_automatic', key: `${fuelKey}|Elektrik` });
+  }
+}
+if ((modelsByYearMake['2012|BMW'] || []).includes('i3')) issues.push({ type: 'bmw_invalid_model_year', key: '2012|BMW|i3' });
+if ((modelsByYearMake['2023|BMW'] || []).includes('iX2')) issues.push({ type: 'bmw_invalid_model_year', key: '2023|BMW|iX2' });
+if ((modelsByYearMake['2023|BMW'] || []).includes('i3')) issues.push({ type: 'bmw_invalid_model_year', key: '2023|BMW|i3' });
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;

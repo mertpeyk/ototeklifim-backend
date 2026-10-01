@@ -3,12 +3,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { prisma } from '../db.js';
+import { bmwCatalog } from '../data/bmwCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v27';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v28';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -506,6 +507,35 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
           const fuelKey = `${yearText}|Audi|${model}|${details.bodyType}`;
           fuelTypesByKey[fuelKey] = details.drives.map((drive) => drive.fuel);
           for (const drive of details.drives) {
+            const driveKey = `${fuelKey}|${drive.fuel}`;
+            transmissionsByKey[driveKey] = [...drive.transmissions];
+            for (const transmission of drive.transmissions) {
+              enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
+            }
+          }
+        }
+      }
+
+      // BMW Turkey catalog, normalized model-by-model for 2010-2026. Exact
+      // canonical nameplates are replaced atomically so global source rows
+      // cannot leak a diesel/manual option into an electric i model.
+      for (const [model, details] of Object.entries(bmwCatalog)) {
+        for (const key of Object.keys(enginesByKey)) if (key.includes(`|BMW|${model}|`)) delete enginesByKey[key];
+        for (const key of Object.keys(fuelTypesByKey)) if (key.includes(`|BMW|${model}|`)) delete fuelTypesByKey[key];
+        for (const key of Object.keys(transmissionsByKey)) if (key.includes(`|BMW|${model}|`)) delete transmissionsByKey[key];
+        modelPackages[`BMW|${model}`] = [...details.packages];
+        brandPackages.BMW = Array.from(new Set([...(brandPackages.BMW || []), ...details.packages]));
+        for (const yearText of years) {
+          const year = Number(yearText);
+          const yearMakeKey = `${yearText}|BMW`;
+          modelsByYearMake[yearMakeKey] = (modelsByYearMake[yearMakeKey] || []).filter((value) => value !== model);
+          if (year < details.from || year > details.to) continue;
+          const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+          if (!activeDrives.length) continue;
+          modelsByYearMake[yearMakeKey] = Array.from(new Set([...(modelsByYearMake[yearMakeKey] || []), model]));
+          const fuelKey = `${yearText}|BMW|${model}|${details.bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+          for (const drive of activeDrives) {
             const driveKey = `${fuelKey}|${drive.fuel}`;
             transmissionsByKey[driveKey] = [...drive.transmissions];
             for (const transmission of drive.transmissions) {
