@@ -8,7 +8,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v8';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v9';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,6 +77,51 @@ async function readStaticSnapshot(): Promise<CatalogSnapshot> {
       const valuationMetadata = JSON.parse(metadata) as Record<string, any>;
       const vehicleReferenceIndex = JSON.parse(referenceIndex) as Record<string, unknown>;
       const webPackages = JSON.parse(webPackageIndex) as { models?: Record<string, unknown> };
+
+      // Promote reference engines into the normal DB lookup maps as well.
+      // This is important for EVs such as Tesla where the source has no
+      // conventional displacement/fuel row but the UI still needs a usable
+      // year -> fuel -> transmission -> engine path.
+      const inferReferenceFuel = (engine: string) => {
+        const value = engine.toLocaleLowerCase('tr-TR');
+        if (/(electric|elektrik|ev\b)/.test(value) || brandIsElectric(vehicleReferenceIndex, engine)) return 'Elektrik';
+        if (/(hybrid|hibrit|hev|phev|mhev)/.test(value)) return 'Hibrit';
+        if (/(diesel|dizel|tdi|tdci|dci|hdi|crdi|cdti|jtd|mjet)/.test(value)) return 'Dizel';
+        return 'Benzin';
+      };
+      const brandIsElectric = (_index: Record<string, unknown>, _engine: string) => false;
+      for (const [referenceKey, enginePackages] of Object.entries(vehicleReferenceIndex.models || {})) {
+        const [vehicleType, brand, model] = referenceKey.split('|');
+        if (!brand || !model || !enginePackages || typeof enginePackages !== 'object') continue;
+        const engines = Object.keys(enginePackages as Record<string, unknown>);
+        if (!engines.length) continue;
+        const fuel = engines.map(inferReferenceFuel).find(Boolean) || 'Benzin';
+        const bodyTypes = vehicleType.toLocaleLowerCase('tr-TR').includes('elektrik') ? ['SUV', 'Sedan'] : ['Sedan'];
+        for (const year of years) for (const bodyType of bodyTypes) {
+          const key = `${year}|${brand}|${model}|${bodyType}|${fuel}|Otomatik`;
+          enginesByKey[key] = Array.from(new Set([...(enginesByKey[key] || []), ...engines]));
+          const fuelKey = `${year}|${brand}|${model}|${bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set([...(fuelTypesByKey[fuelKey] || []), fuel]));
+          transmissionsByKey[`${fuelKey}|${fuel}`] = Array.from(new Set([...(transmissionsByKey[`${fuelKey}|${fuel}`] || []), 'Otomatik']));
+        }
+      }
+      // Keep the four Tesla nameplates usable even when an upstream reference
+      // file only publishes a subset of their historical powertrain labels.
+      const teslaEngines: Record<string, string[]> = {
+        'Model 3': ['Long Range', 'Standart Plus'],
+        'Model Y': ['Long Range (Juniper)', 'Long Range AWD', 'Performance (Legacy)', 'Premium (Juniper)', 'RWD (Juniper)', 'RWD (Legacy)', 'Standart (Juniper)'],
+        'Model X': ['P100D'],
+        'Model S': ['Elektrik'],
+      };
+      for (const [model, engines] of Object.entries(teslaEngines)) {
+        for (const year of years) {
+          const key = `${year}|Tesla|${model}|Sedan|Elektrik|Otomatik`;
+          enginesByKey[key] = Array.from(new Set([...(enginesByKey[key] || []), ...engines]));
+          const fuelKey = `${year}|Tesla|${model}|Sedan`;
+          fuelTypesByKey[fuelKey] = ['Elektrik'];
+          transmissionsByKey[`${fuelKey}|Elektrik`] = ['Otomatik'];
+        }
+      }
       const modelPackages = { ...(valuationMetadata.modelPackages || {}) } as Record<string, string[]>;
       const brandPackages = { ...(valuationMetadata.brandPackages || {}) } as Record<string, string[]>;
       const defaultPackages = Array.isArray(valuationMetadata.defaultPackages) && valuationMetadata.defaultPackages.length
