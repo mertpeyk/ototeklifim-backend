@@ -287,6 +287,37 @@ if ((engines[`${fiatEgea2023Base}|Otomatik`] || []).some((value) => !value.inclu
   issues.push({ type: 'fiat_engine_transmission_leak', key: `${fiatEgea2023Base}|Otomatik` });
 }
 
+const fordEvModels = ['Puma Gen-E', 'Explorer EV', 'Capri EV', 'Mustang Mach-E', 'E-Tourneo Courier', 'E-Tourneo Custom', 'E-Transit Courier', 'E-Transit Custom', 'E-Transit'];
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Ford' || !fordEvModels.includes(model)) continue;
+  if (values.length !== 1 || values[0] !== 'Elektrik') {
+    issues.push({ type: 'ford_ev_non_electric', key: fuelKey });
+  }
+  const gearValues = transmissions[`${fuelKey}|Elektrik`] || [];
+  if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+    issues.push({ type: 'ford_ev_non_automatic', key: `${fuelKey}|Elektrik` });
+  }
+}
+for (const model of ['Fiesta', 'B-Max', 'Mondeo', 'C-Max', 'Grand C-Max', 'EcoSport']) {
+  if ((modelsByYearMake['2026|Ford'] || []).includes(model)) {
+    issues.push({ type: 'ford_invalid_model_year', key: `2026|Ford|${model}` });
+  }
+}
+if ((modelsByYearMake['2020|Ford'] || []).includes('Mustang Mach-E')) {
+  issues.push({ type: 'ford_invalid_model_year', key: '2020|Ford|Mustang Mach-E' });
+}
+if ((modelsByYearMake['2023|Ford'] || []).includes('Explorer EV')) {
+  issues.push({ type: 'ford_invalid_model_year', key: '2023|Ford|Explorer EV' });
+}
+const fordFocus2023Diesel = '2023|Ford|Focus|Hatchback|Dizel';
+if ((engines[`${fordFocus2023Diesel}|Manuel`] || []).some((value) => /AT8|PowerShift|DCT/.test(value))) {
+  issues.push({ type: 'ford_engine_transmission_leak', key: `${fordFocus2023Diesel}|Manuel` });
+}
+if ((engines[`${fordFocus2023Diesel}|Otomatik`] || []).some((value) => !/AT8|PowerShift|DCT/.test(value))) {
+  issues.push({ type: 'ford_engine_transmission_leak', key: `${fordFocus2023Diesel}|Otomatik` });
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;

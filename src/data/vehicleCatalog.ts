@@ -68,7 +68,15 @@ export const vehicleCatalog = {
       label: 'Ford',
       logoUrl: '',
       categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan', 'ticari-araclar', 'kiralik-araclar', 'hasarli-araclar', 'klasik-araclar'],
-      models: ['Fiesta', 'Focus', 'Mondeo', 'Puma', 'Kuga', 'Ranger', 'Tourneo Courier', 'Transit', 'Transit Custom', 'F-Max'],
+      models: [
+        'Ka', 'Ka+', 'Fiesta', 'B-Max', 'Focus', 'Focus Sedan', 'Focus Station Wagon',
+        'C-Max', 'Grand C-Max', 'Mondeo', 'S-Max', 'Galaxy', 'EcoSport', 'Puma',
+        'Puma Gen-E', 'Kuga', 'Edge', 'Explorer', 'Explorer EV', 'Capri EV',
+        'Mustang', 'Mustang Mach-E', 'Ranger', 'Tourneo Courier', 'E-Tourneo Courier',
+        'Tourneo Connect', 'Tourneo Custom', 'E-Tourneo Custom', 'Transit Courier',
+        'E-Transit Courier', 'Transit Connect', 'Transit Custom', 'E-Transit Custom',
+        'Transit', 'E-Transit',
+      ],
     },
     {
       key: 'Renault',
