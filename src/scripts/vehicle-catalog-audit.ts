@@ -146,6 +146,35 @@ if ((modelsByYearMake['2024|Chevrolet'] || []).includes('Camaro')) {
   if (yearModels.includes('Camaro')) issues.push({ type: 'chevrolet_invalid_model_year', key: '2025|Chevrolet|Camaro' });
 }
 
+const citroenEvModels = ['e-C3', 'e-C3 Aircross', 'e-C4', 'e-C4 X', 'e-C5 Aircross', 'e-Berlingo', 'e-Jumpy', 'e-Jumper', 'e-SpaceTourer', 'Ami'];
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Citroën' || !citroenEvModels.includes(model)) continue;
+  if (values.length !== 1 || values[0] !== 'Elektrik') {
+    issues.push({ type: 'citroen_ev_non_electric', key: fuelKey });
+  }
+  const gearValues = transmissions[`${fuelKey}|Elektrik`] || [];
+  if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+    issues.push({ type: 'citroen_ev_non_automatic', key: `${fuelKey}|Elektrik` });
+  }
+}
+for (const model of ['BX', 'Saxo', 'Xantia', 'XM', 'Xsara', 'ZX', 'Evasion']) {
+  for (const year of ['2010', '2015', '2020', '2026']) {
+    if ((modelsByYearMake[`${year}|Citroën`] || []).includes(model)) {
+      issues.push({ type: 'citroen_legacy_model_leak', key: `${year}|Citroën|${model}` });
+    }
+  }
+}
+if ((modelsByYearMake['2026|Citroën'] || []).includes('C-Elysée')) {
+  issues.push({ type: 'citroen_invalid_model_year', key: '2026|Citroën|C-Elysée' });
+}
+if ((modelsByYearMake['2020|Citroën'] || []).includes('e-C3')) {
+  issues.push({ type: 'citroen_invalid_model_year', key: '2020|Citroën|e-C3' });
+}
+if (Object.keys(modelsByYearMake).some((key) => key.endsWith('|Citroen') && (modelsByYearMake[key] || []).length)) {
+  issues.push({ type: 'citroen_duplicate_unaccented_brand', key: 'Citroen' });
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;

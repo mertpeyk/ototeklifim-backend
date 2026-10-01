@@ -7,12 +7,13 @@ import { bmwCatalog } from '../data/bmwCatalog.js';
 import { bydCatalog } from '../data/bydCatalog.js';
 import { cheryCatalog } from '../data/cheryCatalog.js';
 import { chevroletCatalog } from '../data/chevroletCatalog.js';
+import { citroenCatalog } from '../data/citroenCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v32';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v33';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -598,6 +599,44 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
           const yearMakeKey = `${yearText}|Chevrolet`;
           modelsByYearMake[yearMakeKey] = Array.from(new Set([...(modelsByYearMake[yearMakeKey] || []), model]));
           const fuelKey = `${yearText}|Chevrolet|${model}|${details.bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+          for (const drive of activeDrives) {
+            const driveKey = `${fuelKey}|${drive.fuel}`;
+            transmissionsByKey[driveKey] = [...drive.transmissions];
+            for (const transmission of drive.transmissions) {
+              enginesByKey[`${driveKey}|${transmission}`] = [...drive.engines];
+            }
+          }
+        }
+      }
+
+      // Rebuild Citroën model-by-model for 2010-2026. The imported global
+      // source previously exposed discontinued BX/Saxo/Xantia-era rows in
+      // current years and mixed combustion fuels into e-C3/e-C4 nameplates.
+      // Keep the accented Türkiye brand as the sole canonical entry.
+      for (const brand of ['Citroën', 'Citroen']) {
+        for (const key of Object.keys(enginesByKey)) if (key.includes(`|${brand}|`)) delete enginesByKey[key];
+        for (const key of Object.keys(fuelTypesByKey)) if (key.includes(`|${brand}|`)) delete fuelTypesByKey[key];
+        for (const key of Object.keys(transmissionsByKey)) if (key.includes(`|${brand}|`)) delete transmissionsByKey[key];
+        for (const key of Object.keys(modelPackages)) if (key.startsWith(`${brand}|`)) delete modelPackages[key];
+        delete brandPackages[brand];
+        for (const yearText of years) {
+          modelsByYearMake[`${yearText}|${brand}`] = [];
+          makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== brand);
+        }
+      }
+      brandPackages['Citroën'] = Array.from(new Set(Object.values(citroenCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(citroenCatalog)) {
+        modelPackages[`Citroën|${model}`] = [...details.packages];
+        for (const yearText of years) {
+          const year = Number(yearText);
+          if (year < details.from || year > details.to) continue;
+          const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+          if (!activeDrives.length) continue;
+          makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Citroën']));
+          const yearMakeKey = `${yearText}|Citroën`;
+          modelsByYearMake[yearMakeKey] = Array.from(new Set([...(modelsByYearMake[yearMakeKey] || []), model]));
+          const fuelKey = `${yearText}|Citroën|${model}|${details.bodyType}`;
           fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
           for (const drive of activeDrives) {
             const driveKey = `${fuelKey}|${drive.fuel}`;
