@@ -11,6 +11,7 @@ import { opelCatalog } from './opelCatalog.js';
 import { renaultCatalog } from './renaultCatalog.js';
 import { seatCatalog } from './seatCatalog.js';
 import { skodaCatalog } from './skodaCatalog.js';
+import { toggCatalog } from './toggCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -200,7 +201,7 @@ export const vehicleCatalog = {
       label: 'TOGG',
       logoUrl: '',
       categoryKeys: ['elektrikli-araclar', 'otomobil', 'arazi-suv-pickup'],
-      models: ['T10X', 'T10F'],
+      models: Object.keys(toggCatalog),
     },
     {
       key: 'Chery',

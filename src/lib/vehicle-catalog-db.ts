@@ -29,12 +29,13 @@ import { opelCatalog } from '../data/opelCatalog.js';
 import { renaultCatalog } from '../data/renaultCatalog.js';
 import { seatCatalog } from '../data/seatCatalog.js';
 import { skodaCatalog } from '../data/skodaCatalog.js';
+import { toggCatalog } from '../data/toggCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v59';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v60';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,6 +61,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
       if (brand?.key === 'Renault') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan', 'elektrikli-araclar'], models: Object.keys(renaultCatalog) };
       if (brand?.key === 'Seat') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'], models: Object.keys(seatCatalog) };
       if (brand?.key === 'Skoda') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'], models: Object.keys(skodaCatalog) };
+      if (brand?.key === 'TOGG') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'], models: Object.keys(toggCatalog) };
       return brand;
     })
     : snapshot.brands;
@@ -656,6 +658,31 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
     }
   }
   brandPackages.Skoda = Array.from(new Set(Object.values(skodaCatalog).flatMap((details) => details.packages)));
+  for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|TOGG|')) delete fuelTypesByKey[key];
+  for (const key of Object.keys(transmissionsByKey)) if (key.includes('|TOGG|')) delete transmissionsByKey[key];
+  for (const key of Object.keys(enginesByKey)) if (key.includes('|TOGG|')) delete enginesByKey[key];
+  for (const key of Object.keys(modelPackages)) if (key.startsWith('TOGG|')) delete modelPackages[key];
+  delete brandPackages.TOGG;
+  for (const yearText of years) {
+    modelsByYearMake[`${yearText}|TOGG`] = [];
+    makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'TOGG');
+  }
+  for (const [model, details] of Object.entries(toggCatalog)) {
+    modelPackages[`TOGG|${model}`] = [...details.packages];
+    for (const yearText of years) {
+      const year = Number(yearText);
+      if (year < details.from || year > details.to) continue;
+      const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+      if (!activeDrives.length) continue;
+      makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'TOGG']));
+      modelsByYearMake[`${yearText}|TOGG`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|TOGG`] || []), model]));
+      const fuelKey = `${yearText}|TOGG|${model}|${details.bodyType}`;
+      fuelTypesByKey[fuelKey] = ['Elektrik'];
+      transmissionsByKey[`${fuelKey}|Elektrik`] = ['Otomatik'];
+      enginesByKey[`${fuelKey}|Elektrik|Otomatik`] = Array.from(new Set(activeDrives.flatMap((drive) => drive.engines)));
+    }
+  }
+  brandPackages.TOGG = Array.from(new Set(Object.values(toggCatalog).flatMap((details) => details.packages)));
   return {
     ...snapshot,
     brands,
@@ -812,58 +839,6 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
 
       const modelPackages = { ...(valuationMetadata.modelPackages || {}) } as Record<string, string[]>;
       const brandPackages = { ...(valuationMetadata.brandPackages || {}) } as Record<string, string[]>;
-
-      // TOGG Turkey powertrain/package data. Remove the legacy gasoline rows
-      // first; TOGG's T10X and T10F are fully electric and use automatic drive.
-      const toggCatalog: Record<string, { bodyType: string; engines: string[]; packages: string[] }> = {
-        T10X: {
-          bodyType: 'SUV',
-          engines: ['V1 RWD', 'V2 RWD', 'V2 4More AWD'],
-          packages: ['V1 RWD Standart Menzil', 'V1 RWD Uzun Menzil', 'V2 RWD Uzun Menzil', 'V2 4More Obsidiyen'],
-        },
-        T10F: {
-          bodyType: 'Sedan',
-          engines: ['V1 RWD', 'V2 RWD', 'V2 4More AWD'],
-          packages: ['V1 RWD Standart Menzil', 'V2 RWD Uzun Menzil', 'V2 4More Obsidiyen'],
-        },
-      };
-      for (const key of Object.keys(enginesByKey)) {
-        if (key.includes('|TOGG|')) delete enginesByKey[key];
-      }
-      for (const key of Object.keys(fuelTypesByKey)) {
-        if (key.includes('|TOGG|')) delete fuelTypesByKey[key];
-      }
-      for (const key of Object.keys(transmissionsByKey)) {
-        if (key.includes('|TOGG|')) delete transmissionsByKey[key];
-      }
-      brandPackages.TOGG = Array.from(new Set(Object.values(toggCatalog).flatMap((details) => details.packages)));
-      for (const [model, details] of Object.entries(toggCatalog)) {
-        modelPackages[`TOGG|${model}`] = [...details.packages];
-        for (const year of years) {
-          const fuelKey = `${year}|TOGG|${model}|${details.bodyType}`;
-          const driveKey = `${fuelKey}|Elektrik`;
-          enginesByKey[driveKey] = [...details.engines];
-          fuelTypesByKey[fuelKey] = ['Elektrik'];
-          transmissionsByKey[driveKey] = ['Otomatik'];
-        }
-      }
-
-      // Re-assert the TOGG motor rows after all catalog merges. This prevents
-      // a later reference/import pass from hiding them behind an old key.
-      const toggMotorRows: Record<string, string[]> = {
-        T10X: ['V1 RWD', 'V2 RWD', 'V2 4More AWD'],
-        T10F: ['V1 RWD', 'V2 RWD', 'V2 4More AWD'],
-      };
-      for (const [model, motors] of Object.entries(toggMotorRows)) {
-        const bodyType = model === 'T10X' ? 'SUV' : 'Sedan';
-        for (const year of years) {
-          const fuelKey = `${year}|TOGG|${model}|${bodyType}`;
-          const driveKey = `${fuelKey}|Elektrik`;
-          enginesByKey[`${driveKey}|Otomatik`] = [...motors];
-          fuelTypesByKey[fuelKey] = ['Elektrik'];
-          transmissionsByKey[driveKey] = ['Otomatik'];
-        }
-      }
 
       // Complete the Chery, Jaguar and Volvo branches in the same DB maps.
       // These entries deliberately use the model names exposed by the public
@@ -1696,17 +1671,6 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
           }
         }
       }
-
-      // Final authoritative TOGG package rows. Keep these after every merge so
-      // imports cannot replace the exact model keys used by the forms.
-      const toggPackages = {
-        T10X: ['V1 RWD Standart Menzil', 'V1 RWD Uzun Menzil', 'V2 RWD Uzun Menzil', 'V2 4More Obsidiyen'],
-        T10F: ['V1 RWD Standart Menzil', 'V2 RWD Uzun Menzil', 'V2 4More Obsidiyen'],
-      };
-      for (const [model, packages] of Object.entries(toggPackages)) {
-        modelPackages[`TOGG|${model}`] = [...packages];
-      }
-      brandPackages.TOGG = Array.from(new Set(Object.values(toggPackages).flat()));
 
       // Rebuild Jaguar after every generic/reference/web merge. The former
       // broad patch exposed the same petrol engines in every year, omitted
