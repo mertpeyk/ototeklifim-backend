@@ -455,6 +455,39 @@ if ((transmissions[toyotaHilux2026Hybrid] || []).some((value) => value !== 'Otom
   issues.push({ type: 'toyota_hilux_hybrid_non_automatic', key: toyotaHilux2026Hybrid });
 }
 
+// Volkswagen generations must keep discontinued passenger cars out of 2026,
+// battery-electric models isolated, and representative manual/DSG engines
+// separated in the catalogue maps.
+for (const model of ['Jetta', 'CC', 'Arteon', 'Scirocco', 'Beetle', 'Eos', 'Phaeton', 'Golf Plus', 'Golf Sportsvan', 'Tiguan Allspace', 'e-Golf', 'ID.5']) {
+  if ((modelsByYearMake['2026|Volkswagen'] || []).includes(model)) {
+    issues.push({ type: 'volkswagen_discontinued_model_leak', key: `2026|Volkswagen|${model}` });
+  }
+}
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Volkswagen' || !['e-Golf', 'ID.3', 'ID.4', 'ID.5', 'ID.7', 'ID. Buzz'].includes(model)) continue;
+  if (values.length !== 1 || values[0] !== 'Elektrik') {
+    issues.push({ type: 'volkswagen_ev_non_electric', key: fuelKey });
+  }
+  const gearValues = transmissions[`${fuelKey}|Elektrik`] || [];
+  if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+    issues.push({ type: 'volkswagen_ev_non_automatic', key: `${fuelKey}|Elektrik` });
+  }
+}
+if ((modelsByYearMake['2021|Volkswagen'] || []).includes('ID.7')) {
+  issues.push({ type: 'volkswagen_invalid_model_year', key: '2021|Volkswagen|ID.7' });
+}
+if ((modelsByYearMake['2022|Volkswagen'] || []).includes('Tayron')) {
+  issues.push({ type: 'volkswagen_invalid_model_year', key: '2022|Volkswagen|Tayron' });
+}
+const volkswagenPolo2018Petrol = '2018|Volkswagen|Polo|Hatchback|Benzin';
+if ((engines[`${volkswagenPolo2018Petrol}|Manuel`] || []).some((value) => /DSG/i.test(value))) {
+  issues.push({ type: 'volkswagen_engine_transmission_leak', key: `${volkswagenPolo2018Petrol}|Manuel` });
+}
+if ((engines[`${volkswagenPolo2018Petrol}|Otomatik`] || []).some((value) => /\bMT\d\b/i.test(value))) {
+  issues.push({ type: 'volkswagen_engine_transmission_leak', key: `${volkswagenPolo2018Petrol}|Otomatik` });
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;
