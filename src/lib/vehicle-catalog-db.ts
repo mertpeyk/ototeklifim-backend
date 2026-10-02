@@ -759,6 +759,13 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
     }
   }
   brandPackages.Volkswagen = Array.from(new Set(Object.values(volkswagenCatalog).flatMap((details) => details.packages)));
+
+  // Canonical runtime brand overrides above can add makes back into an older
+  // cached snapshot. Enforce the Turkey sales calendar after every override.
+  for (const [yearText, yearMakes] of Object.entries(makesByYear)) {
+    const year = Number(yearText);
+    makesByYear[yearText] = (yearMakes || []).filter((brand) => hasOfficialTurkeySales(brand, year));
+  }
   return {
     ...snapshot,
     brands,
