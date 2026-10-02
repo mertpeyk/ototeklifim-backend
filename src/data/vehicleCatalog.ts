@@ -9,6 +9,7 @@ import { teslaCatalog } from './teslaCatalog.js';
 import { volvoCatalog } from './volvoCatalog.js';
 import { opelCatalog } from './opelCatalog.js';
 import { renaultCatalog } from './renaultCatalog.js';
+import { seatCatalog } from './seatCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -162,8 +163,8 @@ export const vehicleCatalog = {
       key: 'Seat',
       label: 'Seat',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'kiralik-araclar', 'hasarli-araclar'],
-      models: ['Ibiza', 'Leon', 'Arona', 'Ateca', 'Tarraco'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'],
+      models: Object.keys(seatCatalog),
     },
     {
       key: 'Cupra',
