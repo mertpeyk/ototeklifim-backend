@@ -1,4 +1,4 @@
-import { buildVehicleCatalogSnapshot } from '../lib/vehicle-catalog-db.js';
+import { buildVehicleCatalogSnapshot, categoryForBodyType } from '../lib/vehicle-catalog-db.js';
 import { hasOfficialTurkeySales, turkeyBrandSalesPeriods } from '../data/turkeyBrandSalesPeriods.js';
 
 type StringMap = Record<string, string[]>;
@@ -511,6 +511,13 @@ if ((engines[`${volkswagenPolo2018Petrol}|Manuel`] || []).some((value) => /DSG/i
 }
 if ((engines[`${volkswagenPolo2018Petrol}|Otomatik`] || []).some((value) => /\bMT\d\b/i.test(value))) {
   issues.push({ type: 'volkswagen_engine_transmission_leak', key: `${volkswagenPolo2018Petrol}|Otomatik` });
+}
+
+// Commercial body labels must never fall back to the passenger-car bucket.
+for (const bodyType of ['Commercial Vehicle', 'Ticari', 'Panelvan', 'Van']) {
+  if (categoryForBodyType(bodyType) !== 'minivan-panelvan') {
+    issues.push({ type: 'commercial_category_mapping_invalid', key: bodyType });
+  }
 }
 
 const counts = issues.reduce<Record<string, number>>((result, issue) => {

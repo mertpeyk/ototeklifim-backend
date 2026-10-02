@@ -38,7 +38,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v65';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v66';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const AUDI_MASTER_MODELS = [
   'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A6 E-Tron', 'A7', 'A8',
@@ -65,10 +65,10 @@ type CatalogSnapshot = Record<string, unknown> & {
 
 type VehicleCategoryKey = 'otomobil' | 'arazi-suv-pickup' | 'minivan-panelvan';
 
-function categoryForBodyType(bodyType: string): VehicleCategoryKey {
+export function categoryForBodyType(bodyType: string): VehicleCategoryKey {
   const normalized = String(bodyType || '').toLocaleLowerCase('tr');
   if (/(suv|pickup|pick-up|arazi|crossover)/.test(normalized)) return 'arazi-suv-pickup';
-  if (/(minivan|panelvan|panel van|mpv|van|kamyonet|combi|kombi)/.test(normalized)) return 'minivan-panelvan';
+  if (/(minivan|panelvan|panel van|mpv|van|kamyonet|combi|kombi|commercial|ticari)/.test(normalized)) return 'minivan-panelvan';
   return 'otomobil';
 }
 
