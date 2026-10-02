@@ -30,12 +30,13 @@ import { renaultCatalog } from '../data/renaultCatalog.js';
 import { seatCatalog } from '../data/seatCatalog.js';
 import { skodaCatalog } from '../data/skodaCatalog.js';
 import { toggCatalog } from '../data/toggCatalog.js';
+import { toyotaCatalog } from '../data/toyotaCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v60';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v61';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,6 +63,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
       if (brand?.key === 'Seat') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'], models: Object.keys(seatCatalog) };
       if (brand?.key === 'Skoda') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'], models: Object.keys(skodaCatalog) };
       if (brand?.key === 'TOGG') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'], models: Object.keys(toggCatalog) };
+      if (brand?.key === 'Toyota') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'], models: Object.keys(toyotaCatalog) };
       return brand;
     })
     : snapshot.brands;
@@ -683,6 +685,37 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
     }
   }
   brandPackages.TOGG = Array.from(new Set(Object.values(toggCatalog).flatMap((details) => details.packages)));
+  for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Toyota|')) delete fuelTypesByKey[key];
+  for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Toyota|')) delete transmissionsByKey[key];
+  for (const key of Object.keys(enginesByKey)) if (key.includes('|Toyota|')) delete enginesByKey[key];
+  for (const key of Object.keys(modelPackages)) if (key.startsWith('Toyota|')) delete modelPackages[key];
+  delete brandPackages.Toyota;
+  for (const yearText of years) {
+    modelsByYearMake[`${yearText}|Toyota`] = [];
+    makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Toyota');
+  }
+  for (const [model, details] of Object.entries(toyotaCatalog)) {
+    modelPackages[`Toyota|${model}`] = [...details.packages];
+    for (const yearText of years) {
+      const year = Number(yearText);
+      if (year < details.from || year > details.to) continue;
+      const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+      if (!activeDrives.length) continue;
+      makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Toyota']));
+      modelsByYearMake[`${yearText}|Toyota`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Toyota`] || []), model]));
+      const fuelKey = `${yearText}|Toyota|${model}|${details.bodyType}`;
+      fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+      for (const drive of activeDrives) {
+        const driveKey = `${fuelKey}|${drive.fuel}`;
+        transmissionsByKey[driveKey] = Array.from(new Set([...(transmissionsByKey[driveKey] || []), ...drive.transmissions]));
+        for (const transmission of drive.transmissions) {
+          const engineKey = `${driveKey}|${transmission}`;
+          enginesByKey[engineKey] = Array.from(new Set([...(enginesByKey[engineKey] || []), ...drive.engines]));
+        }
+      }
+    }
+  }
+  brandPackages.Toyota = Array.from(new Set(Object.values(toyotaCatalog).flatMap((details) => details.packages)));
   return {
     ...snapshot,
     brands,
@@ -710,6 +743,7 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
         Mitsubishi: Array.from(new Set(Object.values(mitsubishiCatalog).flatMap((details) => details.packages))),
         Nissan: Array.from(new Set(Object.values(nissanCatalog).flatMap((details) => details.packages))),
         Peugeot: Array.from(new Set(Object.values(peugeotCatalog).flatMap((details) => details.packages))),
+        Toyota: Array.from(new Set(Object.values(toyotaCatalog).flatMap((details) => details.packages))),
       },
     },
   };
@@ -1902,6 +1936,41 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         }
       }
 
+      // Rebuild Toyota after generic/reference/web enrichment. Historic D-4D
+      // and Valvematic rows, current Hybrid generations, dedicated EVs and
+      // Toyota Professional models must remain scoped to their real years.
+      for (const key of Object.keys(enginesByKey)) if (key.includes('|Toyota|')) delete enginesByKey[key];
+      for (const key of Object.keys(fuelTypesByKey)) if (key.includes('|Toyota|')) delete fuelTypesByKey[key];
+      for (const key of Object.keys(transmissionsByKey)) if (key.includes('|Toyota|')) delete transmissionsByKey[key];
+      for (const key of Object.keys(modelPackages)) if (key.startsWith('Toyota|')) delete modelPackages[key];
+      delete brandPackages.Toyota;
+      for (const yearText of years) {
+        modelsByYearMake[`${yearText}|Toyota`] = [];
+        makesByYear[yearText] = (makesByYear[yearText] || []).filter((value) => value !== 'Toyota');
+      }
+      brandPackages.Toyota = Array.from(new Set(Object.values(toyotaCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(toyotaCatalog)) {
+        modelPackages[`Toyota|${model}`] = [...details.packages];
+        for (const yearText of years) {
+          const year = Number(yearText);
+          if (year < details.from || year > details.to) continue;
+          const activeDrives = details.drives.filter((drive) => year >= (drive.from ?? details.from) && year <= (drive.to ?? details.to));
+          if (!activeDrives.length) continue;
+          makesByYear[yearText] = Array.from(new Set([...(makesByYear[yearText] || []), 'Toyota']));
+          modelsByYearMake[`${yearText}|Toyota`] = Array.from(new Set([...(modelsByYearMake[`${yearText}|Toyota`] || []), model]));
+          const fuelKey = `${yearText}|Toyota|${model}|${details.bodyType}`;
+          fuelTypesByKey[fuelKey] = Array.from(new Set(activeDrives.map((drive) => drive.fuel)));
+          for (const drive of activeDrives) {
+            const driveKey = `${fuelKey}|${drive.fuel}`;
+            transmissionsByKey[driveKey] = Array.from(new Set([...(transmissionsByKey[driveKey] || []), ...drive.transmissions]));
+            for (const transmission of drive.transmissions) {
+              const engineKey = `${driveKey}|${transmission}`;
+              enginesByKey[engineKey] = Array.from(new Set([...(enginesByKey[engineKey] || []), ...drive.engines]));
+            }
+          }
+        }
+      }
+
       const kiaReferenceModels = vehicleReferenceIndex.models as Record<string, Record<string, string[]>>;
       for (const [model, details] of Object.entries(kiaCatalog)) {
         const category = details.bodyType === 'SUV' ? 'Arazi, SUV, Pick-up'
@@ -1956,6 +2025,16 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
           : details.bodyType === 'MPV' || details.bodyType === 'Panelvan' ? 'Minivan & Panelvan'
             : 'Otomobil';
         peugeotReferenceModels[`${category}|Peugeot|${model}`] = Object.fromEntries(
+          details.drives.flatMap((drive) => drive.engines.map((engine) => [engine, details.packages])),
+        );
+      }
+
+      const toyotaReferenceModels = vehicleReferenceIndex.models as Record<string, Record<string, string[]>>;
+      for (const [model, details] of Object.entries(toyotaCatalog)) {
+        const category = details.bodyType === 'SUV' || details.bodyType === 'Pickup' ? 'Arazi, SUV, Pick-up'
+          : details.bodyType === 'MPV' || details.bodyType === 'Panelvan' ? 'Minivan & Panelvan'
+            : 'Otomobil';
+        toyotaReferenceModels[`${category}|Toyota|${model}`] = Object.fromEntries(
           details.drives.flatMap((drive) => drive.engines.map((engine) => [engine, details.packages])),
         );
       }
@@ -2036,6 +2115,10 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
         modelPackages[`Peugeot|${model}`] = [...details.packages];
       }
       brandPackages.Peugeot = Array.from(new Set(Object.values(peugeotCatalog).flatMap((details) => details.packages)));
+      for (const [model, details] of Object.entries(toyotaCatalog)) {
+        modelPackages[`Toyota|${model}`] = [...details.packages];
+      }
+      brandPackages.Toyota = Array.from(new Set(Object.values(toyotaCatalog).flatMap((details) => details.packages)));
 
       const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
         ? valuationMetadata.commonColors

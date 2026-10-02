@@ -418,6 +418,43 @@ for (const [fuelKey, values] of Object.entries(fuels)) {
   }
 }
 
+const toyotaEvModels = ['bZ4X'];
+for (const [fuelKey, values] of Object.entries(fuels)) {
+  const [, brand, model] = fuelKey.split('|');
+  if (brand !== 'Toyota') continue;
+  if (toyotaEvModels.includes(model) && (values.length !== 1 || values[0] !== 'Elektrik')) {
+    issues.push({ type: 'toyota_ev_non_electric', key: fuelKey });
+  }
+  if (toyotaEvModels.includes(model)) {
+    const gearValues = transmissions[`${fuelKey}|Elektrik`] || [];
+    if (gearValues.length !== 1 || gearValues[0] !== 'Otomatik') {
+      issues.push({ type: 'toyota_ev_non_automatic', key: `${fuelKey}|Elektrik` });
+    }
+  }
+}
+for (const model of ['Auris', 'Avensis', 'Verso', 'Prius', 'GT86', 'GR86', 'GR Supra']) {
+  if ((modelsByYearMake['2026|Toyota'] || []).includes(model)) {
+    issues.push({ type: 'toyota_invalid_model_year', key: `2026|Toyota|${model}` });
+  }
+}
+if ((modelsByYearMake['2021|Toyota'] || []).includes('Corolla Cross')) {
+  issues.push({ type: 'toyota_invalid_model_year', key: '2021|Toyota|Corolla Cross' });
+}
+if ((modelsByYearMake['2026|Toyota'] || []).includes('bZ4X')) {
+  issues.push({ type: 'toyota_invalid_model_year', key: '2026|Toyota|bZ4X' });
+}
+const toyotaCorolla2021Petrol = '2021|Toyota|Corolla|Sedan|Benzin';
+if ((engines[`${toyotaCorolla2021Petrol}|Manuel`] || []).some((value) => /Multidrive|CVT|e-CVT/.test(value))) {
+  issues.push({ type: 'toyota_engine_transmission_leak', key: `${toyotaCorolla2021Petrol}|Manuel` });
+}
+if ((engines[`${toyotaCorolla2021Petrol}|Otomatik`] || []).some((value) => !/Multidrive|CVT/.test(value))) {
+  issues.push({ type: 'toyota_engine_transmission_leak', key: `${toyotaCorolla2021Petrol}|Otomatik` });
+}
+const toyotaHilux2026Hybrid = '2026|Toyota|Hilux|Pickup|Hibrit';
+if ((transmissions[toyotaHilux2026Hybrid] || []).some((value) => value !== 'Otomatik')) {
+  issues.push({ type: 'toyota_hilux_hybrid_non_automatic', key: toyotaHilux2026Hybrid });
+}
+
 const counts = issues.reduce<Record<string, number>>((result, issue) => {
   result[issue.type] = (result[issue.type] || 0) + 1;
   return result;
