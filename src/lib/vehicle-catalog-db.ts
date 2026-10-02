@@ -31,13 +31,14 @@ import { seatCatalog } from '../data/seatCatalog.js';
 import { skodaCatalog } from '../data/skodaCatalog.js';
 import { toggCatalog } from '../data/toggCatalog.js';
 import { toyotaCatalog } from '../data/toyotaCatalog.js';
+import { hasOfficialTurkeySales } from '../data/turkeyBrandSalesPeriods.js';
 import { volkswagenCatalog } from '../data/volkswagenCatalog.js';
 import { vehicleCatalog } from '../data/vehicleCatalog.js';
 
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v62';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v63';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,6 +78,13 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
   const valuationMetadata = (snapshot.valuationMetadata || {}) as Record<string, any>;
   const modelPackages = { ...((valuationMetadata.modelPackages || {}) as Record<string, string[]>) };
   const brandPackages = { ...((valuationMetadata.brandPackages || {}) as Record<string, string[]>) };
+
+  // Keep rollout-time cached snapshots subject to the same Turkey sales
+  // calendar as newly generated snapshots.
+  for (const [yearText, yearMakes] of Object.entries(makesByYear)) {
+    const year = Number(yearText);
+    makesByYear[yearText] = (yearMakes || []).filter((brand) => hasOfficialTurkeySales(brand, year));
+  }
   for (const [model, details] of Object.entries(citroenCatalog)) {
     modelPackages[`Citroën|${model}`] = [...details.packages];
   }
@@ -2196,6 +2204,13 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
       const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
         ? valuationMetadata.commonColors
         : vehicleCatalog.colorOptions;
+
+      // Run last: no global-reference merge or canonical brand override may
+      // re-add a make to a year without official Turkish sales.
+      for (const [yearText, yearMakes] of Object.entries(makesByYear)) {
+        const year = Number(yearText);
+        makesByYear[yearText] = (yearMakes || []).filter((brand) => hasOfficialTurkeySales(brand, year));
+      }
 
       const allowedCategories = (vehicleCatalog.categories || []).filter((category: any) =>
         ALLOWED_CATEGORY_KEYS.has(category.key),

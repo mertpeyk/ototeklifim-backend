@@ -1,4 +1,5 @@
 import { buildVehicleCatalogSnapshot } from '../lib/vehicle-catalog-db.js';
+import { hasOfficialTurkeySales, turkeyBrandSalesPeriods } from '../data/turkeyBrandSalesPeriods.js';
 
 type StringMap = Record<string, string[]>;
 
@@ -14,6 +15,30 @@ const referenceModels = ((snapshot.vehicleReferenceIndex || {}).models || {}) as
 const issues: Array<{ type: string; key: string }> = [];
 const modelKeys = new Set<string>();
 const fuelRowsByModelYear = new Map<string, Array<[string, string[]]>>();
+
+for (const [yearText, brands] of Object.entries((snapshot.makesByYear || {}) as StringMap)) {
+  const year = Number(yearText);
+  for (const brand of brands) {
+    if (!hasOfficialTurkeySales(brand, year)) issues.push({ type: 'brand_outside_turkey_sales_period', key: `${year}|${brand}` });
+  }
+}
+for (const brand of new Set(Object.values((snapshot.makesByYear || {}) as StringMap).flat())) {
+  if (!turkeyBrandSalesPeriods[brand]) issues.push({ type: 'brand_missing_turkey_sales_policy', key: brand });
+}
+const assertBrandYear = (year: number, brand: string, expected: boolean) => {
+  const present = (((snapshot.makesByYear || {}) as StringMap)[String(year)] || []).includes(brand);
+  if (present !== expected) issues.push({ type: 'turkey_brand_year_regression', key: `${year}|${brand}|expected:${expected}` });
+};
+assertBrandYear(2022, 'TOGG', false);
+assertBrandYear(2023, 'TOGG', true);
+assertBrandYear(2022, 'Tesla', false);
+assertBrandYear(2023, 'Tesla', true);
+assertBrandYear(2017, 'Cupra', false);
+assertBrandYear(2018, 'Cupra', true);
+assertBrandYear(2015, 'Chevrolet', true);
+assertBrandYear(2016, 'Chevrolet', false);
+assertBrandYear(2022, 'Chery', false);
+assertBrandYear(2023, 'Chery', true);
 
 for (const [fuelKey, values] of Object.entries(fuels)) {
   const [year, brand, model] = fuelKey.split('|');
