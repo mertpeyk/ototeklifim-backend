@@ -39,7 +39,15 @@ export const vehicleCatalog = {
       label: 'Audi',
       logoUrl: '',
       categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar', 'hasarli-araclar', 'klasik-araclar'],
-      models: ['A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'Q2', 'Q3', 'Q5', 'Q7', 'Q8', 'TT', 'e-tron'],
+      models: [
+        'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A6 E-Tron', 'A7', 'A8',
+        'E-Tron GT', 'R8', 'RS', 'S Serisi', 'TT', 'TTS', '80 Serisi',
+        '90 Serisi', '100 Serisi', '200 Serisi',
+        'E-Tron', 'E-Tron Sportback', 'Q2', 'Q3', 'Q3 Sportback',
+        'Q4 E-tron', 'Q4 E-tron Sportback', 'Q5', 'Q5 Sportback',
+        'Q6 E-tron', 'Q6 E-tron Sportback', 'Q7', 'Q8', 'Q8 E-tron',
+        'Q8 E-tron Sportback', 'RS Q8', 'SQ7',
+      ],
     },
     {
       key: 'BMW',

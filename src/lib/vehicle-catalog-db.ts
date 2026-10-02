@@ -38,8 +38,23 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v63';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v64';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
+const AUDI_MASTER_MODELS = [
+  'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A6 E-Tron', 'A7', 'A8',
+  'E-Tron GT', 'R8', 'RS', 'S Serisi', 'TT', 'TTS', '80 Serisi',
+  '90 Serisi', '100 Serisi', '200 Serisi', 'E-Tron', 'E-Tron Sportback',
+  'Q2', 'Q3', 'Q3 Sportback', 'Q4 E-tron', 'Q4 E-tron Sportback', 'Q5',
+  'Q5 Sportback', 'Q6 E-tron', 'Q6 E-tron Sportback', 'Q7', 'Q8',
+  'Q8 E-tron', 'Q8 E-tron Sportback', 'RS Q8', 'SQ7',
+] as const;
+const AUDI_YEAR_MODEL_SET = new Set([
+  'A1', 'A3', 'A4', 'A5', 'A6', 'A6 E-Tron', 'A7', 'A8', 'E-Tron GT',
+  'R8', 'RS', 'S Serisi', 'TT', 'TTS', 'E-Tron', 'E-Tron Sportback', 'Q2',
+  'Q3', 'Q3 Sportback', 'Q4 E-tron', 'Q4 E-tron Sportback', 'Q5',
+  'Q5 Sportback', 'Q6 E-tron', 'Q6 E-tron Sportback', 'Q7', 'Q8',
+  'Q8 E-tron', 'Q8 E-tron Sportback', 'RS Q8', 'SQ7',
+]);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -53,6 +68,7 @@ let memorySnapshot: CatalogSnapshot | null = null;
 function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapshot {
   const brands = Array.isArray(snapshot.brands)
     ? snapshot.brands.map((brand: any) => {
+      if (brand?.key === 'Audi') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup'], models: [...AUDI_MASTER_MODELS] };
       if (brand?.key === 'Mitsubishi') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'], models: Object.keys(mitsubishiCatalog) };
       if (brand?.key === 'Nissan') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'], models: Object.keys(nissanCatalog) };
       if (brand?.key === 'Peugeot') return { ...brand, categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan'], models: Object.keys(peugeotCatalog) };
@@ -762,6 +778,19 @@ function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapsho
 
   // Canonical runtime brand overrides above can add makes back into an older
   // cached snapshot. Enforce the Turkey sales calendar after every override.
+  for (const yearText of Object.keys(makesByYear)) {
+    const key = `${yearText}|Audi`;
+    if (modelsByYearMake[key]) modelsByYearMake[key] = modelsByYearMake[key].filter((model) => AUDI_YEAR_MODEL_SET.has(model));
+  }
+  for (const map of [fuelTypesByKey, transmissionsByKey, enginesByKey]) {
+    for (const key of Object.keys(map)) {
+      const parts = key.split('|');
+      if (parts[1] === 'Audi' && !AUDI_YEAR_MODEL_SET.has(parts[2])) delete map[key];
+    }
+  }
+  for (const key of Object.keys(modelPackages)) {
+    if (key.startsWith('Audi|') && !AUDI_MASTER_MODELS.includes(key.slice('Audi|'.length) as any)) delete modelPackages[key];
+  }
   for (const [yearText, yearMakes] of Object.entries(makesByYear)) {
     const year = Number(yearText);
     makesByYear[yearText] = (yearMakes || []).filter((brand) => hasOfficialTurkeySales(brand, year));
@@ -1148,6 +1177,16 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
           { fuel: 'Dizel', transmissions: ['Otomatik'], engines: ['3.0 TDI quattro', '50 TDI quattro'] },
           { fuel: 'Hibrit', transmissions: ['Otomatik'], engines: ['60 TFSI e quattro'] },
         ], packages: ['Business', 'Premium', 'Luxury', 'S line', 'Business Paket'] },
+        R8: { from: 2010, to: 2024, bodyType: 'Coupe', drives: [
+          { fuel: 'Benzin', transmissions: ['Manuel', 'Otomatik'], engines: ['4.2 FSI quattro', '5.2 FSI quattro', 'V10 quattro', 'V10 performance quattro'] },
+        ], packages: ['Base', 'V8', 'V10', 'V10 Plus', 'V10 Performance'] },
+        RS: { from: 2010, to: 2026, bodyType: 'Sportif', drives: [
+          { fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['RS 3 2.5 TFSI quattro', 'RS 4 2.9 TFSI quattro', 'RS 5 2.9 TFSI quattro', 'RS 6 4.0 TFSI quattro', 'RS 7 4.0 TFSI quattro'] },
+        ], packages: ['RS', 'RS Performance', 'RS Dynamic', 'Carbon Paket'] },
+        'S Serisi': { from: 2010, to: 2026, bodyType: 'Sportif', drives: [
+          { fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['S3 TFSI quattro', 'S4 TFSI quattro', 'S5 TFSI quattro', 'S6 TFSI quattro', 'S7 TFSI quattro', 'S8 TFSI quattro'] },
+          { fuel: 'Dizel', transmissions: ['Otomatik'], engines: ['S4 TDI quattro', 'S5 TDI quattro', 'S6 TDI quattro', 'S7 TDI quattro'] },
+        ], packages: ['S', 'S Sport', 'Black Edition', 'Carbon Paket'] },
         Q2: { from: 2016, to: 2026, bodyType: 'SUV', drives: [
           { fuel: 'Benzin', transmissions: ['Manuel', 'Otomatik'], engines: ['1.0 TFSI', '1.4 TFSI', '1.5 TFSI', '30 TFSI', '35 TFSI'] },
           { fuel: 'Dizel', transmissions: ['Manuel', 'Otomatik'], engines: ['1.6 TDI', '2.0 TDI', '30 TDI', '35 TDI'] },
@@ -1157,11 +1196,21 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
           { fuel: 'Dizel', transmissions: ['Manuel', 'Otomatik'], engines: ['2.0 TDI', '35 TDI', '40 TDI quattro'] },
           { fuel: 'Hibrit', transmissions: ['Otomatik'], engines: ['45 TFSI e'] },
         ], packages: ['Attraction', 'Design', 'Sport', 'Advanced', 'S line', 'Black Edition', 'Teknoloji Paketi Pro'] },
+        'Q3 Sportback': { from: 2020, to: 2026, bodyType: 'SUV', drives: [
+          { fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['35 TFSI', '40 TFSI quattro'] },
+          { fuel: 'Dizel', transmissions: ['Otomatik'], engines: ['35 TDI', '40 TDI quattro'] },
+          { fuel: 'Hibrit', transmissions: ['Otomatik'], engines: ['45 TFSI e'] },
+        ], packages: ['Advanced', 'S line', 'Black Edition', 'Teknoloji Paketi Pro'] },
         Q5: { from: 2010, to: 2026, bodyType: 'SUV', drives: [
           { fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['2.0 TFSI', '40 TFSI quattro', '45 TFSI quattro', 'TFSI quattro 150 kW'] },
           { fuel: 'Dizel', transmissions: ['Manuel', 'Otomatik'], engines: ['2.0 TDI', '35 TDI', '40 TDI quattro', 'TDI quattro 150 kW', '3.0 TDI quattro'] },
           { fuel: 'Hibrit', transmissions: ['Otomatik'], engines: ['50 TFSI e quattro', '55 TFSI e quattro'] },
         ], packages: ['Design', 'Sport', 'Advanced', 'S line', 'Black Edition', 'Teknoloji Paketi Plus'] },
+        'Q5 Sportback': { from: 2021, to: 2026, bodyType: 'SUV', drives: [
+          { fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['40 TFSI quattro', '45 TFSI quattro'] },
+          { fuel: 'Dizel', transmissions: ['Otomatik'], engines: ['40 TDI quattro'] },
+          { fuel: 'Hibrit', transmissions: ['Otomatik'], engines: ['50 TFSI e quattro', '55 TFSI e quattro'] },
+        ], packages: ['Advanced', 'S line', 'Black Edition', 'Teknoloji Paketi Plus'] },
         Q7: { from: 2010, to: 2026, bodyType: 'SUV', drives: [
           { fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['3.0 TFSI quattro', '55 TFSI quattro', '4.0 TFSI quattro'] },
           { fuel: 'Dizel', transmissions: ['Otomatik'], engines: ['3.0 TDI quattro', '45 TDI quattro', '50 TDI quattro'] },
@@ -1172,29 +1221,64 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
           { fuel: 'Dizel', transmissions: ['Otomatik'], engines: ['45 TDI quattro', '50 TDI quattro'] },
           { fuel: 'Hibrit', transmissions: ['Otomatik'], engines: ['55 TFSI e quattro', '60 TFSI e quattro'] },
         ], packages: ['Advanced', 'S line', 'Black Edition', 'Edition One', 'Prestige Paket', 'Premium Paket'] },
+        'RS Q8': { from: 2020, to: 2026, bodyType: 'SUV', drives: [
+          { fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['4.0 TFSI V8 quattro 600 PS', '4.0 TFSI V8 quattro 640 PS performance'] },
+        ], packages: ['RS Q8', 'RS Q8 Performance', 'Dynamic Plus', 'Carbon Paket'] },
+        SQ7: { from: 2016, to: 2026, bodyType: 'SUV', drives: [
+          { fuel: 'Dizel', transmissions: ['Otomatik'], engines: ['4.0 TDI V8 quattro'] },
+          { fuel: 'Benzin', transmissions: ['Otomatik'], engines: ['4.0 TFSI V8 quattro'] },
+        ], packages: ['SQ7', 'Black Edition', 'Dynamic Plus', 'Carbon Paket'] },
         TT: { from: 2010, to: 2023, bodyType: 'Coupe', drives: [
           { fuel: 'Benzin', transmissions: ['Manuel', 'Otomatik'], engines: ['1.8 TFSI', '2.0 TFSI', '40 TFSI', '45 TFSI quattro'] },
           { fuel: 'Dizel', transmissions: ['Manuel', 'Otomatik'], engines: ['2.0 TDI quattro'] },
         ], packages: ['Base', 'Sport', 'S line', 'Black Edition'] },
-        'e-tron': { from: 2019, to: 2022, bodyType: 'SUV', drives: [
+        TTS: { from: 2010, to: 2023, bodyType: 'Coupe', drives: [
+          { fuel: 'Benzin', transmissions: ['Manuel', 'Otomatik'], engines: ['2.0 TFSI quattro', 'TTS 2.0 TFSI quattro'] },
+        ], packages: ['TTS', 'Competition', 'Black Edition'] },
+        'E-Tron': { from: 2019, to: 2022, bodyType: 'SUV', drives: [
           { fuel: 'Elektrik', transmissions: ['Otomatik'], engines: ['50 quattro', '55 quattro', 'S quattro'] },
         ], packages: ['Advanced', 'S line', 'Black Edition', 'Edition One'] },
-        'Q4 e-tron': { from: 2021, to: 2026, bodyType: 'SUV', drives: [
+        'E-Tron Sportback': { from: 2020, to: 2022, bodyType: 'SUV', drives: [
+          { fuel: 'Elektrik', transmissions: ['Otomatik'], engines: ['50 quattro', '55 quattro', 'S quattro'] },
+        ], packages: ['Advanced', 'S line', 'Black Edition', 'Edition One'] },
+        'Q4 E-tron': { from: 2021, to: 2026, bodyType: 'SUV', drives: [
           { fuel: 'Elektrik', transmissions: ['Otomatik'], engines: ['35 e-tron', '40 e-tron', '45 e-tron', '50 e-tron quattro', '55 e-tron quattro'] },
         ], packages: ['Advanced', 'S line', 'Black Edition', 'Premium Paket'] },
-        'Q6 e-tron': { from: 2024, to: 2026, bodyType: 'SUV', drives: [
+        'Q4 E-tron Sportback': { from: 2021, to: 2026, bodyType: 'SUV', drives: [
+          { fuel: 'Elektrik', transmissions: ['Otomatik'], engines: ['35 e-tron', '40 e-tron', '45 e-tron', '50 e-tron quattro', '55 e-tron quattro'] },
+        ], packages: ['Advanced', 'S line', 'Black Edition', 'Premium Paket'] },
+        'Q6 E-tron': { from: 2024, to: 2026, bodyType: 'SUV', drives: [
           { fuel: 'Elektrik', transmissions: ['Otomatik'], engines: ['Q6 e-tron performance', 'Q6 e-tron quattro', 'SQ6 e-tron'] },
         ], packages: ['Advanced', 'S line', 'Premium Paket', 'Teknoloji Paketi Plus'] },
-        'Q8 e-tron': { from: 2023, to: 2025, bodyType: 'SUV', drives: [
+        'Q6 E-tron Sportback': { from: 2025, to: 2026, bodyType: 'SUV', drives: [
+          { fuel: 'Elektrik', transmissions: ['Otomatik'], engines: ['Q6 e-tron performance', 'Q6 e-tron quattro', 'SQ6 e-tron'] },
+        ], packages: ['Advanced', 'S line', 'Premium Paket', 'Teknoloji Paketi Plus'] },
+        'Q8 E-tron': { from: 2023, to: 2025, bodyType: 'SUV', drives: [
           { fuel: 'Elektrik', transmissions: ['Otomatik'], engines: ['50 e-tron quattro', '55 e-tron quattro', 'SQ8 e-tron'] },
         ], packages: ['Advanced', 'S line', 'Black Edition', 'Premium Paket'] },
-        'A6 e-tron': { from: 2024, to: 2026, bodyType: 'Sportback', drives: [
+        'Q8 E-tron Sportback': { from: 2023, to: 2025, bodyType: 'SUV', drives: [
+          { fuel: 'Elektrik', transmissions: ['Otomatik'], engines: ['50 e-tron quattro', '55 e-tron quattro', 'SQ8 e-tron'] },
+        ], packages: ['Advanced', 'S line', 'Black Edition', 'Premium Paket'] },
+        'A6 E-Tron': { from: 2024, to: 2026, bodyType: 'Sportback', drives: [
           { fuel: 'Elektrik', transmissions: ['Otomatik'], engines: ['A6 e-tron performance', 'A6 e-tron quattro', 'S6 e-tron'] },
         ], packages: ['Advanced', 'S line', 'Premium Paket', 'Teknoloji Paketi Plus'] },
-        'e-tron GT': { from: 2021, to: 2026, bodyType: 'Sedan', drives: [
+        'E-Tron GT': { from: 2021, to: 2026, bodyType: 'Sedan', drives: [
           { fuel: 'Elektrik', transmissions: ['Otomatik'], engines: ['e-tron GT quattro', 'S e-tron GT', 'RS e-tron GT', 'RS e-tron GT performance'] },
         ], packages: ['Advanced', 'S line', 'Premium Paket', 'Tasarım Paketi'] },
       };
+      // Remove previous spelling aliases before inserting the canonical names.
+      // Otherwise both "e-tron" and "E-Tron" can appear in the same model list.
+      const audiObsoleteAliases = ['e-tron', 'Q4 e-tron', 'Q6 e-tron', 'Q8 e-tron', 'A6 e-tron', 'e-tron GT'];
+      for (const model of audiObsoleteAliases) {
+        for (const key of Object.keys(enginesByKey)) if (key.includes(`|Audi|${model}|`)) delete enginesByKey[key];
+        for (const key of Object.keys(fuelTypesByKey)) if (key.includes(`|Audi|${model}|`)) delete fuelTypesByKey[key];
+        for (const key of Object.keys(transmissionsByKey)) if (key.includes(`|Audi|${model}|`)) delete transmissionsByKey[key];
+        delete modelPackages[`Audi|${model}`];
+        for (const yearText of years) {
+          const yearMakeKey = `${yearText}|Audi`;
+          modelsByYearMake[yearMakeKey] = (modelsByYearMake[yearMakeKey] || []).filter((value) => value !== model);
+        }
+      }
       for (const [model, details] of Object.entries(audiCatalog)) {
         // Canonical nameplates are authoritative: remove generic/global rows
         // for these exact model names before adding their valid year ranges.
@@ -2211,6 +2295,24 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
       const commonColors = Array.isArray(valuationMetadata.commonColors) && valuationMetadata.commonColors.length
         ? valuationMetadata.commonColors
         : vehicleCatalog.colorOptions;
+
+      // Global reference data carries Audi generation aliases (for example
+      // "Q3 (8U)") and duplicate e-tron spellings. Keep only the public
+      // canonical names. Historic pre-2010 nameplates remain in Audi's master
+      // model list, but no fake 2010+ model-year rows are manufactured.
+      for (const yearText of years) {
+        const key = `${yearText}|Audi`;
+        modelsByYearMake[key] = (modelsByYearMake[key] || []).filter((model) => AUDI_YEAR_MODEL_SET.has(model));
+      }
+      for (const map of [fuelTypesByKey, transmissionsByKey, enginesByKey]) {
+        for (const key of Object.keys(map)) {
+          const parts = key.split('|');
+          if (parts[1] === 'Audi' && !AUDI_YEAR_MODEL_SET.has(parts[2])) delete map[key];
+        }
+      }
+      for (const key of Object.keys(modelPackages)) {
+        if (key.startsWith('Audi|') && !AUDI_MASTER_MODELS.includes(key.slice('Audi|'.length) as any)) delete modelPackages[key];
+      }
 
       // Run last: no global-reference merge or canonical brand override may
       // re-add a make to a year without official Turkish sales.

@@ -114,7 +114,7 @@ for (const [yearMake, models] of Object.entries(modelsByYearMake)) {
 // Brand-by-brand regression checks. Audi is the first fully reconciled
 // nameplate catalog: current EVs must not inherit combustion fuels/gears and
 // discontinued canonical models must not appear outside their valid years.
-const audiEvModels = ['e-tron', 'Q4 e-tron', 'Q6 e-tron', 'Q8 e-tron', 'A6 e-tron', 'e-tron GT'];
+const audiEvModels = ['E-Tron', 'E-Tron Sportback', 'Q4 E-tron', 'Q4 E-tron Sportback', 'Q6 E-tron', 'Q6 E-tron Sportback', 'Q8 E-tron', 'Q8 E-tron Sportback', 'A6 E-Tron', 'E-Tron GT'];
 for (const [fuelKey, values] of Object.entries(fuels)) {
   const [, brand, model] = fuelKey.split('|');
   if (brand !== 'Audi' || !audiEvModels.includes(model)) continue;
@@ -125,7 +125,7 @@ for (const [fuelKey, values] of Object.entries(fuels)) {
   }
 }
 if ((modelsByYearMake['2025|Audi'] || []).includes('A4')) issues.push({ type: 'audi_invalid_model_year', key: '2025|Audi|A4' });
-if ((modelsByYearMake['2026|Audi'] || []).includes('Q8 e-tron')) issues.push({ type: 'audi_invalid_model_year', key: '2026|Audi|Q8 e-tron' });
+if ((modelsByYearMake['2026|Audi'] || []).includes('Q8 E-tron')) issues.push({ type: 'audi_invalid_model_year', key: '2026|Audi|Q8 E-tron' });
 const audiA4ReferencePackages = referenceModels['Otomobil|Audi|A4']?.['45 TFSI quattro'] || [];
 if (!audiA4ReferencePackages.includes('Advanced') || !audiA4ReferencePackages.includes('S line')) {
   issues.push({ type: 'audi_missing_engine_packages', key: 'Otomobil|Audi|A4|45 TFSI quattro' });
