@@ -10,6 +10,7 @@ import { volvoCatalog } from './volvoCatalog.js';
 import { opelCatalog } from './opelCatalog.js';
 import { renaultCatalog } from './renaultCatalog.js';
 import { seatCatalog } from './seatCatalog.js';
+import { skodaCatalog } from './skodaCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -156,8 +157,8 @@ export const vehicleCatalog = {
       key: 'Skoda',
       label: 'Skoda',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'kiralik-araclar', 'hasarli-araclar'],
-      models: ['Fabia', 'Scala', 'Octavia', 'Superb', 'Kamiq', 'Karoq', 'Kodiaq', 'Enyaq'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'elektrikli-araclar'],
+      models: Object.keys(skodaCatalog),
     },
     {
       key: 'Seat',
