@@ -8,6 +8,7 @@ import { suzukiCatalog } from './suzukiCatalog.js';
 import { teslaCatalog } from './teslaCatalog.js';
 import { volvoCatalog } from './volvoCatalog.js';
 import { opelCatalog } from './opelCatalog.js';
+import { renaultCatalog } from './renaultCatalog.js';
 
 const currentYear = new Date().getFullYear();
 
@@ -84,8 +85,8 @@ export const vehicleCatalog = {
       key: 'Renault',
       label: 'Renault',
       logoUrl: '',
-      categoryKeys: ['otomobil', 'minivan-panelvan', 'kiralik-araclar', 'hasarli-araclar'],
-      models: ['Clio', 'Megane', 'Taliant', 'Captur', 'Austral', 'Kangoo', 'Trafic', 'Master'],
+      categoryKeys: ['otomobil', 'arazi-suv-pickup', 'minivan-panelvan', 'elektrikli-araclar'],
+      models: Object.keys(renaultCatalog),
     },
     {
       key: 'Peugeot',
