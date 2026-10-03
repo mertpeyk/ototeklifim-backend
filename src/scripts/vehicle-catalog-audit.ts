@@ -469,11 +469,25 @@ if ((modelsByYearMake['2026|Toyota'] || []).includes('bZ4X')) {
   issues.push({ type: 'toyota_invalid_model_year', key: '2026|Toyota|bZ4X' });
 }
 const toyotaCorolla2021Petrol = '2021|Toyota|Corolla|Sedan|Benzin';
-if ((engines[`${toyotaCorolla2021Petrol}|Manuel`] || []).some((value) => /Multidrive|CVT|e-CVT/.test(value))) {
+const toyotaCorolla2021Manual = engines[`${toyotaCorolla2021Petrol}|Manuel`] || [];
+const toyotaCorolla2021Automatic = engines[`${toyotaCorolla2021Petrol}|Otomatik`] || [];
+if (toyotaCorolla2021Manual.some((value) => /Multidrive|CVT|e-CVT/.test(value))) {
   issues.push({ type: 'toyota_engine_transmission_leak', key: `${toyotaCorolla2021Petrol}|Manuel` });
 }
-if ((engines[`${toyotaCorolla2021Petrol}|Otomatik`] || []).some((value) => !/Multidrive|CVT/.test(value))) {
+if (toyotaCorolla2021Automatic.some((value) => !/Multidrive|CVT/.test(value))) {
   issues.push({ type: 'toyota_engine_transmission_leak', key: `${toyotaCorolla2021Petrol}|Otomatik` });
+}
+if (!toyotaCorolla2021Manual.includes('1.5 Dynamic Force 125') || toyotaCorolla2021Manual.some((value) => /1\.6 Valvematic/.test(value))) {
+  issues.push({ type: 'toyota_corolla_2021_petrol_engine_mismatch', key: `${toyotaCorolla2021Petrol}|Manuel` });
+}
+if (!toyotaCorolla2021Automatic.includes('1.5 Dynamic Force Multidrive S 125') || toyotaCorolla2021Automatic.some((value) => /1\.6 Valvematic/.test(value))) {
+  issues.push({ type: 'toyota_corolla_2021_petrol_engine_mismatch', key: `${toyotaCorolla2021Petrol}|Otomatik` });
+}
+for (const transmission of ['Manuel', 'Otomatik']) {
+  const values = engines[`2020|Toyota|Corolla|Sedan|Benzin|${transmission}`] || [];
+  if (!values.some((value) => /1\.6 Valvematic/.test(value)) || values.some((value) => /1\.5 Dynamic Force/.test(value))) {
+    issues.push({ type: 'toyota_corolla_2020_petrol_engine_mismatch', key: `2020|Toyota|Corolla|Sedan|Benzin|${transmission}` });
+  }
 }
 const toyotaHilux2026Hybrid = '2026|Toyota|Hilux|Pickup|Hibrit';
 if ((transmissions[toyotaHilux2026Hybrid] || []).some((value) => value !== 'Otomatik')) {

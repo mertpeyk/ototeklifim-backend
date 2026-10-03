@@ -38,7 +38,7 @@ import { vehicleCatalog } from '../data/vehicleCatalog.js';
 // Bump the snapshot whenever catalog metadata changes. This forces existing
 // deployments to refresh the DB copy instead of serving the old incomplete
 // colour/package map forever.
-const SETTING_KEY = 'vehicle_catalog_snapshot_v66';
+const SETTING_KEY = 'vehicle_catalog_snapshot_v67';
 const ALLOWED_CATEGORY_KEYS = new Set(['otomobil', 'arazi-suv-pickup', 'minivan-panelvan']);
 const AUDI_MASTER_MODELS = [
   'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A6 E-Tron', 'A7', 'A8',
