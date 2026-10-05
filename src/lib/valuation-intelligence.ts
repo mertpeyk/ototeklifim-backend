@@ -333,6 +333,68 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
         reasoning: {
           effort: process.env.OPENAI_VALUATION_REASONING_EFFORT || 'medium',
         },
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'vehicle_valuation',
+            strict: true,
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                perListing: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: {
+                      index: { type: 'number' },
+                      similarityScore: { type: 'number' },
+                      note: { type: 'string' },
+                    },
+                    required: ['index', 'similarityScore', 'note'],
+                  },
+                },
+                comparableListings: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: {
+                      title: { type: 'string' },
+                      price: { type: 'number' },
+                      year: { type: ['number', 'null'] },
+                      approxKm: { type: ['number', 'null'] },
+                      url: { type: 'string' },
+                      variant: { type: 'string' },
+                      similarityScore: { type: 'number' },
+                      note: { type: 'string' },
+                    },
+                    required: ['title', 'price', 'year', 'approxKm', 'url', 'variant', 'similarityScore', 'note'],
+                  },
+                },
+                reviewRecommendation: { type: 'string', enum: ['approve', 'manual_review'] },
+                reviewReason: { type: 'string' },
+                explanation: { type: 'string' },
+                adjustmentPercent: { type: 'number' },
+                marketEstimate: { type: ['number', 'null'] },
+                marketMinimum: { type: ['number', 'null'] },
+                marketMaximum: { type: ['number', 'null'] },
+              },
+              required: [
+                'perListing',
+                'comparableListings',
+                'reviewRecommendation',
+                'reviewReason',
+                'explanation',
+                'adjustmentPercent',
+                'marketEstimate',
+                'marketMinimum',
+                'marketMaximum',
+              ],
+            },
+          },
+        },
         tools: [{ type: 'web_search' }],
         tool_choice: 'auto',
         include: ['web_search_call.action.sources'],
