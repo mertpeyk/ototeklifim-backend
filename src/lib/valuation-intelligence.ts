@@ -329,9 +329,9 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
       body: JSON.stringify({
         model: webSearchModel,
         store: false,
-        max_output_tokens: 1800,
+        max_output_tokens: 4000,
         reasoning: {
-          effort: process.env.OPENAI_VALUATION_REASONING_EFFORT || 'medium',
+          effort: process.env.OPENAI_VALUATION_REASONING_EFFORT || 'low',
         },
         text: {
           format: {
@@ -420,6 +420,8 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
     if (response.ok) {
       webSearchDiagnostic = 'web_search_response_received';
       const json = await response.json() as {
+        status?: string;
+        incomplete_details?: { reason?: string };
         output_text?: string;
         output?: Array<{
           type?: string;
@@ -473,7 +475,9 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
           };
         }
       }
-      webSearchDiagnostic = 'web_search_invalid_output';
+      webSearchDiagnostic = json.status === 'incomplete'
+        ? `web_search_incomplete_${json.incomplete_details?.reason || 'unknown'}`
+        : 'web_search_invalid_output';
     } else {
       const errorText = (await response.text()).slice(0, 240).replace(/\s+/g, ' ');
       webSearchDiagnostic = `web_search_http_${response.status}${errorText ? `: ${errorText}` : ''}`;
