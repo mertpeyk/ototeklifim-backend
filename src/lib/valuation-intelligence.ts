@@ -323,7 +323,9 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
         'content-type': 'application/json',
         authorization: `Bearer ${apiKey}`,
       },
-      signal: AbortSignal.timeout(30000),
+      // A reasoning model with live web search can legitimately need longer
+      // than the former 30-second mini-model budget.
+      signal: AbortSignal.timeout(65000),
       body: JSON.stringify({
         model: webSearchModel,
         store: false,
