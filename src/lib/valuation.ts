@@ -506,7 +506,27 @@ export async function estimateVehicleValue(
   let maximum = heuristicEstimate * (demand === 'Yüksek' ? 1.08 : 1.10);
   let usedAgentMarketEstimate = false;
 
-  if (effectiveMarketStats) {
+  // A sourced GPT-6 Sol market estimate is the primary price anchor. The
+  // deterministic catalogue/market calculation remains a bounded safety
+  // reference and a fallback for missing or weak AI evidence.
+  if (intelligence.marketEstimate && intelligence.sources.length >= 2) {
+    usedAgentMarketEstimate = true;
+    const vehicleAge = Math.max(0, new Date().getFullYear() - input.vehicleInfo.year);
+    const expectedMileage = Math.min(240000, Math.max(5000, vehicleAge * 14500));
+    const hasExceptionalLowMileage = vehicleAge >= 8 && input.vehicleInfo.mileage <= expectedMileage * 0.55;
+    const normalizedAgentEstimate = hasExceptionalLowMileage
+      ? Math.max(cleanAdjustedEstimate, intelligence.marketEstimate)
+      : intelligence.marketEstimate;
+    const agentAnchor = Math.max(
+      cleanAdjustedEstimate * 0.55,
+      Math.min(cleanAdjustedEstimate * 2.2, normalizedAgentEstimate),
+    );
+    estimate = Math.round((agentAnchor * 0.90) + (cleanAdjustedEstimate * 0.10));
+    const agentMinimum = intelligence.marketMinimum || agentAnchor * 0.95;
+    const agentMaximum = intelligence.marketMaximum || agentAnchor * 1.05;
+    minimum = Math.round((agentMinimum * 0.90) + (estimate * 0.10));
+    maximum = Math.round((agentMaximum * 0.90) + (estimate * 0.10));
+  } else if (effectiveMarketStats) {
     const sampleSize = effectiveMarketSampleSize;
     const trimmedAverage = Number(effectiveMarketStats.trimmedAverage || 0);
     const medianValue = Number(effectiveMarketStats.median || 0);
@@ -537,25 +557,6 @@ export async function estimateVehicleValue(
     estimate = Math.round((marketAnchor * confidence) + (cleanAdjustedEstimate * (1 - confidence)));
     minimum = Math.round((lowerBand * 0.88) + (estimate * 0.12));
     maximum = Math.round((upperBand * 0.88) + (estimate * 0.12));
-  }
-
-  if (!effectiveMarketStats && intelligence.marketEstimate && intelligence.sources.length >= 2) {
-    usedAgentMarketEstimate = true;
-    const vehicleAge = Math.max(0, new Date().getFullYear() - input.vehicleInfo.year);
-    const expectedMileage = Math.min(240000, Math.max(5000, vehicleAge * 14500));
-    const hasExceptionalLowMileage = vehicleAge >= 8 && input.vehicleInfo.mileage <= expectedMileage * 0.55;
-    const normalizedAgentEstimate = hasExceptionalLowMileage
-      ? Math.max(cleanAdjustedEstimate, intelligence.marketEstimate)
-      : intelligence.marketEstimate;
-    const agentAnchor = Math.max(
-      cleanAdjustedEstimate * 0.55,
-      Math.min(cleanAdjustedEstimate * 2.2, normalizedAgentEstimate),
-    );
-    estimate = Math.round((agentAnchor * 0.82) + (cleanAdjustedEstimate * 0.18));
-    const agentMinimum = intelligence.marketMinimum || agentAnchor * 0.95;
-    const agentMaximum = intelligence.marketMaximum || agentAnchor * 1.05;
-    minimum = Math.round((agentMinimum * 0.82) + (estimate * 0.18));
-    maximum = Math.round((agentMaximum * 0.82) + (estimate * 0.18));
   }
 
   if (effectiveMarketStats || usedAgentMarketEstimate) {

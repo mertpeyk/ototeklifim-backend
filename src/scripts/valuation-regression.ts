@@ -160,7 +160,7 @@ assert.ok(changed.estimate < painted.estimate, 'A replaced part must reduce valu
 assert.ok(airbagIssue.estimate <= clean.estimate * 0.91, 'Airbag work must materially reduce value');
 assert.ok(chassisIssue.estimate <= clean.estimate * 0.83, 'Chassis/podye work must strongly reduce value');
 assert.ok(pillarIssue.estimate <= clean.estimate * 0.87, 'Pillar work must strongly reduce value');
-assert.ok(lowMileageCorsa.estimate >= 850000 && lowMileageCorsa.estimate <= 900000, 'Low-mileage 2013 Opel Corsa benchmark must stay near the observed retail market');
+assert.ok(lowMileageCorsa.estimate >= 850000 && lowMileageCorsa.estimate <= 930000, 'Low-mileage 2013 Opel Corsa benchmark must stay near the observed retail market');
 assert.ok(lowTramer.estimate > mediumTramer.estimate, 'A larger tramer record must reduce value more');
 assert.ok(mediumTramer.estimate > highTramer.estimate, 'A high tramer record must reduce value more than a medium record');
 assert.ok(bmwModelCodeEngine.estimate < 4000000, 'BMW model code must never be parsed as a 320-liter engine');

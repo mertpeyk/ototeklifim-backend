@@ -408,7 +408,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
             aiDiagnostic: estimatedValues.result.intelligence.aiDiagnostic,
             model: estimatedValues.result.intelligence.provider === 'deterministic'
               ? 'fallback-deterministic'
-              : (process.env.OPENAI_VALUATION_WEB_MODEL || 'gpt-5.4-mini'),
+              : (process.env.OPENAI_VALUATION_WEB_MODEL || 'gpt-6-sol'),
             fallbackModel: process.env.OPENAI_VALUATION_MODEL || 'gpt-4.1-mini',
             marketCompSampleSize: estimatedValues.result.marketComps?.sampleSize || 0,
             marketMedian: estimatedValues.result.marketComps?.median || 0,
