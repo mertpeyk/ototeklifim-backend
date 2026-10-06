@@ -840,6 +840,12 @@ async function buildAdminRepository() {
           mechanicalStatus: String(condition.mechanicalStatus ?? ''),
           maintenanceHistory: String(condition.maintenanceHistory ?? ''),
           appraisalReport: String(condition.appraisalReport ?? ''),
+          expertisePhotos: parseArray<Record<string, unknown>>(condition.expertisePhotos).map((photo, index) => ({
+            id: String(photo.id ?? `${request.id}-expertise-${index}`),
+            title: String(photo.title ?? `Ekspertiz raporu ${index + 1}`),
+            url: String(photo.url ?? ''),
+            cover: Boolean(photo.cover),
+          })).filter((photo) => Boolean(photo.url)),
           airbagCondition: resolveStructuralConditionFromChecks(condition.airbagCondition, criticalChecks, ['airbag']),
           chassisPodyeCondition: resolveStructuralConditionFromChecks(condition.chassisPodyeCondition, criticalChecks, ['chassis', 'podye', 'şase', 'sase']),
           pillarCondition: resolveStructuralConditionFromChecks(condition.pillarCondition, criticalChecks, ['pillar', 'direk']),
