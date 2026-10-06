@@ -591,6 +591,20 @@ async function buildAdminRepository() {
       prisma.adminUserNote.findMany({ orderBy: { createdAt: 'desc' } }),
     ]);
 
+  const fastSaleUploadWindow = fastSales.length
+    ? {
+        from: new Date(Math.min(...fastSales.map((item) => item.createdAt.getTime())) - (60 * 60 * 1000)),
+        to: new Date(Math.max(...fastSales.map((item) => item.createdAt.getTime())) + (10 * 60 * 1000)),
+      }
+    : null;
+  const uploadedImageMetadata = fastSaleUploadWindow
+    ? await prisma.uploadedImage.findMany({
+        where: { createdAt: { gte: fastSaleUploadWindow.from, lte: fastSaleUploadWindow.to } },
+        select: { filename: true, originalName: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      })
+    : [];
+
   const notesByUser = new Map<string, string[]>();
   for (const note of userNotes) {
     const list = notesByUser.get(note.userId) ?? [];
@@ -811,6 +825,32 @@ async function buildAdminRepository() {
       const condition = parseObject<Record<string, unknown>>(request.condition, {});
       const criticalChecks = parseArray<Record<string, unknown>>(condition.criticalChecks);
       const photos = parseArray<Record<string, unknown>>(request.photos);
+      let expertisePhotoRecords = parseLegacyExpertisePhotos(condition);
+      if (!expertisePhotoRecords.length) {
+        const expectedPhotoCount = Number(String(condition.appraisalReport ?? '').match(/\((\d+)\s+fotoğraf\)/i)?.[1] ?? 0);
+        if (expectedPhotoCount > 0) {
+          const linkedFilenames = new Set(
+            photos
+              .map((photo) => String(photo.url ?? '').match(/\/uploads\/([^/?#]+)/i)?.[1])
+              .filter((value): value is string => Boolean(value)),
+          );
+          const from = request.createdAt.getTime() - (60 * 60 * 1000);
+          const to = request.createdAt.getTime() + (10 * 60 * 1000);
+          const recoveryCandidates = uploadedImageMetadata.filter((image) => (
+            image.createdAt.getTime() >= from
+            && image.createdAt.getTime() <= to
+            && !linkedFilenames.has(image.filename)
+          ));
+          if (recoveryCandidates.length === expectedPhotoCount) {
+            expertisePhotoRecords = recoveryCandidates.map((image, index) => ({
+              id: `${request.id}-legacy-expertise-${index}`,
+              title: image.originalName || `Ekspertiz raporu ${index + 1}`,
+              url: `https://ototeklifim-backend-production.up.railway.app/uploads/${image.filename}`,
+              cover: index === 0,
+            }));
+          }
+        }
+      }
       const requestUser =
         mappedUsers.find((user) => user.id === request.userId) ?? {
           id: request.user.id,
@@ -858,7 +898,7 @@ async function buildAdminRepository() {
           mechanicalStatus: String(condition.mechanicalStatus ?? ''),
           maintenanceHistory: String(condition.maintenanceHistory ?? ''),
           appraisalReport: String(condition.appraisalReport ?? ''),
-          expertisePhotos: parseLegacyExpertisePhotos(condition).map((photo, index) => ({
+          expertisePhotos: expertisePhotoRecords.map((photo, index) => ({
             id: String(photo.id ?? `${request.id}-expertise-${index}`),
             title: String(photo.title ?? `Ekspertiz raporu ${index + 1}`),
             url: String(photo.url ?? ''),
