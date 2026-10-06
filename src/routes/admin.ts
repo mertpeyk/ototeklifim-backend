@@ -287,6 +287,24 @@ function parseArray<T>(value: unknown, fallback: T[] = []): T[] {
   return fallback;
 }
 
+function parseLegacyExpertisePhotos(condition: Record<string, unknown>) {
+  const legacyCandidates = [
+    condition.expertisePhotos,
+    condition.expertiseReportPhotos,
+    condition.appraisalPhotos,
+    condition.expertPhotos,
+  ];
+
+  for (const candidate of legacyCandidates) {
+    const photos = parseArray<Record<string, unknown>>(candidate);
+    if (photos.length) {
+      return photos;
+    }
+  }
+
+  return [];
+}
+
 function normalizeWhatsappNumber(value: string) {
   const digits = value.replace(/\D/g, '');
 
@@ -840,7 +858,7 @@ async function buildAdminRepository() {
           mechanicalStatus: String(condition.mechanicalStatus ?? ''),
           maintenanceHistory: String(condition.maintenanceHistory ?? ''),
           appraisalReport: String(condition.appraisalReport ?? ''),
-          expertisePhotos: parseArray<Record<string, unknown>>(condition.expertisePhotos).map((photo, index) => ({
+          expertisePhotos: parseLegacyExpertisePhotos(condition).map((photo, index) => ({
             id: String(photo.id ?? `${request.id}-expertise-${index}`),
             title: String(photo.title ?? `Ekspertiz raporu ${index + 1}`),
             url: String(photo.url ?? ''),
@@ -1690,6 +1708,109 @@ export async function adminRoutes(app: FastifyInstance) {
       description: [payload.note, payload.message].filter(Boolean).join(' | ') || `${requestModel.requestNo} hızlı sat durumu güncellendi.`,
     });
     return requestModel;
+  });
+
+  app.get('/admin/fast-sales/:id/expertise-recovery-candidates', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const params = z.object({ id: z.string().min(1) }).parse(request.params);
+    const requestModel = await prisma.fastSaleRequest.findUnique({
+      where: { id: params.id },
+      select: { id: true, createdAt: true, condition: true, photos: true },
+    });
+    if (!requestModel) {
+      reply.code(404);
+      return { message: 'Hızlı sat talebi bulunamadı.' };
+    }
+
+    const condition = parseObject<Record<string, unknown>>(requestModel.condition, {});
+    const currentExpertisePhotos = parseLegacyExpertisePhotos(condition);
+    if (currentExpertisePhotos.length) {
+      return { recovered: false, alreadyLinked: true, candidates: currentExpertisePhotos };
+    }
+
+    const linkedFilenames = new Set(
+      parseArray<Record<string, unknown>>(requestModel.photos)
+        .map((photo) => String(photo.url ?? '').match(/\/uploads\/([^/?#]+)/i)?.[1])
+        .filter((value): value is string => Boolean(value)),
+    );
+    const from = new Date(requestModel.createdAt.getTime() - (60 * 60 * 1000));
+    const to = new Date(requestModel.createdAt.getTime() + (10 * 60 * 1000));
+    const forwardedProto = request.headers['x-forwarded-proto'];
+    const protocol = typeof forwardedProto === 'string' ? forwardedProto.split(',')[0]?.trim() : request.protocol;
+    const host = request.headers['x-forwarded-host'] ?? request.headers.host ?? request.hostname;
+    const origin = `${protocol || 'https'}://${host}`;
+    const candidates = (await prisma.uploadedImage.findMany({
+      where: { createdAt: { gte: from, lte: to } },
+      orderBy: { createdAt: 'asc' },
+      select: { filename: true, originalName: true, contentType: true, createdAt: true },
+    }))
+      .filter((image) => !linkedFilenames.has(image.filename))
+      .map((image) => ({
+        ...image,
+        url: `${origin}/uploads/${image.filename}`,
+      }));
+
+    return { recovered: false, alreadyLinked: false, candidates };
+  });
+
+  app.post('/admin/fast-sales/:id/recover-expertise', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const params = z.object({ id: z.string().min(1) }).parse(request.params);
+    const payload = z.object({ filenames: z.array(z.string().min(1)).min(1).max(8) }).parse(request.body);
+    const requestModel = await prisma.fastSaleRequest.findUnique({
+      where: { id: params.id },
+      select: { condition: true },
+    });
+    if (!requestModel) {
+      reply.code(404);
+      return { message: 'Hızlı sat talebi bulunamadı.' };
+    }
+
+    const images = await prisma.uploadedImage.findMany({
+      where: { filename: { in: payload.filenames } },
+      orderBy: { createdAt: 'asc' },
+      select: { filename: true, originalName: true },
+    });
+    if (images.length !== payload.filenames.length) {
+      reply.code(400);
+      return { message: 'Seçilen ekspertiz görsellerinden bazıları bulunamadı.' };
+    }
+
+    const condition = parseObject<Record<string, unknown>>(requestModel.condition, {});
+    const forwardedProto = request.headers['x-forwarded-proto'];
+    const protocol = typeof forwardedProto === 'string' ? forwardedProto.split(',')[0]?.trim() : request.protocol;
+    const host = request.headers['x-forwarded-host'] ?? request.headers.host ?? request.hostname;
+    const origin = `${protocol || 'https'}://${host}`;
+    const expertisePhotos = images.map((image, index) => ({
+      id: `${params.id}-recovered-expertise-${index}`,
+      title: image.originalName || `Ekspertiz raporu ${index + 1}`,
+      url: `${origin}/uploads/${image.filename}`,
+      cover: index === 0,
+    }));
+    await prisma.fastSaleRequest.update({
+      where: { id: params.id },
+      data: { condition: { ...condition, expertisePhotos } },
+    });
+    await appendActivityLog({
+      adminId: admin.id,
+      adminName: admin.fullName,
+      action: 'FAST_SALE_EXPERTISE_RECOVER',
+      module: 'Hızlı Sat',
+      recordId: params.id,
+      previousValue: '',
+      newValue: `${expertisePhotos.length} görsel`,
+      description: `${expertisePhotos.length} eski ekspertiz görseli talebe yeniden bağlandı.`,
+    });
+
+    return { recovered: true, expertisePhotos };
   });
 
   app.post('/admin/fast-sales/read-all', async (request, reply) => {

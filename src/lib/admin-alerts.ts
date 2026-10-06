@@ -16,6 +16,10 @@ type NewApplicationAlertInput = {
   district?: string | null;
   details?: string[];
   compact?: boolean;
+  media?: Array<{
+    url: string;
+    caption?: string;
+  }>;
 };
 
 async function resolveAlertPhone() {
@@ -73,6 +77,7 @@ export function buildApplicationAlertMessage(input: NewApplicationAlertInput) {
 export async function notifyNewApplicationViaTelegram(input: NewApplicationAlertInput) {
   await sendTelegramMessage({
     message: buildApplicationAlertMessage(input),
+    media: input.media,
   });
 }
 

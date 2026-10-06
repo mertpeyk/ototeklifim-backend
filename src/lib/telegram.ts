@@ -3,6 +3,10 @@ import { env } from '../config.js';
 type TelegramPayload = {
   message: string;
   chatId?: string;
+  media?: Array<{
+    url: string;
+    caption?: string;
+  }>;
 };
 
 export type TelegramSendResult = {
@@ -17,6 +21,7 @@ function escapeTelegramMarkdown(value: string) {
 export async function sendTelegramMessage({
   message,
   chatId = env.TELEGRAM_ALERT_CHAT_ID,
+  media = [],
 }: TelegramPayload): Promise<TelegramSendResult> {
   if (!chatId) {
     console.info(`[telegram] chat id missing -> ${message}`);
@@ -50,6 +55,30 @@ export async function sendTelegramMessage({
   if (!response.ok) {
     const details = await response.text();
     throw new Error(`Telegram bildirimi basarisiz: ${details}`);
+  }
+
+  const validMedia = media.filter((item) => /^https?:\/\//i.test(item.url)).slice(0, 20);
+  for (let index = 0; index < validMedia.length; index += 10) {
+    const batch = validMedia.slice(index, index + 10);
+    const mediaResponse = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMediaGroup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        media: batch.map((item) => ({
+          type: 'photo',
+          media: item.url,
+          ...(item.caption ? { caption: item.caption } : {}),
+        })),
+      }),
+    });
+
+    if (!mediaResponse.ok) {
+      const details = await mediaResponse.text();
+      throw new Error(`Telegram medya bildirimi basarisiz: ${details}`);
+    }
   }
 
   return {

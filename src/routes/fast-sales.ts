@@ -516,6 +516,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
       details: [
         `Paket / Motor: ${normalizedVehicleInfo.packageName} / ${normalizedVehicleInfo.engineVolume}`,
         `Yakıt / Vites: ${normalizedVehicleInfo.fuelType} / ${normalizedVehicleInfo.transmission}`,
+        `Renk: ${normalizedVehicleInfo.color || 'Belirtilmedi'}`,
         `KM: ${new Intl.NumberFormat('tr-TR').format(normalizedVehicleInfo.mileage)}`,
         `Tramer: ${new Intl.NumberFormat('tr-TR').format(payload.condition.tramerAmount)} TL`,
         `Boya: ${telegramDamageSummary.painted}`,
@@ -525,6 +526,16 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `AI önerilen bayi teklifi (%10 aşağı): ${new Intl.NumberFormat('tr-TR').format(estimatedValues.result.recommendedOffer)} TL`,
         `AI durumu: ${estimatedValues.result.intelligence.aiEnabled ? 'Aktif' : 'Fallback'} · ${estimatedValues.result.intelligence.aiDiagnostic}`,
         `Hızlı satış değeri: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.quickSaleValue)} TL`,
+      ],
+      media: [
+        ...payload.photos.map((photo, index) => ({
+          url: photo.url,
+          caption: `Araç fotoğrafı ${index + 1}/${payload.photos.length}`,
+        })),
+        ...payload.expertiseReportPhotos.map((photo, index) => ({
+          url: photo.url,
+          caption: `Ekspertiz fotoğrafı ${index + 1}/${payload.expertiseReportPhotos.length}`,
+        })),
       ],
     }).catch((error) => {
       request.log.error(
