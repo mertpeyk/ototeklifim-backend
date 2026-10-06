@@ -60,19 +60,27 @@ export async function sendTelegramMessage({
   const validMedia = media.filter((item) => /^https?:\/\//i.test(item.url)).slice(0, 20);
   for (let index = 0; index < validMedia.length; index += 10) {
     const batch = validMedia.slice(index, index + 10);
-    const mediaResponse = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMediaGroup`, {
+    const endpoint = batch.length === 1 ? 'sendPhoto' : 'sendMediaGroup';
+    const body = batch.length === 1
+      ? {
+          chat_id: chatId,
+          photo: batch[0]?.url,
+          ...(batch[0]?.caption ? { caption: batch[0].caption } : {}),
+        }
+      : {
+          chat_id: chatId,
+          media: batch.map((item) => ({
+            type: 'photo',
+            media: item.url,
+            ...(item.caption ? { caption: item.caption } : {}),
+          })),
+        };
+    const mediaResponse = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        chat_id: chatId,
-        media: batch.map((item) => ({
-          type: 'photo',
-          media: item.url,
-          ...(item.caption ? { caption: item.caption } : {}),
-        })),
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!mediaResponse.ok) {
