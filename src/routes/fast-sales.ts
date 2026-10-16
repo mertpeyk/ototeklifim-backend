@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { prisma } from '../db.js';
 import { hashPassword, requireAuth, resolveAuthUser } from '../lib/auth.js';
-import { notifyNewApplicationViaTelegram, notifyNewApplicationViaWhatsapp } from '../lib/admin-alerts.js';
+import { notifyNewApplicationViaTelegram } from '../lib/admin-alerts.js';
 import {
   buildEstimatedFastSaleNumbers,
   valuationConditionSchema,
@@ -462,45 +462,6 @@ export async function fastSaleRoutes(app: FastifyInstance) {
       );
     }
 
-    void notifyNewApplicationViaWhatsapp({
-      type: 'hizli-sat',
-      referenceNo: requestNo,
-      customerName: fullName,
-      customerPhone: normalizedPhone,
-      customerEmail: normalizedEmail,
-      vehicleSummary: `${normalizedVehicleInfo.year} ${normalizedVehicleInfo.brand} ${normalizedVehicleInfo.model}`.trim(),
-      city: normalizedVehicleInfo.city,
-      district: normalizedVehicleInfo.district,
-      details: [
-        `Paket: ${normalizedVehicleInfo.packageName}`,
-        `Motor hacmi: ${normalizedVehicleInfo.engineVolume}`,
-        `Motor gucu: ${normalizedVehicleInfo.enginePower || '-'}`,
-        `Yakit: ${normalizedVehicleInfo.fuelType}`,
-        `Vites: ${normalizedVehicleInfo.transmission}`,
-        `KM: ${normalizedVehicleInfo.mileage}`,
-        `Kasa: ${normalizedVehicleInfo.bodyType}`,
-        `Renk: ${normalizedVehicleInfo.color}`,
-        `Kullanici beklentisi: ${customerExpectedPrice > 0 ? `${customerExpectedPrice} TL` : 'Belirtilmedi'}`,
-        `Piyasa degeri: ${estimatedValues.estimatedMarketValue} TL`,
-        `Hizli sat degeri: ${estimatedValues.quickSaleValue} TL`,
-        `Bayi alim degeri: ${estimatedValues.dealerBuyValue} TL`,
-        `Tramer: ${payload.condition.tramerAmount} TL`,
-        `Agir hasar: ${payload.condition.severeDamage ? 'Var' : 'Yok'}`,
-        `Mekanik: ${payload.condition.mechanicalStatus}`,
-        `Bakim gecmisi: ${payload.condition.maintenanceHistory}`,
-        `Airbag durumu: ${payload.condition.airbagCondition}`,
-        `Sase/Podye durumu: ${payload.condition.chassisPodyeCondition}`,
-        `Direk durumu: ${payload.condition.pillarCondition}`,
-        `Ekspertiz notu: ${payload.condition.appraisalReport || '-'}`,
-        `Foto sayisi: ${payload.photos.length}`,
-        `Degerleme notu: ${estimatedValues.valuationSummary}`,
-      ],
-    }).catch((error) => {
-      request.log.error(
-        { error, requestNo, route: 'fast-sales.create' },
-        'WhatsApp hizli sat bildirimi gonderilemedi',
-      );
-    });
     const telegramDamageSummary = summarizeDamageCondition(payload.condition);
 
     void notifyNewApplicationViaTelegram({

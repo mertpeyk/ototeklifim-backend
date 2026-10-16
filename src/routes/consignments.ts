@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 import { prisma } from '../db.js';
 import { hashPassword, requireAdmin, requireAuth, resolveAuthUser } from '../lib/auth.js';
-import { notifyNewApplicationViaTelegram, notifyNewApplicationViaWhatsapp } from '../lib/admin-alerts.js';
+import { notifyNewApplicationViaTelegram } from '../lib/admin-alerts.js';
 
 const phoneRegex = /^5\d{9}$/;
 
@@ -572,41 +572,6 @@ export async function consignmentRoutes(app: FastifyInstance) {
       },
     });
 
-    void notifyNewApplicationViaWhatsapp({
-      type: 'konsinye',
-      referenceNo,
-      customerName: fullName,
-      customerPhone: normalizedPhone,
-      customerEmail: normalizedEmail,
-      vehicleSummary: `${payload.vehicleInfo.year} ${payload.vehicleInfo.brand} ${payload.vehicleInfo.model}`.trim(),
-      city: payload.expectations.city,
-      district: payload.expectations.district,
-      details: [
-        `Paket: ${payload.vehicleInfo.packageName}`,
-        `Motor: ${payload.vehicleInfo.engine}`,
-        `Yakit: ${payload.vehicleInfo.fuel}`,
-        `Vites: ${payload.vehicleInfo.transmission}`,
-        `KM: ${payload.vehicleInfo.mileage}`,
-        `Kasa: ${payload.vehicleInfo.bodyType}`,
-        `Renk: ${payload.vehicleInfo.color}`,
-        `Hedef fiyat: ${payload.expectations.expectedPrice} TL`,
-        `Alt limit: ${payload.expectations.minimumPrice} TL`,
-        `Oncelik: ${payload.expectations.salePriority}`,
-        `Takas: ${payload.expectations.openToTrade ? 'Acik' : 'Yok'}`,
-        `Galeriye birakma: ${payload.expectations.canLeaveAtDealer ? 'Evet' : 'Hayir'}`,
-        `Yerinde ekspertiz: ${payload.expectations.requestOnsiteInspection ? 'Istiyor' : 'Istemiyor'}`,
-        `Tramer: ${payload.condition.tramerInfo}`,
-        `Agir hasar: ${payload.condition.heavyDamage}`,
-        `Mekanik: ${payload.condition.mechanicalStatus}`,
-        `Ekspertiz: ${payload.condition.expertiseReport}`,
-        `Foto sayisi: ${payload.photos.length}`,
-      ],
-    }).catch((error) => {
-      request.log.error(
-        { error, referenceNo, route: 'consignments.create' },
-        'WhatsApp konsinye bildirimi gonderilemedi',
-      );
-    });
     void notifyNewApplicationViaTelegram({
       type: 'konsinye',
       referenceNo,
