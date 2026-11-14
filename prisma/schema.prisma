@@ -411,7 +411,7 @@ model FastSaleOffer {
   pickupOption      String
   paymentMethod     String
   adminNote         String          @default("")
-  message           String          @default("")
+  message           String          @default("") @db.Text
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   request           FastSaleRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
