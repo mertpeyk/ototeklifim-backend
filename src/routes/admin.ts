@@ -22,7 +22,7 @@ import {
   removeValuationModelMultiplier,
   upsertValuationModelMultiplier,
 } from '../lib/valuation-calibration.js';
-import { sendFastSaleOfferSms } from '../lib/fast-sale-offer-notification.js';
+import { buildFastSaleOfferCustomerMessage, sendFastSaleOfferSms } from '../lib/fast-sale-offer-notification.js';
 import { sendSms, waitForSmsFinalStatus } from '../lib/sms.js';
 
 const adminPermissions = [
@@ -1903,6 +1903,7 @@ export async function adminRoutes(app: FastifyInstance) {
     }
 
     const validUntil = new Date(Date.now() + payload.validHours * 60 * 60 * 1000);
+    const customerMessage = buildFastSaleOfferCustomerMessage(payload.amount);
     const [offer] = await prisma.$transaction([
       prisma.fastSaleOffer.create({
         data: {
@@ -1914,7 +1915,7 @@ export async function adminRoutes(app: FastifyInstance) {
           pickupOption: payload.pickupOption,
           paymentMethod: payload.paymentMethod,
           adminNote: payload.adminNote ?? '',
-          message: payload.message,
+          message: customerMessage,
         },
       }),
       prisma.fastSaleRequest.update({
@@ -1934,7 +1935,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const sms = await sendFastSaleOfferSms({
       amount: payload.amount,
       customerName: fastSale.user.fullName,
-      customMessage: payload.message,
+      customMessage: customerMessage,
       phone: fastSale.user.phone,
       requestNo: fastSale.requestNo,
       validUntil,

@@ -16,6 +16,21 @@ export type FastSaleOfferNotificationResult = {
   provider: 'log' | 'twilio' | 'none';
 };
 
+export function buildFastSaleOfferCustomerMessage(amount: number) {
+  const formattedAmount = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(amount);
+
+  return `Merhaba, aracınız için fiyat teklifimiz hazır! 🚘
+
+Aracınıza özel teklifimiz: ${formattedAmount} TL
+
+Teklifimiz size cazip geldiyse, detaylı bilgi almak ve satış sürecini başlatmak için 0533 651 66 06 numaralı telefondan bizimle iletişime geçebilirsiniz.
+
+Nihai teklif; aracın ekspertiz kontrolü, kilometresi, hasar durumu ve mevcut kondisyonunun doğrulanmasının ardından kesinleşecektir.
+
+OtoTeklifim
+Aracını hızlı, güvenli ve değerinde sat.`;
+}
+
 function normalizeSmsPhone(phone?: string | null) {
   const digits = String(phone || '').replace(/\D/g, '');
   const normalized = digits.startsWith('90') && digits.length === 12
@@ -41,25 +56,13 @@ function toGsmSafeText(value: string) {
     .replace(/[öÖ]/g, (character) => character === 'ö' ? 'o' : 'O')
     .replace(/[şŞ]/g, (character) => character === 'ş' ? 's' : 'S')
     .replace(/[üÜ]/g, (character) => character === 'ü' ? 'u' : 'U')
-    .replace(/[^\x20-\x7E]/g, '')
     .replace(/\s+/g, ' ')
+    .replace(/[^\x20-\x7E]/g, '')
     .trim();
 }
 
 export function buildFastSaleOfferSmsMessage(input: Omit<FastSaleOfferNotificationInput, 'phone'>) {
-  const firstName = toGsmSafeText(compactMessage(input.customerName, 30)).split(' ')[0] || 'Musterimiz';
-  const vehicleSummary = toGsmSafeText(compactMessage(input.vehicleSummary, 90));
-  const amount = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(input.amount);
-  const validUntil = new Intl.DateTimeFormat('tr-TR', {
-    dateStyle: 'short',
-    timeZone: 'Europe/Istanbul',
-  }).format(input.validUntil);
-  const prefix = `OtoTeklifim: Merhaba ${firstName}, `;
-  const suffix = ` icin hizli satis teklifimiz ${amount} TL. Son: ${validUntil}. No: ${input.requestNo}.`;
-  const maxVehicleLength = Math.max(12, 160 - prefix.length - suffix.length);
-  const compactVehicle = vehicleSummary.slice(0, maxVehicleLength).trim();
-
-  return `${prefix}${compactVehicle}${suffix}`;
+  return toGsmSafeText(input.customMessage || buildFastSaleOfferCustomerMessage(input.amount));
 }
 
 export async function sendFastSaleOfferSms(input: FastSaleOfferNotificationInput): Promise<FastSaleOfferNotificationResult> {
