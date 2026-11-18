@@ -473,6 +473,20 @@ export async function fastSaleRoutes(app: FastifyInstance) {
 
     const telegramDamageSummary = summarizeDamageCondition(payload.condition);
 
+    const telegramValuationDetails = estimatedValues.result.pricingReady
+      ? [
+          `Piyasa değeri: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.estimatedMarketValue)} TL`,
+          `AI piyasa fiyatı: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.estimatedMarketValue)} TL`,
+          `AI önerilen bayi teklifi (%10 aşağı): ${new Intl.NumberFormat('tr-TR').format(estimatedValues.result.recommendedOffer)} TL`,
+          `AI durumu: ${estimatedValues.result.intelligence.aiEnabled ? 'Aktif' : 'Fallback'} · ${estimatedValues.result.intelligence.aiDiagnostic}`,
+          `Hızlı satış değeri: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.quickSaleValue)} TL`,
+        ]
+      : [
+          'Fiyatlandırma: Manuel fiyatlandırma gerekli',
+          `Neden: ${estimatedValues.result.unavailableReason || 'Otomatik değerleme güven eşiğini karşılamadı.'}`,
+          `Güçlü emsal: ${estimatedValues.result.marketComps?.sampleSize || 0}/3`,
+        ];
+
     void notifyNewApplicationViaTelegram({
       type: 'hizli-sat',
       compact: true,
@@ -491,11 +505,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `Tramer: ${new Intl.NumberFormat('tr-TR').format(payload.condition.tramerAmount)} TL`,
         `Boya: ${telegramDamageSummary.painted}`,
         `Değişen: ${telegramDamageSummary.changed}`,
-        `Piyasa değeri: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.estimatedMarketValue)} TL`,
-        `AI piyasa fiyatı: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.estimatedMarketValue)} TL`,
-        `AI önerilen bayi teklifi (%10 aşağı): ${new Intl.NumberFormat('tr-TR').format(estimatedValues.result.recommendedOffer)} TL`,
-        `AI durumu: ${estimatedValues.result.intelligence.aiEnabled ? 'Aktif' : 'Fallback'} · ${estimatedValues.result.intelligence.aiDiagnostic}`,
-        `Hızlı satış değeri: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.quickSaleValue)} TL`,
+        ...telegramValuationDetails,
       ],
       media: [
         ...payload.photos.map((photo, index) => ({
