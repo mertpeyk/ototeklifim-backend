@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { normalizeComparablePriceForTarget } from '../lib/market-comps.js';
+import { isHighConfidenceComparableForTarget, normalizeComparablePriceForTarget } from '../lib/market-comps.js';
 import { estimateVehicleValue, type ValuationEstimateInput } from '../lib/valuation.js';
 
 process.env.OPENAI_API_KEY = '';
@@ -172,6 +172,7 @@ assert.ok(bmwLowerPower.estimate < bmwLiteralEngine.estimate, 'Lower engine powe
 assert.ok(bmwHigherPower.estimate > bmwLiteralEngine.estimate, 'Higher engine power must increase the estimate');
 assert.ok(unknownPackage.estimate < neutralNamedPackage.estimate, 'Unknown package must not receive a generic trim premium');
 assert.ok(unknownPackage.confidenceScore < neutralNamedPackage.confidenceScore, 'Unknown package must lower valuation confidence');
+assert.equal(clean.pricingReady, false, 'A valuation without verified comparable listings must not be customer-price-ready');
 
 for (const result of [clean, newer, older, lowMileage, highMileage, damaged, localPainted, painted, changed, airbagIssue, chassisIssue, pillarIssue, lowTramer, mediumTramer, highTramer, lowMileageCorsa, bmwModelCodeEngine, bmwLiteralEngine, bmwLowerPower, bmwHigherPower, unknownPackage, neutralNamedPackage]) {
   assert.ok(result.minimum <= result.estimate, 'Minimum must not exceed the estimate');
@@ -205,6 +206,40 @@ const higherForNewerTargetYear = normalizeComparablePriceForTarget({
 assert.ok(lowerForHigherTargetKm < advertPrice, 'A higher-mileage target must lower the comparable price');
 assert.ok(higherForLowerTargetKm > advertPrice, 'A lower-mileage target must raise the comparable price');
 assert.ok(higherForNewerTargetYear > advertPrice, 'A newer target year must raise the comparable price');
+
+const golfQuery = {
+  brand: 'Volkswagen',
+  model: 'Golf',
+  year: 2018,
+  km: 85000,
+  vehicleType: 'Otomobil',
+  bodyType: 'Hatchback',
+  fuelType: 'Benzin',
+  transmission: 'Otomatik',
+  engine: '1.4 TSI',
+  packageName: 'Highline',
+};
+assert.equal(isHighConfidenceComparableForTarget({
+  title: '2018 Volkswagen Golf 1.4 TSI DSG Highline',
+  variant: '1.4 TSI DSG Highline',
+  categoryName: 'Golf',
+  year: 2018,
+  approxKm: 90000,
+}, golfQuery), true, 'Matching Golf generation, engine, gearbox and trim must be accepted');
+assert.equal(isHighConfidenceComparableForTarget({
+  title: '2021 Volkswagen Golf 1.0 TSI DSG Life',
+  variant: '1.0 TSI DSG Life',
+  categoryName: 'Golf',
+  year: 2021,
+  approxKm: 70000,
+}, golfQuery), false, 'Golf 8 must not be mixed with Golf 7.5');
+assert.equal(isHighConfidenceComparableForTarget({
+  title: '2018 Volkswagen Golf 1.6 TDI Manuel Highline',
+  variant: '1.6 TDI Manuel Highline',
+  categoryName: 'Golf',
+  year: 2018,
+  approxKm: 90000,
+}, golfQuery), false, 'Diesel/manual Golf must not match petrol/DSG target');
 
 console.log(JSON.stringify({
   clean: clean.estimate,

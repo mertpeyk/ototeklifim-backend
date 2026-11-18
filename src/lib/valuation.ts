@@ -66,6 +66,7 @@ type ValuationEstimateOptions = {
 };
 
 const MIN_REQUIRED_MARKET_COMPS = 3;
+const MIN_REQUIRED_AVERAGE_SIMILARITY = 72;
 
 type StructuralState = 'clean' | 'issue' | 'Belirtilmedi';
 
@@ -495,8 +496,12 @@ export async function estimateVehicleValue(
     skipOpenAi: options.skipOpenAi,
   });
 
-  const effectiveMarketStats = intelligence.filteredStats || marketComps?.stats || null;
-  const effectiveMarketSampleSize = intelligence.filteredListings.length || Number(marketComps?.sampleSize || 0);
+  const effectiveMarketSampleSize = intelligence.filteredListings.length;
+  const hasStrongComparableEvidence = (
+    effectiveMarketSampleSize >= MIN_REQUIRED_MARKET_COMPS
+    && intelligence.averageSimilarity >= MIN_REQUIRED_AVERAGE_SIMILARITY
+  );
+  const effectiveMarketStats = hasStrongComparableEvidence ? intelligence.filteredStats : null;
   const marketCompSource = marketComps?.source || 'arabam';
   const marketCompSourceUrl = marketComps?.sourceUrl || '';
   const marketCompFallbackUsed = Boolean(marketComps?.fallbackUsed);
@@ -509,7 +514,7 @@ export async function estimateVehicleValue(
   // A sourced GPT-6 Sol market estimate is the primary price anchor. The
   // deterministic catalogue/market calculation remains a bounded safety
   // reference and a fallback for missing or weak AI evidence.
-  if (intelligence.marketEstimate && intelligence.sources.length >= 2) {
+  if (hasStrongComparableEvidence && intelligence.marketEstimate && intelligence.sources.length >= 2) {
     usedAgentMarketEstimate = true;
     const vehicleAge = Math.max(0, new Date().getFullYear() - input.vehicleInfo.year);
     const expectedMileage = Math.min(240000, Math.max(5000, vehicleAge * 14500));
@@ -646,6 +651,14 @@ export async function estimateVehicleValue(
       ? (intelligence.reviewReason || 'AI katmanı bu dosyayı dikkatli izliyor')
       : null,
   ].filter(Boolean) as string[];
+  const pricingReady = (
+    hasStrongComparableEvidence
+    && intelligence.reviewRecommendation !== 'manual_review'
+    && Boolean(effectiveMarketStats || usedAgentMarketEstimate)
+  );
+  const unavailableReason = pricingReady
+    ? ''
+    : (intelligence.reviewReason || `Otomatik değerleme için yeterli güvenilir emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS}); uzman incelemesine alındı`);
 
   return {
     normalizedVehicleInfo: input.vehicleInfo,
@@ -664,8 +677,8 @@ export async function estimateVehicleValue(
     changedCount,
     positives: positives.length ? positives : ['Bakımlı görünüm ve güncel piyasa ilgisi'],
     negatives: [...pricingWarnings, ...(negatives.length ? negatives : ['Ek ekspertiz raporu ile fiyat daha da netleşebilir'])],
-    pricingReady: true,
-    unavailableReason: '',
+    pricingReady,
+    unavailableReason,
     intelligence,
     confidenceScore,
     confidenceLabel,

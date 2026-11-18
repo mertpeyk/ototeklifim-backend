@@ -610,17 +610,19 @@ export async function runValuationIntelligence(args: ValuationIntelligenceArgs):
           adjustedPrice: Math.round(Number(item.price)),
         }));
     }
-    const aiMap = new Map(openAiRefinement.perListing.map((item) => [item.index, item]));
-    listings = baseListings.map((item, index) => {
-      const ai = aiMap.get(index);
-      if (!ai) return item;
-      const blendedScore = Math.round((item.similarityScore * 0.7) + (ai.similarityScore * 0.3));
-      return {
-        ...item,
-        similarityScore: Math.max(0, Math.min(100, blendedScore)),
-        similarityReason: ai.note || item.similarityReason,
-      };
-    });
+    if (baseListings.length) {
+      const aiMap = new Map(openAiRefinement.perListing.map((item) => [item.index, item]));
+      listings = baseListings.map((item, index) => {
+        const ai = aiMap.get(index);
+        if (!ai) return item;
+        const blendedScore = Math.round((item.similarityScore * 0.7) + (ai.similarityScore * 0.3));
+        return {
+          ...item,
+          similarityScore: Math.max(0, Math.min(100, blendedScore)),
+          similarityReason: ai.note || item.similarityReason,
+        };
+      });
+    }
     adjustmentPercent = openAiRefinement.adjustmentPercent;
     reviewRecommendation = openAiRefinement.reviewRecommendation;
     reviewReason = openAiRefinement.reviewReason;
@@ -632,7 +634,7 @@ export async function runValuationIntelligence(args: ValuationIntelligenceArgs):
   }
 
   const filteredListings = listings
-    .filter((item) => item.similarityScore >= 60)
+    .filter((item) => item.similarityScore >= 72)
     .sort((left, right) => right.similarityScore - left.similarityScore || (right.comparisonWeight || 0) - (left.comparisonWeight || 0))
     .slice(0, 10);
   const averageSimilarity = filteredListings.length
@@ -641,17 +643,12 @@ export async function runValuationIntelligence(args: ValuationIntelligenceArgs):
   const filteredStats = buildStats(filteredListings);
 
   if (!reviewReason) {
-    if (filteredListings.length < 3 && !openAiRefinement) {
+    if (filteredListings.length < 3) {
       reviewRecommendation = 'manual_review';
-      reviewReason = 'AI katmanı yeterince benzer emsal bulamadı';
-    } else if (averageSimilarity < 68) {
+      reviewReason = `Otomatik fiyatlama için en az 3 güçlü emsal gerekli (${filteredListings.length}/3)`;
+    } else if (averageSimilarity < 72) {
       reviewRecommendation = 'manual_review';
       reviewReason = 'Emsaller var ama benzerlik gücü düşük';
-    } else if (!filteredListings.length && openAiRefinement) {
-      reviewRecommendation = args.severityScore >= 5 || parsedSignals.riskFlags.length ? 'manual_review' : 'approve';
-      reviewReason = reviewRecommendation === 'manual_review'
-        ? 'AI düzeltmesi uygulandı ama kondisyon riski uzman kontrolü gerektiriyor'
-        : 'AI düzeltmesi sınırlı veriyle kontrollü şekilde uygulandı';
     } else if (args.severityScore >= 5 || parsedSignals.riskFlags.length) {
       reviewRecommendation = 'manual_review';
       reviewReason = 'Kondisyon ve risk sinyalleri uzman kontrolü gerektiriyor';
@@ -659,6 +656,16 @@ export async function runValuationIntelligence(args: ValuationIntelligenceArgs):
       reviewRecommendation = 'approve';
       reviewReason = 'Emsal kalitesi yeterli görünüyor';
     }
+  }
+
+  // Evidence thresholds are deterministic safety rules. An AI recommendation
+  // may make the review stricter, but it must never bypass these minimums.
+  if (filteredListings.length < 3) {
+    reviewRecommendation = 'manual_review';
+    reviewReason = `Otomatik fiyatlama için en az 3 güçlü emsal gerekli (${filteredListings.length}/3)`;
+  } else if (averageSimilarity < 72) {
+    reviewRecommendation = 'manual_review';
+    reviewReason = 'Emsaller var ama ortalama benzerlik 72 puanın altında';
   }
 
   if (!explanation) {

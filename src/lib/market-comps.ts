@@ -300,8 +300,14 @@ function parsePrice(value: unknown) {
 }
 
 function extractNumericEngineToken(value: string) {
-  const match = normalizeText(value).match(/(\d+(?:\s*\d+)?)/);
-  return match ? match[1]!.replace(/\s+/g, '') : '';
+  const normalized = normalizeText(value);
+  const decimalEngine = normalized.match(/\b([0-8])\s+([0-9])\s*(?:tsi|tdi|tfsi|tce|dci|hdi|crdi|cdti|turbo|mpi|hybrid|hibrit|benzin|dizel)?\b/);
+  if (decimalEngine) return `${decimalEngine[1]}${decimalEngine[2]}`;
+
+  const ccEngine = normalized.match(/\b([6-8]\d{2}|[1-7]\d{3})\s*(?:cc|cm3)?\b/);
+  if (ccEngine) return ccEngine[1]!;
+
+  return '';
 }
 
 function extractYearFromText(value: string) {
@@ -351,6 +357,7 @@ function isAdvertStrictMatch(
   const engineNormalized = normalizeText(query.engine || '');
   const engineNumericToken = extractNumericEngineToken(query.engine || '');
   const fuelNormalized = normalizeText(query.fuelType || '');
+  const transmissionNormalized = normalizeText(query.transmission || '');
 
   if (packageNormalized && packageNormalized !== 'standart' && !haystack.includes(packageNormalized)) {
     return false;
@@ -375,7 +382,45 @@ function isAdvertStrictMatch(
   if (engineNormalized.includes('e tech') && !hasAnyToken(haystack, ['e tech', 'hibrit', 'hybrid'])) return false;
   if (engineNormalized.includes('hybrid') && !hasAnyToken(haystack, ['hybrid', 'hibrit', 'e tech'])) return false;
 
+  if (transmissionNormalized.includes('otomatik') || transmissionNormalized.includes('dsg')) {
+    if (!hasAnyToken(haystack, ['otomatik', 'dsg', 'tiptronic', 's tronic'])) return false;
+  }
+  if (transmissionNormalized.includes('manuel')) {
+    if (hasAnyToken(haystack, ['otomatik', 'dsg', 'tiptronic', 's tronic'])) return false;
+  }
+
   return true;
+}
+
+function getGolfGeneration(year: number | null | undefined) {
+  if (!year) return '';
+  if (year <= 2012) return 'golf-6';
+  if (year <= 2016) return 'golf-7';
+  if (year <= 2019) return 'golf-7.5';
+  return 'golf-8';
+}
+
+function isGolfGenerationCompatible(advert: ParsedListing, query: MarketCompsQuery) {
+  const isGolf = normalizeText(query.brand) === 'volkswagen' && normalizeText(query.model) === 'golf';
+  if (!isGolf) return true;
+  if (!advert.year || !query.year) return false;
+  return getGolfGeneration(advert.year) === getGolfGeneration(query.year);
+}
+
+export function isHighConfidenceComparableForTarget(
+  advert: Pick<ParsedListing, 'title' | 'variant' | 'categoryName' | 'year' | 'approxKm'>,
+  query: MarketCompsQuery,
+) {
+  const listing: ParsedListing = {
+    source: 'arabam',
+    id: null,
+    price: 1,
+    formattedPrice: '1',
+    ...advert,
+  };
+  return isAdvertStrictMatch(listing, query)
+    && isYearKmCompatible(listing, query)
+    && isGolfGenerationCompatible(listing, query);
 }
 
 function scoreAdvertRelevance(advert: ParsedListing, query: MarketCompsQuery) {
@@ -433,7 +478,7 @@ function isYearKmCompatible(advert: ParsedListing, query: MarketCompsQuery) {
     || String(query.fuelType || '').trim(),
   );
   const maxYearGap = hasExactVariantInputs ? 1 : 2;
-  const maxKmGap = hasExactVariantInputs ? 60000 : 80000;
+  const maxKmGap = hasExactVariantInputs ? 25000 : 50000;
 
   if (advert.year && query.year && Math.abs(advert.year - query.year) > maxYearGap) {
     return false;
@@ -687,6 +732,7 @@ function selectComparableListings(
   const strictAdverts = scoredAdverts.filter((item) => (
     isAdvertStrictMatch(item, query)
     && isYearKmCompatible(item, query)
+    && isGolfGenerationCompatible(item, query)
     && !isSuspiciousCommercialListing(item)
   ));
   const relevantAdverts = scoredAdverts
@@ -698,7 +744,7 @@ function selectComparableListings(
       || left.price - right.price
     ));
 
-  if (strictAdverts.length >= 2) {
+  if (strictAdverts.length >= 3) {
     return strictAdverts.sort((left, right) => (
       (right.comparisonWeight || 0) - (left.comparisonWeight || 0)
       || (right.relevanceScore || 0) - (left.relevanceScore || 0)
@@ -760,16 +806,6 @@ async function resolveArabamComps(query: MarketCompsQuery): Promise<SourceRespon
         listings: listings.slice(0, 14),
       };
     }
-  }
-
-  if (requiresHighSpecificity) {
-    return resolveArabamComps({
-      ...query,
-      fuelType: '',
-      transmission: '',
-      engine: '',
-      packageName: '',
-    });
   }
 
   return {

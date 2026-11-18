@@ -233,13 +233,20 @@ function serializeFastSaleWithDetails(
   },
   messageHistory: Array<{ id: string; sender: string; senderType: 'admin' | 'user' | 'dealer'; content: string; createdAt: string }>,
 ) {
+  const valuationAudit = fastSale.valuationAudit && typeof fastSale.valuationAudit === 'object'
+    ? fastSale.valuationAudit as Record<string, unknown>
+    : {};
+  const pricingReady = valuationAudit.pricingReady !== false;
   return {
     ...fastSale,
     expectedPrice: toDecimal(Number(fastSale.expectedPrice)),
-    estimatedMarketValue: toDecimal(Number(fastSale.estimatedMarketValue)),
-    quickSaleValue: toDecimal(Number(fastSale.quickSaleValue)),
-          dealerBuyValue: toDecimal(Number(fastSale.dealerBuyValue)),
-          valuationAudit: fastSale.valuationAudit,
+    estimatedMarketValue: pricingReady ? toDecimal(Number(fastSale.estimatedMarketValue)) : 0,
+    quickSaleValue: pricingReady ? toDecimal(Number(fastSale.quickSaleValue)) : 0,
+    dealerBuyValue: pricingReady ? toDecimal(Number(fastSale.dealerBuyValue)) : 0,
+    valuationAudit: {
+      ...valuationAudit,
+      pricingReady,
+    },
     currentOffer: fastSale.offers[0] ? toDecimal(Number(fastSale.offers[0].amount)) : 0,
     previousOffers: fastSale.offers.map((offer) => ({
       id: offer.id,
@@ -421,6 +428,8 @@ export async function fastSaleRoutes(app: FastifyInstance) {
             reviewRecommendation: estimatedValues.result.intelligence.reviewRecommendation,
             reviewReason: estimatedValues.result.intelligence.reviewReason,
             explanation: estimatedValues.result.intelligence.explanation,
+            pricingReady: estimatedValues.result.pricingReady,
+            unavailableReason: estimatedValues.result.unavailableReason,
             offerDiscountPercent: 10,
             recommendedOffer: estimatedValues.result.recommendedOffer,
           },
