@@ -656,9 +656,16 @@ export async function estimateVehicleValue(
     && intelligence.reviewRecommendation !== 'manual_review'
     && Boolean(effectiveMarketStats || usedAgentMarketEstimate)
   );
+  const comparableSourceUnavailable = Boolean(
+    marketComps
+    && marketCompSampleSize === 0
+    && marketComps.sources.some((source) => source.challengeDetected),
+  );
   const unavailableReason = pricingReady
     ? ''
-    : (intelligence.reviewReason || `Otomatik değerleme için yeterli güvenilir emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS}); uzman incelemesine alındı`);
+    : comparableSourceUnavailable
+      ? 'Canlı emsal kaynaklarına geçici olarak erişilemedi; manuel fiyatlandırma gerekli.'
+      : (intelligence.reviewReason || `Otomatik değerleme için yeterli güvenilir emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS}); uzman incelemesine alındı`);
 
   return {
     normalizedVehicleInfo: input.vehicleInfo,

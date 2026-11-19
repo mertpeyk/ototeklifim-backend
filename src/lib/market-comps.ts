@@ -792,12 +792,14 @@ async function resolveArabamComps(query: MarketCompsQuery): Promise<SourceRespon
     || String(query.engine || '').trim()
     || String(query.fuelType || '').trim(),
   );
+  let challengeDetected = false;
 
   for (const category of categories) {
     for (const path of paths) {
       const url = `https://www.arabam.com/ikinci-el/${category}/${path}`;
       const html = await fetchViaCurl(url).catch(() => fetchPublicHtml(url));
       if (isCloudflareChallenge(html)) {
+        challengeDetected = true;
         continue;
       }
 
@@ -847,7 +849,7 @@ async function resolveArabamComps(query: MarketCompsQuery): Promise<SourceRespon
     sourceUrl: null,
     sampleSize: 0,
     fallbackUsed: true,
-    challengeDetected: false,
+    challengeDetected,
     listings: [],
   };
 }
