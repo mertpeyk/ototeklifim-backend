@@ -972,10 +972,10 @@ export async function getMarketComps(query: MarketCompsQuery) {
     return cached.payload;
   }
 
-  const sourceResponses = await Promise.all([
-    resolveArabamComps(parsed),
-    resolveSahibindenComps(parsed),
-  ]);
+  // Sahibinden actively challenges automated server traffic and was adding
+  // latency without producing verified comparables. Keep the production
+  // valuation path focused on Arabam until an authorized data feed exists.
+  const sourceResponses = [await resolveArabamComps(parsed)];
   const payload = buildMergedResponse(parsed, sourceResponses);
 
   marketCompCache.set(cacheKey, {
