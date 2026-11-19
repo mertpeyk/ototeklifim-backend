@@ -567,7 +567,11 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
     });
 
     if (!response.ok) {
-      return { refinement: null, diagnostic: `openai_http_${response.status}` };
+      const errorText = (await response.text()).slice(0, 240).replace(/\s+/g, ' ');
+      return {
+        refinement: null,
+        diagnostic: `openai_http_${response.status}_after_${webSearchDiagnostic}${errorText ? `: ${errorText}` : ''}`,
+      };
     }
     const json = await response.json() as {
       choices?: Array<{
