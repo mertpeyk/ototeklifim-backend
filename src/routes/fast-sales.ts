@@ -484,7 +484,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
       : [
           'Fiyatlandırma: Manuel fiyatlandırma gerekli',
           `Neden: ${estimatedValues.result.unavailableReason || 'Otomatik değerleme güven eşiğini karşılamadı.'}`,
-          `Güçlü emsal: ${estimatedValues.result.marketComps?.sampleSize || 0}/3`,
+          `Doğrulanmış emsal: ${estimatedValues.result.marketComps?.sampleSize || 0}`,
         ];
 
     void notifyNewApplicationViaTelegram({

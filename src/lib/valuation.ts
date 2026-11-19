@@ -501,6 +501,14 @@ export async function estimateVehicleValue(
     effectiveMarketSampleSize >= MIN_REQUIRED_MARKET_COMPS
     && intelligence.averageSimilarity >= MIN_REQUIRED_AVERAGE_SIMILARITY
   );
+  const hasSourcedAgentEstimate = (
+    intelligence.provider !== 'deterministic'
+    && intelligence.aiDiagnostic === 'openai_web_search_ok'
+    && Number(intelligence.marketEstimate || 0) >= 100000
+    && Number(intelligence.marketMinimum || 0) >= 100000
+    && Number(intelligence.marketMaximum || 0) >= 100000
+    && intelligence.sources.length >= 2
+  );
   const effectiveMarketStats = hasStrongComparableEvidence ? intelligence.filteredStats : null;
   const marketCompSource = marketComps?.source || 'arabam';
   const marketCompSourceUrl = marketComps?.sourceUrl || '';
@@ -514,7 +522,7 @@ export async function estimateVehicleValue(
   // A sourced GPT-6 Sol market estimate is the primary price anchor. The
   // deterministic catalogue/market calculation remains a bounded safety
   // reference and a fallback for missing or weak AI evidence.
-  if (hasStrongComparableEvidence && intelligence.marketEstimate && intelligence.sources.length >= 2) {
+  if ((hasStrongComparableEvidence || hasSourcedAgentEstimate) && intelligence.marketEstimate && intelligence.sources.length >= 2) {
     usedAgentMarketEstimate = true;
     const vehicleAge = Math.max(0, new Date().getFullYear() - input.vehicleInfo.year);
     const expectedMileage = Math.min(240000, Math.max(5000, vehicleAge * 14500));
@@ -640,21 +648,21 @@ export async function estimateVehicleValue(
   ].filter(Boolean) as string[];
 
   const pricingWarnings = [
-    marketCompSampleSize < MIN_REQUIRED_MARKET_COMPS
+    marketCompSampleSize < MIN_REQUIRED_MARKET_COMPS && !usedAgentMarketEstimate
       ? (
         hasAiFallbackDecision
           ? 'Canlı emsal akışı sınırlı kaldı, AI destekli değerleme uygulandı'
           : `Yeterli emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS})`
       )
       : null,
-    intelligence.reviewRecommendation === 'manual_review'
+    intelligence.reviewRecommendation === 'manual_review' && !usedAgentMarketEstimate
       ? (intelligence.reviewReason || 'AI katmanı bu dosyayı dikkatli izliyor')
       : null,
   ].filter(Boolean) as string[];
-  const pricingReady = (
+  const pricingReady = usedAgentMarketEstimate || (
     hasStrongComparableEvidence
     && intelligence.reviewRecommendation !== 'manual_review'
-    && Boolean(effectiveMarketStats || usedAgentMarketEstimate)
+    && Boolean(effectiveMarketStats)
   );
   const comparableSourceUnavailable = Boolean(
     marketComps
