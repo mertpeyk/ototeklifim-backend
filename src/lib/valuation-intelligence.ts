@@ -302,6 +302,47 @@ function parseJsonObject(text: string): Record<string, unknown> {
   }
 }
 
+function normalizeWebComparableListings(value: unknown): OpenAiRefinement['comparableListings'] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => (item && typeof item === 'object' ? item as Record<string, unknown> : null))
+    .filter((item): item is Record<string, unknown> => Boolean(item))
+    .map((item) => {
+      const price = Math.round(Number(item.price || 0));
+      const url = String(item.url || '').trim();
+      let isAllowedArabamListing = false;
+
+      try {
+        const parsedUrl = new URL(url);
+        isAllowedArabamListing = (
+          (parsedUrl.hostname === 'arabam.com' || parsedUrl.hostname.endsWith('.arabam.com'))
+          && parsedUrl.pathname.includes('/ilan/')
+        );
+      } catch {
+        isAllowedArabamListing = false;
+      }
+
+      if (!isAllowedArabamListing || price < 100000) return null;
+
+      const yearValue = item.year == null ? null : Number(item.year);
+      const kmValue = item.approxKm == null ? null : Number(item.approxKm);
+      return {
+        title: String(item.title || '').trim(),
+        price,
+        year: Number.isFinite(yearValue) ? yearValue : null,
+        approxKm: Number.isFinite(kmValue) ? kmValue : null,
+        url,
+        variant: String(item.variant || '').trim(),
+        source: 'arabam',
+        similarityScore: Math.max(0, Math.min(100, Number(item.similarityScore || 0))),
+        note: String(item.note || '').trim(),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .slice(0, 10);
+}
+
 async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: IntelligenceListing[]): Promise<OpenAiAttemptResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -466,6 +507,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
               reviewReason: String(parsed.reviewReason || '').trim(),
               explanation: String(parsed.explanation || '').trim(),
               adjustmentPercent: Math.max(-12, Math.min(12, Number(parsed.adjustmentPercent || 0))),
+              comparableListings: normalizeWebComparableListings(parsed.comparableListings),
               marketEstimate: normalizeMarketValue(parsed.marketEstimate),
               marketMinimum: normalizeMarketValue(parsed.marketMinimum),
               marketMaximum: normalizeMarketValue(parsed.marketMaximum),
@@ -556,6 +598,7 @@ async function refineWithOpenAi(args: ValuationIntelligenceArgs, listings: Intel
         reviewReason: String(parsed.reviewReason || '').trim(),
         explanation: String(parsed.explanation || '').trim(),
         adjustmentPercent: Math.max(-6, Math.min(6, Number(parsed.adjustmentPercent || 0))),
+        comparableListings: normalizeWebComparableListings(parsed.comparableListings),
         marketEstimate: null,
         marketMinimum: null,
         marketMaximum: null,
@@ -591,10 +634,9 @@ export async function runValuationIntelligence(args: ValuationIntelligenceArgs):
     provider = baseListings.length ? 'hybrid' : 'openai';
     if (!baseListings.length && Array.isArray(openAiRefinement.comparableListings)) {
       listings = openAiRefinement.comparableListings
-        .filter((item) => Number(item.price) >= 100000)
         .slice(0, 10)
-        .map((item, index) => ({
-          source: item.source === 'sahibinden' ? 'sahibinden' : 'arabam',
+        .map((item, index) => scoreComparableListing(args.input, {
+          source: 'arabam',
           id: null,
           title: String(item.title || `AI emsal ${index + 1}`),
           price: Math.round(Number(item.price)),
@@ -604,8 +646,6 @@ export async function runValuationIntelligence(args: ValuationIntelligenceArgs):
           url: item.url,
           year: item.year == null ? null : Number(item.year),
           approxKm: item.approxKm == null ? null : Number(item.approxKm),
-          similarityScore: Math.max(0, Math.min(100, Number(item.similarityScore || 60))),
-          similarityReason: String(item.note || 'AI web emsali'),
           comparisonWeight: 1,
           adjustedPrice: Math.round(Number(item.price)),
         }));
