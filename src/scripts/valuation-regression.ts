@@ -223,13 +223,23 @@ assert.equal(isHighConfidenceComparableForTarget({
   title: '2018 Volkswagen Golf 1.4 TSI DSG Highline',
   variant: '1.4 TSI DSG Highline',
   categoryName: 'Golf',
+  url: '',
   year: 2018,
   approxKm: 90000,
 }, golfQuery), true, 'Matching Golf generation, engine, gearbox and trim must be accepted');
 assert.equal(isHighConfidenceComparableForTarget({
+  title: 'Volkswagen Golf 1.4 TSI Highline',
+  variant: '1.4 TSI Highline',
+  categoryName: 'Golf',
+  url: '/ilan/2018-vw-golf-1-4-tsi-highline-dsg-90-000-km/12345',
+  year: 2018,
+  approxKm: 90000,
+}, golfQuery), true, 'Gearbox, year and mileage encoded in the listing URL must be used for matching');
+assert.equal(isHighConfidenceComparableForTarget({
   title: '2021 Volkswagen Golf 1.0 TSI DSG Life',
   variant: '1.0 TSI DSG Life',
   categoryName: 'Golf',
+  url: '',
   year: 2021,
   approxKm: 70000,
 }, golfQuery), false, 'Golf 8 must not be mixed with Golf 7.5');
@@ -237,9 +247,31 @@ assert.equal(isHighConfidenceComparableForTarget({
   title: '2018 Volkswagen Golf 1.6 TDI Manuel Highline',
   variant: '1.6 TDI Manuel Highline',
   categoryName: 'Golf',
+  url: '',
   year: 2018,
   approxKm: 90000,
 }, golfQuery), false, 'Diesel/manual Golf must not match petrol/DSG target');
+
+const corollaQuery = {
+  brand: 'Toyota',
+  model: 'Corolla',
+  year: 2021,
+  km: 130000,
+  vehicleType: 'Otomobil',
+  bodyType: 'Sedan',
+  fuelType: 'Benzin',
+  transmission: 'Otomatik',
+  engine: '1.5 Dynamic Force Multidrive S 125',
+  packageName: 'Flame X-Pack',
+};
+assert.equal(isHighConfidenceComparableForTarget({
+  title: 'Toyota Corolla 1.5 Flame X-Pack',
+  variant: '1.5 Flame X-Pack',
+  categoryName: 'Corolla',
+  url: '/ilan/2021-toyota-corolla-1-5-flame-x-pack-multidrive-s-130-000-km/54321',
+  year: 2021,
+  approxKm: 130000,
+}, corollaQuery), true, 'Toyota Multidrive S listings must be recognized as automatic exact-trim comparables');
 
 console.log(JSON.stringify({
   clean: clean.estimate,

@@ -166,7 +166,18 @@ function buildArabamPathCandidates(query: MarketCompsQuery) {
 
   const engineVariants = new Set<string>();
   if (engineSlug) {
+    const numericEngineToken = extractNumericEngineToken(query.engine || '');
+    if (/^\d{2}$/.test(numericEngineToken)) {
+      engineVariants.add(`${numericEngineToken[0]}-${numericEngineToken[1]}`);
+    }
     engineVariants.add(engineSlug);
+    const normalizedEngine = normalizeText(query.engine || '');
+    const engineFamilyMatch = normalizedEngine.match(
+      /\b([0-8])\s+([0-9])\s+(tsi|tdi|tfsi|tce|dci|hdi|crdi|cdti|mpi|turbo|hybrid|hibrit)\b/,
+    );
+    if (engineFamilyMatch) {
+      engineVariants.add(`${engineFamilyMatch[1]}-${engineFamilyMatch[2]}-${engineFamilyMatch[3]}`);
+    }
     const engineTokens = engineSlug.split('-').filter(Boolean);
     const filteredTokens = engineTokens.filter((token) => !['dsg', 'cvt', 'edc', 'tam', 'otomatik', 'manuel'].includes(token));
     if (filteredTokens.length) {
@@ -237,14 +248,8 @@ async function fetchViaCurl(url: string) {
       '-sS',
       '-L',
       url,
-      '-H',
-      'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
-      '-H',
-      'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      '-H',
-      'Accept-Language: tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-      '-H',
-      'Cache-Control: no-cache',
+      '-A',
+      'Mozilla/5.0',
       '--max-time',
       '15',
     ],
@@ -349,10 +354,10 @@ function hasAnyToken(haystack: string, tokens: string[]) {
 }
 
 function isAdvertStrictMatch(
-  advert: { title: string; variant: string; categoryName: string },
+  advert: { title: string; variant: string; categoryName: string; url?: string },
   query: MarketCompsQuery,
 ) {
-  const haystack = normalizeText(`${advert.title} ${advert.variant} ${advert.categoryName}`);
+  const haystack = normalizeText(`${advert.title} ${advert.variant} ${advert.categoryName} ${advert.url || ''}`);
   const packageNormalized = normalizeText(query.packageName || '');
   const engineNormalized = normalizeText(query.engine || '');
   const engineNumericToken = extractNumericEngineToken(query.engine || '');
@@ -383,10 +388,10 @@ function isAdvertStrictMatch(
   if (engineNormalized.includes('hybrid') && !hasAnyToken(haystack, ['hybrid', 'hibrit', 'e tech'])) return false;
 
   if (transmissionNormalized.includes('otomatik') || transmissionNormalized.includes('dsg')) {
-    if (!hasAnyToken(haystack, ['otomatik', 'dsg', 'tiptronic', 's tronic'])) return false;
+    if (!hasAnyToken(haystack, ['otomatik', 'dsg', 'tiptronic', 's tronic', 'multidrive', 'cvt', 'e cvt', 'edc'])) return false;
   }
   if (transmissionNormalized.includes('manuel')) {
-    if (hasAnyToken(haystack, ['otomatik', 'dsg', 'tiptronic', 's tronic'])) return false;
+    if (hasAnyToken(haystack, ['otomatik', 'dsg', 'tiptronic', 's tronic', 'multidrive', 'cvt', 'e cvt', 'edc'])) return false;
   }
 
   return true;
@@ -408,7 +413,7 @@ function isGolfGenerationCompatible(advert: ParsedListing, query: MarketCompsQue
 }
 
 export function isHighConfidenceComparableForTarget(
-  advert: Pick<ParsedListing, 'title' | 'variant' | 'categoryName' | 'year' | 'approxKm'>,
+  advert: Pick<ParsedListing, 'title' | 'variant' | 'categoryName' | 'url' | 'year' | 'approxKm'>,
   query: MarketCompsQuery,
 ) {
   const listing: ParsedListing = {
@@ -424,7 +429,7 @@ export function isHighConfidenceComparableForTarget(
 }
 
 function scoreAdvertRelevance(advert: ParsedListing, query: MarketCompsQuery) {
-  const haystack = normalizeText(`${advert.title} ${advert.variant} ${advert.categoryName}`);
+  const haystack = normalizeText(`${advert.title} ${advert.variant} ${advert.categoryName} ${advert.url || ''}`);
   let score = advert.source === 'arabam' ? 1.6 : 1.1;
 
   const packageNormalized = normalizeText(query.packageName || '');
@@ -670,6 +675,26 @@ function parseArabamInsiderListings(html: string): ParsedListing[] {
   return listings;
 }
 
+function parseArabamListings(html: string): ParsedListing[] {
+  const insiderListings = parseArabamInsiderListings(html);
+  if (insiderListings.length) return insiderListings;
+
+  return parseArabamAdverts(html)
+    .map((item) => {
+      const price = parsePrice(item.FormattedPrice);
+      return {
+        source: 'arabam' as const,
+        id: typeof item.Id === 'number' ? item.Id : null,
+        title: String(item.ModelName || item.Title || '').trim(),
+        price,
+        formattedPrice: String(item.FormattedPrice || '').trim(),
+        categoryName: String(item.CategoryName || '').trim(),
+        variant: String(item.Variant || '').trim(),
+      };
+    })
+    .filter((item) => item.price > 0);
+}
+
 function parseSahibindenListings(html: string): ParsedListing[] {
   const listings: ParsedListing[] = [];
   const seen = new Set<string>();
@@ -771,30 +796,39 @@ async function resolveArabamComps(query: MarketCompsQuery): Promise<SourceRespon
   for (const category of categories) {
     for (const path of paths) {
       const url = `https://www.arabam.com/ikinci-el/${category}/${path}`;
-      const html = await fetchPublicHtml(url);
+      const html = await fetchViaCurl(url).catch(() => fetchPublicHtml(url));
       if (isCloudflareChallenge(html)) {
         continue;
       }
 
-      const insiderListings = parseArabamInsiderListings(html);
-      const parsedAdverts = (insiderListings.length ? insiderListings : parseArabamAdverts(html)
-        .map((item) => {
-          const price = parsePrice(item.FormattedPrice);
-          return {
-            source: 'arabam' as const,
-            id: typeof item.Id === 'number' ? item.Id : null,
-            title: String(item.ModelName || item.Title || '').trim(),
-            price,
-            formattedPrice: String(item.FormattedPrice || '').trim(),
-            categoryName: String(item.CategoryName || '').trim(),
-            variant: String(item.Variant || '').trim(),
-          };
-        }))
-        .filter((item) => item.price > 0);
+      let parsedAdverts = parseArabamListings(html);
+
+      // Some listing pages return HTTP 200 to Node fetch while omitting the
+      // advert payload. Retry the same public page with the browser-like curl
+      // transport before concluding that no comparable adverts exist.
+      if (parsedAdverts.length < 3) {
+        try {
+          parsedAdverts = parseArabamListings(await fetchViaCurl(url));
+        } catch {
+          // Continue with the original response and try the next candidate.
+        }
+      }
 
       if (parsedAdverts.length < 3) continue;
 
-      const listings = selectComparableListings('arabam', parsedAdverts, query, requiresHighSpecificity);
+      let listings = selectComparableListings('arabam', parsedAdverts, query, requiresHighSpecificity);
+
+      // A generic HTTP-200 page can contain unrelated adverts even though the
+      // requested exact variant page has matching listings. Retry via curl if
+      // the first payload yields no strict comparable records.
+      if (!listings.length) {
+        try {
+          const curlAdverts = parseArabamListings(await fetchViaCurl(url));
+          listings = selectComparableListings('arabam', curlAdverts, query, requiresHighSpecificity);
+        } catch {
+          // Try the next URL candidate.
+        }
+      }
       if (!listings.length) continue;
 
       return {
