@@ -324,7 +324,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
           || payload.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('bakim')
           || payload.condition.maintenanceHistory.toLocaleLowerCase('tr-TR').includes('servis'),
       },
-      { skipMarketComps: true },
+      {},
     );
     const normalizedVehicleInfo = estimatedValues.normalizedVehicleInfo;
     const requestNo = payload.submissionKey

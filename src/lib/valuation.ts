@@ -65,7 +65,7 @@ type ValuationEstimateOptions = {
   skipOpenAi?: boolean;
 };
 
-const MIN_REQUIRED_MARKET_COMPS = 3;
+const MIN_REQUIRED_MARKET_COMPS = 2;
 const MIN_REQUIRED_AVERAGE_SIMILARITY = 72;
 
 type StructuralState = 'clean' | 'issue' | 'Belirtilmedi';
