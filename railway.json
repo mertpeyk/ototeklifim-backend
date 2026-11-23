@@ -1,6 +1,12 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "deploy": {
+    "limitOverride": {
+      "containers": {
+        "cpu": 1,
+        "memoryBytes": 1073741824
+      }
+    },
     "preDeployCommand": "npm run db:push && npm run db:seed && npm run catalog:refresh",
     "startCommand": "npm start",
     "healthcheckPath": "/api/health",
