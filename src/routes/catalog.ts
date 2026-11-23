@@ -4,6 +4,18 @@ import { prisma } from '../db.js';
 import { getVehicleCatalogSnapshot } from '../lib/vehicle-catalog-db.js';
 
 export async function catalogRoutes(app: FastifyInstance) {
+  app.get('/catalog/metadata', async (_request, reply) => {
+    const catalog = await getVehicleCatalogSnapshot();
+
+    // Trim/package cards only need the small metadata slice. Serving the
+    // complete multi-megabyte vehicle catalog here made the second valuation
+    // step wait for unrelated year/engine maps to download and parse.
+    reply.header('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    return {
+      valuationMetadata: catalog.valuationMetadata ?? {},
+    };
+  });
+
   app.get('/catalog/vehicles', async () => {
     const catalog = await getVehicleCatalogSnapshot();
     const grouped = await prisma.listing.groupBy({
