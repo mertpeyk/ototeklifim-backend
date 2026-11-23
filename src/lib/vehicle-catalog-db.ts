@@ -86,6 +86,7 @@ function buildModelsByCategoryMake(fuelTypesByKey: Record<string, string[]>) {
 }
 
 let memorySnapshot: CatalogSnapshot | null = null;
+let runtimeSnapshot: CatalogSnapshot | null = null;
 
 function applyRuntimeCatalogOverrides(snapshot: CatalogSnapshot): CatalogSnapshot {
   const brands = Array.isArray(snapshot.brands)
@@ -2397,14 +2398,19 @@ export async function buildVehicleCatalogSnapshot(): Promise<CatalogSnapshot> {
 }
 
 export async function getVehicleCatalogSnapshot() {
-  if (memorySnapshot) return applyRuntimeCatalogOverrides(memorySnapshot);
+  if (runtimeSnapshot) return runtimeSnapshot;
+  if (memorySnapshot) {
+    runtimeSnapshot = applyRuntimeCatalogOverrides(memorySnapshot);
+    return runtimeSnapshot;
+  }
 
   try {
     const setting = await prisma.appSetting.findUnique({ where: { key: SETTING_KEY } });
     if (setting) {
       try {
         memorySnapshot = JSON.parse(setting.value) as CatalogSnapshot;
-        return applyRuntimeCatalogOverrides(memorySnapshot);
+        runtimeSnapshot = applyRuntimeCatalogOverrides(memorySnapshot);
+        return runtimeSnapshot;
       } catch {
         // Rebuild a corrupt/old snapshot below.
       }
@@ -2434,7 +2440,8 @@ export async function getVehicleCatalogSnapshot() {
   }
 
   memorySnapshot = { ...vehicleCatalog };
-  return applyRuntimeCatalogOverrides(memorySnapshot);
+  runtimeSnapshot = applyRuntimeCatalogOverrides(memorySnapshot);
+  return runtimeSnapshot;
 }
 
 export async function refreshVehicleCatalogSnapshot() {
@@ -2449,4 +2456,5 @@ export async function refreshVehicleCatalogSnapshot() {
 
 export function clearVehicleCatalogCache() {
   memorySnapshot = null;
+  runtimeSnapshot = null;
 }
