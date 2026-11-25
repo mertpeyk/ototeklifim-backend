@@ -68,6 +68,32 @@ type ValuationEstimateOptions = {
 const MIN_REQUIRED_MARKET_COMPS = 2;
 const MIN_REQUIRED_AVERAGE_SIMILARITY = 72;
 
+type SafeSourcedFallbackInput = {
+  aiDiagnostic: string;
+  sourceCount: number;
+  confidenceScore: number;
+  hasUnverifiedPackage: boolean;
+  hasUnverifiedEngine: boolean;
+  severeDamage: boolean;
+  airbagState: StructuralState;
+  chassisState: StructuralState;
+  pillarState: StructuralState;
+  riskFlagCount: number;
+};
+
+export function canUseSafeSourcedFallback(input: SafeSourcedFallbackInput) {
+  return input.aiDiagnostic === 'openai_web_search_ok'
+    && input.sourceCount >= 2
+    && input.confidenceScore >= 58
+    && !input.hasUnverifiedPackage
+    && !input.hasUnverifiedEngine
+    && !input.severeDamage
+    && input.airbagState !== 'issue'
+    && input.chassisState !== 'issue'
+    && input.pillarState !== 'issue'
+    && input.riskFlagCount === 0;
+}
+
 type StructuralState = 'clean' | 'issue' | 'Belirtilmedi';
 
 function normalizeText(value: string | undefined) {
@@ -612,6 +638,18 @@ export async function estimateVehicleValue(
       ? Math.max(36, 60 - (severityScore * 2) + Math.round(intelligence.averageSimilarity / 10) - catalogUncertaintyPenalty)
       : Math.max(28, 48 - (severityScore * 2) - catalogUncertaintyPenalty);
   const confidenceLabel = confidenceScore >= 80 ? 'Yüksek' : confidenceScore >= 60 ? 'Orta' : 'Düşük';
+  const hasSafeSourcedFallback = canUseSafeSourcedFallback({
+    aiDiagnostic: intelligence.aiDiagnostic,
+    sourceCount: intelligence.sources.length,
+    confidenceScore,
+    hasUnverifiedPackage,
+    hasUnverifiedEngine,
+    severeDamage: input.condition.severeDamage,
+    airbagState,
+    chassisState,
+    pillarState,
+    riskFlagCount: intelligence.parsedSignals.riskFlags.length,
+  });
   const saleWindow = severityScore >= 4 ? '28 - 45 Gün' : demand === 'Yüksek' ? '14 - 28 Gün' : '18 - 34 Gün';
   const positives = [
     input.vehicleInfo.mileage && input.vehicleInfo.mileage < 50000 ? `Düşük kilometre (${new Intl.NumberFormat('tr-TR').format(input.vehicleInfo.mileage)} KM)` : null,
@@ -648,18 +686,18 @@ export async function estimateVehicleValue(
   ].filter(Boolean) as string[];
 
   const pricingWarnings = [
-    marketCompSampleSize < MIN_REQUIRED_MARKET_COMPS && !usedAgentMarketEstimate
+    marketCompSampleSize < MIN_REQUIRED_MARKET_COMPS && !usedAgentMarketEstimate && !hasSafeSourcedFallback
       ? (
         hasAiFallbackDecision
           ? 'Canlı emsal akışı sınırlı kaldı, AI destekli değerleme uygulandı'
           : `Yeterli emsal bulunamadı (${marketCompSampleSize}/${MIN_REQUIRED_MARKET_COMPS})`
       )
       : null,
-    intelligence.reviewRecommendation === 'manual_review' && !usedAgentMarketEstimate
+    intelligence.reviewRecommendation === 'manual_review' && !usedAgentMarketEstimate && !hasSafeSourcedFallback
       ? (intelligence.reviewReason || 'AI katmanı bu dosyayı dikkatli izliyor')
       : null,
   ].filter(Boolean) as string[];
-  const pricingReady = usedAgentMarketEstimate || (
+  const pricingReady = usedAgentMarketEstimate || hasSafeSourcedFallback || (
     hasStrongComparableEvidence
     && intelligence.reviewRecommendation !== 'manual_review'
     && Boolean(effectiveMarketStats)

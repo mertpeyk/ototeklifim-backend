@@ -1,10 +1,29 @@
 import assert from 'node:assert/strict';
 
 import { isHighConfidenceComparableForTarget, normalizeComparablePriceForTarget } from '../lib/market-comps.js';
-import { estimateVehicleValue, type ValuationEstimateInput } from '../lib/valuation.js';
+import { canUseSafeSourcedFallback, estimateVehicleValue, type ValuationEstimateInput } from '../lib/valuation.js';
 
 process.env.OPENAI_API_KEY = '';
 process.env.VALUATION_SKIP_CALIBRATION_DB = '1';
+
+const safeSourcedFallback = {
+  aiDiagnostic: 'openai_web_search_ok',
+  sourceCount: 3,
+  confidenceScore: 60,
+  hasUnverifiedPackage: false,
+  hasUnverifiedEngine: false,
+  severeDamage: false,
+  airbagState: 'clean' as const,
+  chassisState: 'clean' as const,
+  pillarState: 'clean' as const,
+  riskFlagCount: 0,
+};
+
+assert.equal(canUseSafeSourcedFallback(safeSourcedFallback), true, 'Verified clean vehicles with sourced AI evidence should receive a bounded fallback price');
+assert.equal(canUseSafeSourcedFallback({ ...safeSourcedFallback, sourceCount: 1 }), false, 'A single web source must not unlock automatic pricing');
+assert.equal(canUseSafeSourcedFallback({ ...safeSourcedFallback, severeDamage: true }), false, 'Severe-damage vehicles must remain in manual review');
+assert.equal(canUseSafeSourcedFallback({ ...safeSourcedFallback, chassisState: 'issue' }), false, 'Structural-risk vehicles must remain in manual review');
+assert.equal(canUseSafeSourcedFallback({ ...safeSourcedFallback, hasUnverifiedPackage: true }), false, 'Unverified packages must remain in manual review');
 
 const baseInput: ValuationEstimateInput = {
   vehicleInfo: {
