@@ -121,6 +121,60 @@ function summarizeDamageCondition(condition: z.infer<typeof conditionSchema>) {
   };
 }
 
+function formatTelegramCurrency(value: number) {
+  return `${new Intl.NumberFormat('tr-TR').format(Math.round(value))} TL`;
+}
+
+function roundTelegramOffer(value: number) {
+  return Math.round(value / 5000) * 5000;
+}
+
+function buildTelegramValuationDetails(
+  estimatedValues: Awaited<ReturnType<typeof buildEstimatedFastSaleNumbers>>,
+  condition: z.infer<typeof conditionSchema>,
+) {
+  const { result } = estimatedValues;
+  const sourceCount = result.intelligence.sources.length;
+  const preliminaryOffer = roundTelegramOffer(result.recommendedOffer);
+  const cleanInspectionUpperOffer = roundTelegramOffer(Math.min(
+    estimatedValues.quickSaleValue,
+    result.recommendedOffer * 1.025,
+  ));
+  const marketMinimum = Number(result.minimum || estimatedValues.estimatedMarketValue * 0.96);
+  const marketMaximum = Number(result.maximum || estimatedValues.estimatedMarketValue * 1.04);
+  const conciseExplanation = result.intelligence.explanation?.trim().slice(0, 600);
+  const attentionNotes = result.negatives.slice(0, 4);
+  const hasStructuralRisk = condition.severeDamage
+    || [condition.airbagCondition, condition.chassisPodyeCondition, condition.pillarCondition]
+      .some((value) => value === 'issue')
+    || condition.criticalChecks.some((check) => check.status === 'issue');
+  const offerGuidance = hasStructuralRisk
+    ? ['Ön teklif: VERMEYİN — yapısal ekspertiz ve uzman incelemesi gerekli']
+    : [
+        `Güvenli ilk bayi teklifi: ${formatTelegramCurrency(preliminaryOffer)}`,
+        `Ekspertiz temizse üst teklif: ${formatTelegramCurrency(cleanInspectionUpperOffer)}`,
+      ];
+
+  return [
+    '',
+    '💰 DEĞERLEME ÖZETİ',
+    `Makul piyasa aralığı: ${formatTelegramCurrency(marketMinimum)} – ${formatTelegramCurrency(marketMaximum)}`,
+    `Hesaplanan piyasa değeri: ${formatTelegramCurrency(estimatedValues.estimatedMarketValue)}`,
+    `Hızlı satış değeri: ${formatTelegramCurrency(estimatedValues.quickSaleValue)}`,
+    ...offerGuidance,
+    `Güven: ${result.confidenceLabel} (${result.confidenceScore}/100) · İncelenen kaynak: ${sourceCount}`,
+    `Otomatik fiyat durumu: ${result.pricingReady ? 'Hazır' : 'Manuel inceleme gerekli'}`,
+    ...(!result.pricingReady
+      ? [`Kilitleme nedeni: ${result.unavailableReason || result.intelligence.reviewReason || 'Güven eşiği karşılanmadı.'}`]
+      : []),
+    ...(conciseExplanation ? [`AI değerlendirme notu: ${conciseExplanation}`] : []),
+    ...(attentionNotes.length
+      ? ['Dikkat noktaları:', ...attentionNotes.map((note) => `• ${note}`)]
+      : []),
+    'Nihai teklif ekspertiz, kilometre ve mekanik kontrollerden sonra kesinleştirilmelidir.',
+  ];
+}
+
 const photoSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -473,19 +527,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
 
     const telegramDamageSummary = summarizeDamageCondition(payload.condition);
 
-    const telegramValuationDetails = estimatedValues.result.pricingReady
-      ? [
-          `Piyasa değeri: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.estimatedMarketValue)} TL`,
-          `AI piyasa fiyatı: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.estimatedMarketValue)} TL`,
-          `AI önerilen bayi teklifi (%10 aşağı): ${new Intl.NumberFormat('tr-TR').format(estimatedValues.result.recommendedOffer)} TL`,
-          `AI durumu: ${estimatedValues.result.intelligence.aiEnabled ? 'Aktif' : 'Fallback'} · ${estimatedValues.result.intelligence.aiDiagnostic}`,
-          `Hızlı satış değeri: ${new Intl.NumberFormat('tr-TR').format(estimatedValues.quickSaleValue)} TL`,
-        ]
-      : [
-          'Fiyatlandırma: Manuel fiyatlandırma gerekli',
-          `Neden: ${estimatedValues.result.unavailableReason || 'Otomatik değerleme güven eşiğini karşılamadı.'}`,
-          `Doğrulanmış emsal: ${estimatedValues.result.marketComps?.sampleSize || 0}`,
-        ];
+    const telegramValuationDetails = buildTelegramValuationDetails(estimatedValues, payload.condition);
 
     void notifyNewApplicationViaTelegram({
       type: 'hizli-sat',
@@ -505,6 +547,7 @@ export async function fastSaleRoutes(app: FastifyInstance) {
         `Tramer: ${new Intl.NumberFormat('tr-TR').format(payload.condition.tramerAmount)} TL`,
         `Boya: ${telegramDamageSummary.painted}`,
         `Değişen: ${telegramDamageSummary.changed}`,
+        `Ekspertiz raporu: ${payload.expertiseReportPhotos.length ? `${payload.expertiseReportPhotos.length} fotoğraf paylaşıldı` : 'Paylaşılmadı'}`,
         ...telegramValuationDetails,
       ],
       media: [
