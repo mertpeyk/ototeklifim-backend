@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../db.js';
 
 const uploadDir = path.resolve(process.cwd(), 'uploads');
@@ -16,10 +16,73 @@ function getUploadPublicUrl(request: FastifyRequest, fileName: string) {
   return `${origin}/uploads/${fileName}`;
 }
 
+type ImageVariant = 'gallery' | 'card' | 'thumb' | 'original';
+
+function normalizeVariant(value: string): ImageVariant {
+  if (value === 'original') return 'original';
+  if (value === 'card') return 'card';
+  if (value === 'thumb') return 'thumb';
+  return 'gallery';
+}
+
+function canOptimize(contentType: string) {
+  return /^image\/(?:jpe?g|png|webp|avif|heic|heif)$/i.test(contentType);
+}
+
+async function optimizeImage(content: Buffer, variant: Exclude<ImageVariant, 'original'>) {
+  const { default: sharp } = await import('sharp');
+  const image = sharp(content, { failOn: 'none' }).rotate();
+
+  if (variant === 'thumb') {
+    return image
+      .resize({ width: 640, height: 480, fit: 'cover', position: 'centre', withoutEnlargement: true })
+      .webp({ quality: 76, effort: 4 })
+      .toBuffer();
+  }
+
+  if (variant === 'card') {
+    return image
+      .resize({ width: 800, height: 600, fit: 'cover', position: 'centre', withoutEnlargement: true })
+      .webp({ quality: 80, effort: 4 })
+      .toBuffer();
+  }
+
+  return image
+    .resize({ width: 1600, height: 1200, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 84, effort: 4 })
+    .toBuffer();
+}
+
+async function sendUploadedImage(
+  reply: FastifyReply,
+  content: Buffer,
+  contentType: string,
+  variant: ImageVariant,
+) {
+  reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+  reply.header('Vary', 'Accept');
+
+  if (variant === 'original' || !canOptimize(contentType)) {
+    reply.type(contentType || 'application/octet-stream');
+    return reply.send(content);
+  }
+
+  try {
+    const optimized = await optimizeImage(content, variant);
+    reply.type('image/webp');
+    return reply.send(optimized);
+  } catch (error) {
+    // A damaged or unsupported upload must remain viewable instead of turning
+    // an existing listing image into a 500 response.
+    reply.type(contentType || 'application/octet-stream');
+    return reply.send(content);
+  }
+}
+
 export async function publicUploadRoutes(app: FastifyInstance) {
   app.get('/uploads/:filename', async (request, reply) => {
     const filename = String((request.params as { filename?: string }).filename || '').trim();
-    const variant = String((request.query as { variant?: string })?.variant || '').trim().toLowerCase();
+    const variant = normalizeVariant(String((request.query as { variant?: string })?.variant || '').trim().toLowerCase());
 
     if (!filename) {
       reply.code(400);
@@ -31,26 +94,18 @@ export async function publicUploadRoutes(app: FastifyInstance) {
     });
 
     if (uploadedImage) {
-      reply.header('Cache-Control', 'public, max-age=31536000, immutable');
-      if (variant === 'thumb') {
-        // Keep the API healthcheck/startup fast; load the image processor only
-        // when a thumbnail is actually requested.
-        const { default: sharp } = await import('sharp');
-        reply.type('image/webp');
-        return reply.send(await sharp(Buffer.from(uploadedImage.content))
-          .rotate()
-          .resize({ width: 640, height: 480, fit: 'cover', withoutEnlargement: true })
-          .webp({ quality: 72 })
-          .toBuffer());
-      }
-      reply.type(uploadedImage.contentType);
-      return reply.send(Buffer.from(uploadedImage.content));
+      return sendUploadedImage(reply, Buffer.from(uploadedImage.content), uploadedImage.contentType, variant);
     }
 
     const localPath = path.join(uploadDir, filename);
     if (existsSync(localPath)) {
-      reply.header('Cache-Control', 'public, max-age=31536000, immutable');
-      return reply.send(readFileSync(localPath));
+      const content = readFileSync(localPath);
+      const extension = path.extname(filename).toLowerCase();
+      const contentType = extension === '.png' ? 'image/png'
+        : extension === '.webp' ? 'image/webp'
+          : extension === '.avif' ? 'image/avif'
+            : 'image/jpeg';
+      return sendUploadedImage(reply, content, contentType, variant);
     }
 
     reply.code(404);
@@ -91,6 +146,12 @@ export async function uploadRoutes(app: FastifyInstance) {
 
     return {
       url: getUploadPublicUrl(request, safeName),
+      variants: {
+        gallery: getUploadPublicUrl(request, safeName),
+        card: `${getUploadPublicUrl(request, safeName)}?variant=card`,
+        thumb: `${getUploadPublicUrl(request, safeName)}?variant=thumb`,
+        original: `${getUploadPublicUrl(request, safeName)}?variant=original`,
+      },
       filename: safeName,
     };
   });
