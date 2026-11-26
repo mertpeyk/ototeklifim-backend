@@ -256,9 +256,11 @@ function resolveStructuralConditionFromChecks(
 const structuralConditionValueSchema = structuralConditionInputSchema.transform(normalizeStructuralConditionValue);
 
 const WHATSAPP_SETTING_KEY = 'contact.whatsapp_number';
-const DEFAULT_WHATSAPP_NUMBER = '905443152285';
+const DEFAULT_WHATSAPP_NUMBER = '905336516606';
 const SUPPORT_PHONE_SETTING_KEY = 'contact.support_phone';
-const DEFAULT_SUPPORT_PHONE = '+908503050000';
+const DEFAULT_SUPPORT_PHONE = '+905336516606';
+const CONTACT_PHONE_MIGRATION_KEY = 'migration.contact_phone_2026_11_26';
+let contactPhoneMigrationPromise: Promise<void> | null = null;
 
 function toNumber(value: unknown, fallback = 0) {
   const numeric = typeof value === 'number' ? value : Number(value);
@@ -360,7 +362,42 @@ function formatSupportPhoneDisplay(value: string) {
   return local || '0850 305 00 00';
 }
 
+async function ensureCurrentContactSettings() {
+  contactPhoneMigrationPromise ??= (async () => {
+    const completed = await prisma.appSetting.findUnique({
+      where: { key: CONTACT_PHONE_MIGRATION_KEY },
+    });
+    if (completed?.value === 'done') {
+      return;
+    }
+
+    await prisma.$transaction([
+      prisma.appSetting.upsert({
+        where: { key: WHATSAPP_SETTING_KEY },
+        update: { value: DEFAULT_WHATSAPP_NUMBER },
+        create: { key: WHATSAPP_SETTING_KEY, value: DEFAULT_WHATSAPP_NUMBER },
+      }),
+      prisma.appSetting.upsert({
+        where: { key: SUPPORT_PHONE_SETTING_KEY },
+        update: { value: DEFAULT_SUPPORT_PHONE },
+        create: { key: SUPPORT_PHONE_SETTING_KEY, value: DEFAULT_SUPPORT_PHONE },
+      }),
+      prisma.appSetting.upsert({
+        where: { key: CONTACT_PHONE_MIGRATION_KEY },
+        update: { value: 'done' },
+        create: { key: CONTACT_PHONE_MIGRATION_KEY, value: 'done' },
+      }),
+    ]);
+  })().catch((error) => {
+    contactPhoneMigrationPromise = null;
+    throw error;
+  });
+
+  await contactPhoneMigrationPromise;
+}
+
 async function getWhatsappSettingValue() {
+  await ensureCurrentContactSettings();
   const stored = await prisma.appSetting.findUnique({
     where: { key: WHATSAPP_SETTING_KEY },
   });
@@ -369,6 +406,7 @@ async function getWhatsappSettingValue() {
 }
 
 async function getSupportPhoneSettingValue() {
+  await ensureCurrentContactSettings();
   const stored = await prisma.appSetting.findUnique({
     where: { key: SUPPORT_PHONE_SETTING_KEY },
   });
